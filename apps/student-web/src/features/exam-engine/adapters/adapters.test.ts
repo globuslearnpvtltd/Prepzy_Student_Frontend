@@ -232,13 +232,12 @@ describe('adapters against the API', () => {
 
   it('board mock: lists subjects and papers for the class', async () => {
     server.use(
-      http.get(`${API}/api/active-exams`, ({ request }) => {
+      http.get(`${API}/api/v4/assessments/board/subjects`, ({ request }) => {
         expect(new URL(request.url).searchParams.get('class_id')).toBe('12');
         return HttpResponse.json({
-          success: true,
+          success: true, data: {
           mock_result: [{ subject_id: 3, subject_title: 'Physics', exam_count: 2 }],
-          pyq_result: [],
-        });
+          pyq_result: [] } });
       }),
       http.get(`${API}/api/mock-exams/fetch-mock-sets`, () =>
         HttpResponse.json({

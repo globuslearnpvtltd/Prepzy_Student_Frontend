@@ -75,7 +75,7 @@ function hub({ friends = friendsRaw, statement = statementRaw, balance = 550, fa
     http.get(`${API}/api/referral/my-statement`, () => HttpResponse.json({ success: true, data: statement })),
     http.get(`${API}/api/referral/earn-rates`, () => HttpResponse.json({ success: true, data: rawRates })),
     http.get(`${API}/api/v2/purchase/purchase-plans`, () => HttpResponse.json({ success: true, data: { exams: rawPlans } })),
-    http.get(`${API}/api/v1/student/plans/active`, () =>
+    http.get(`${API}/api/v4/student/plans/active`, () =>
       HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 0, status: 'active' }] } }),
     ),
   ];

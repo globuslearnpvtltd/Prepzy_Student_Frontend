@@ -227,3 +227,11 @@ export const TEST_MOCKS: Record<string, unknown> = {
     },
   },
 };
+
+// The new app reads CBSE test subjects from the v4 backend (same lists, under data).
+const activeExams = TEST_MOCKS['/api/active-exams'] as Record<string, unknown>;
+TEST_MOCKS['/api/v4/assessments/board/subjects'] = {
+  success: true,
+  message: 'ok',
+  data: { mock_result: activeExams.mock_result, pyq_result: activeExams.pyq_result },
+};

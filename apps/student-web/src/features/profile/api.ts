@@ -115,12 +115,12 @@ export function toParent(raw: unknown): Parent | null {
 
 export const profileApi = {
   async get(): Promise<Profile> {
-    return toProfile(unwrapData(await apiClient.get<Envelope<unknown>>('/api/accounts')));
+    return toProfile(unwrapData(await apiClient.get<Envelope<unknown>>('/api/v4/student/account')));
   },
 
   async update(values: ProfileUpdate): Promise<void> {
     assertOk(
-      await apiClient.put<Envelope<unknown>>('/api/accounts', {
+      await apiClient.put<Envelope<unknown>>('/api/v4/student/account', {
         first_name: values.firstName,
         last_name: values.lastName,
         email: values.email,

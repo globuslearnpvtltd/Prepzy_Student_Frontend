@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { onApiEvent } from '@/shared/lib/api-client';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
@@ -212,9 +213,9 @@ describe('OtpForm (more flows)', () => {
     useOnboardingStore.getState().startOtp('+919876543210', 'signup');
     let body: unknown;
     server.use(
-      http.post(`${API}/api/auth/v2/verify-otp`, async ({ request }) => {
+      http.post(`${API}/api/v4/auth/verify-otp`, async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ success: true });
+        return HttpResponse.json({ success: true, message: 'Phone number verified', data: null });
       }),
     );
     renderWithProviders(<OtpForm />);
@@ -228,7 +229,9 @@ describe('OtpForm (more flows)', () => {
     useOnboardingStore.getState().startOtp('+919876543210', 'login');
     navigation.searchParams = new URLSearchParams('next=/neet/tests');
     server.use(
-      http.post(`${API}/api/auth/verifyLoginOtp`, () => HttpResponse.json({ success: true, account_id: 7 })),
+      http.post(`${API}/api/v4/auth/verify-login-otp`, () =>
+        HttpResponse.json({ success: true, message: 'Logged in successfully', data: { account_id: 7 } }),
+      ),
     );
     renderWithProviders(<OtpForm />);
     await userEvent.type(screen.getByLabelText('One-time code'), '123456');
@@ -247,7 +250,14 @@ describe('OtpForm (more flows)', () => {
 
   it('shows a generic message when the server fails', async () => {
     useOnboardingStore.getState().startOtp('+919876543210', 'login');
-    server.use(http.post(`${API}/api/auth/verifyLoginOtp`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(
+      http.post(`${API}/api/v4/auth/verify-login-otp`, () =>
+        HttpResponse.json(
+          { success: false, message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR', data: null },
+          { status: 500 },
+        ),
+      ),
+    );
     renderWithProviders(<OtpForm />);
     await userEvent.type(screen.getByLabelText('One-time code'), '123456');
     await userEvent.click(screen.getByRole('button', { name: 'Verify' }));
@@ -270,9 +280,9 @@ describe('OtpForm (more flows)', () => {
       useOnboardingStore.getState().startOtp('+919876543210', 'signup');
       let flow: string | null = null;
       server.use(
-        http.post(`${API}/api/auth/v2/resend-otp`, ({ request }) => {
+        http.post(`${API}/api/v4/auth/resend-otp`, ({ request }) => {
           flow = new URL(request.url).searchParams.get('flow');
-          return HttpResponse.json({ success: true });
+          return HttpResponse.json({ success: true, message: 'OTP sent to your WhatsApp number', data: null });
         }),
       );
       renderWithProviders(<OtpForm />);
@@ -285,17 +295,36 @@ describe('OtpForm (more flows)', () => {
       expect(screen.getByRole('button', { name: /Resend code in 59s/ })).toBeDisabled();
     });
 
-    it('shows a toast when resending fails (HTTP 200 + success:false)', async () => {
+    it('shows the rate-limit message as a toast, not the plan-limit dialog (429 TOO_MANY_REQUESTS)', async () => {
       useOnboardingStore.getState().startOtp('+919876543210', 'login');
+      const message = 'Too many OTP requests for this number. Please wait a few minutes and try again.';
+      const planLimit = vi.fn();
+      const stop = onApiEvent('rateLimited', planLimit);
       server.use(
-        http.post(`${API}/api/auth/v2/resend-otp`, () =>
-          HttpResponse.json({ success: false, message: 'Too many attempts' }),
+        http.post(`${API}/api/v4/auth/resend-otp`, () =>
+          HttpResponse.json({ success: false, message, code: 'TOO_MANY_REQUESTS', data: null }, { status: 429 }),
         ),
       );
       renderWithProviders(<OtpForm />);
       await waitOutCountdown();
       fireEvent.click(screen.getByRole('button', { name: 'Resend code' }));
-      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Too many attempts'));
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+      expect(planLimit).not.toHaveBeenCalled();
+      stop();
+    });
+
+    it('shows the WhatsApp delivery failure message (502 OTP_DELIVERY_FAILED)', async () => {
+      useOnboardingStore.getState().startOtp('+919876543210', 'signup');
+      const message = 'Failed to send OTP. Please check your network and try again.';
+      server.use(
+        http.post(`${API}/api/v4/auth/resend-otp`, () =>
+          HttpResponse.json({ success: false, message, code: 'OTP_DELIVERY_FAILED', data: null }, { status: 502 }),
+        ),
+      );
+      renderWithProviders(<OtpForm />);
+      await waitOutCountdown();
+      fireEvent.click(screen.getByRole('button', { name: 'Resend code' }));
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
     });
   });
 });

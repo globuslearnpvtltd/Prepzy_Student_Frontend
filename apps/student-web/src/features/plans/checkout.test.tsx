@@ -80,7 +80,7 @@ function handlers(account: Record<string, unknown> = { account_id: 1, first_name
       HttpResponse.json({ success: true, data: { exams: [{ exam_key: 'cbse', features: [{ feature_name: 'Quiz', free_limit: 2, premium_limit: null }] }] } }),
     ),
     http.get(`${API}/api/subscriptions/active-coupons`, () => HttpResponse.json({ coupons: [] })),
-    http.get(`${API}/api/accounts`, () => HttpResponse.json({ success: true, data: account })),
+    http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: account })),
   ];
 }
 

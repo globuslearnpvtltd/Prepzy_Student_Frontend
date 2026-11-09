@@ -9,7 +9,7 @@ import { DiagnosticResultScreen, overview } from './result-screen';
 
 const cbse = getExam('cbse')!;
 
-const activePlan = http.get(`${API}/api/v1/student/plans/active`, () =>
+const activePlan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' }] } }),
 );
 
@@ -59,7 +59,7 @@ describe('report overview', () => {
 
 describe('DiagnosticResultScreen', () => {
   it('asks for a class without an active plan', async () => {
-    server.use(http.get(`${API}/api/v1/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } })));
+    server.use(http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } })));
     renderWithProviders(<DiagnosticResultScreen />, { exam: cbse });
     expect(await screen.findByText('No active class')).toBeInTheDocument();
   });

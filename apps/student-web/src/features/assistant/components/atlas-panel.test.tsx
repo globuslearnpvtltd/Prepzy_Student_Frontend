@@ -10,7 +10,7 @@ import { LectureAtlas } from './lecture-atlas';
 const cbse = getExam('cbse')!;
 const neet = getExam('neet')!;
 
-const noPlan = http.get(`${API}/api/v1/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } }));
+const noPlan = http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } }));
 const avatar = (base: string, name: string | null = 'Atlas') =>
   http.post(`${API}${base}/marketingChatImageName`, () =>
     HttpResponse.json({ success: true, data: { avatar: name ? [{ id: 1, name, image: null }] : [] } }),

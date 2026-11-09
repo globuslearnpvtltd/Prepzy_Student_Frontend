@@ -14,7 +14,7 @@ const neet = getExam('neet')!;
 const cbse = getExam('cbse')!;
 
 const plan = (classId: number) =>
-  http.get(`${API}/api/v1/student/plans/active`, () =>
+  http.get(`${API}/api/v4/student/plans/active`, () =>
     HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: classId, class_name: 'X', duration_months: 12, status: 'active' }] } }),
   );
 
@@ -150,7 +150,7 @@ describe('custom tests', () => {
   it('builds a test: subject → chapter → topics → generate opens the player', async () => {
     let generated: unknown;
     server.use(
-      http.get(`${API}/api/neet/subject-progress`, () =>
+      http.get(`${API}/api/v4/dashboard/neet/subject-progress`, () =>
         HttpResponse.json({ success: true, data: [{ subject_name: 'NEET-Botany', total_chapters: 18, course_ids: '1' }] }),
       ),
       http.get(`${API}/api/neet/custom-exam/chapters/1`, () =>

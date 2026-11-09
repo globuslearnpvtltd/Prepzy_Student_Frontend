@@ -15,14 +15,14 @@ import { SectionPlaceholder } from './section-placeholder';
 import { shellApi, subjectLabel } from './shell-api';
 
 const purchased = (...exams: [string, string][]) =>
-  http.get(`${API}/api/v1/student/exams/purchased`, () =>
+  http.get(`${API}/api/v4/student/exams/purchased`, () =>
     HttpResponse.json({
       success: true,
       data: { exams: exams.map(([slice, name], i) => ({ exam_id: i + 1, exam_slice: slice, exam_name: name })) },
     }),
   );
 
-const account = http.get(`${API}/api/accounts`, () =>
+const account = http.get(`${API}/api/v4/student/account`, () =>
   HttpResponse.json({
     success: true,
     data: { account_id: 1, first_name: 'Asha', last_name: 'Rao', phone: '+919876543210' },
@@ -41,7 +41,7 @@ const boardPlan = (extra: RawPlan = {}): RawPlan => ({
   ...extra,
 });
 const plans = (...rows: RawPlan[]) =>
-  http.get(`${API}/api/v1/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: rows } }));
+  http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: rows } }));
 const studyPlan = (hasPlan: boolean) =>
   http.get(`${API}/api/v1/study-plan/status/:classId`, () => HttpResponse.json({ success: true, data: { has_plan: hasPlan } }));
 
@@ -246,15 +246,15 @@ describe('competitive shell', () => {
       purchased(['neet-ug', 'NEET-UG'], ['cbse', 'CBSE']),
       account,
       neetPlan,
-      http.get(`${API}/api/neet/v1/purchase/plan-summary`, () =>
+      http.get(`${API}/api/v4/student/plans/neet-summary`, () =>
         HttpResponse.json({
           success: true,
           data: { planName: 'NEET Basic', planType: 'basic', status: 'ACTIVE', expiryDate: null, daysLeft: null, isFreeForever: true },
         }),
       ),
-      http.post(`${API}/api/auth/logoutStudent`, () => {
+      http.post(`${API}/api/v4/auth/logout`, () => {
         loggedOut = true;
-        return HttpResponse.text('User has been logged out.');
+        return HttpResponse.json({ success: true, message: 'Logged out', data: null });
       }),
     );
     renderShell('neet');

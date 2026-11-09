@@ -68,7 +68,7 @@ afterEach(() => {
 
 describe('useLogout', () => {
   it('logs out, forgets the exam, clears the cache and opens login even when the call fails', async () => {
-    server.use(http.post(`${API}/api/auth/logoutStudent`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(http.post(`${API}/api/v4/auth/logout`, () => HttpResponse.json({}, { status: 500 })));
     document.cookie = 'prepzy_exam=neet; path=/';
     const { queryClient, wrapper } = setup();
     queryClient.setQueryData(authKeys.me, { accountId: 1 });
@@ -81,14 +81,14 @@ describe('useLogout', () => {
 });
 
 describe('useSessionExpiryRedirect', () => {
-  const unauthorized = () => http.get(`${API}/api/accounts`, () => HttpResponse.json({}, { status: 401 }));
+  const unauthorized = () => http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({}, { status: 401 }));
 
   it('redirects students to login once, however many requests fail', async () => {
     server.use(unauthorized());
     const { queryClient, wrapper } = setup();
     queryClient.setQueryData(authKeys.me, { accountId: 1 });
     renderHook(() => useSessionExpiryRedirect(), { wrapper });
-    await Promise.allSettled([apiClient.get('/api/accounts'), apiClient.get('/api/accounts')]);
+    await Promise.allSettled([apiClient.get('/api/v4/student/account'), apiClient.get('/api/v4/student/account')]);
     expect(navigation.replace).toHaveBeenCalledTimes(1);
     expect(navigation.replace).toHaveBeenCalledWith('/login');
     expect(queryClient.getQueryData(authKeys.me)).toBeUndefined();
@@ -98,7 +98,7 @@ describe('useSessionExpiryRedirect', () => {
     server.use(unauthorized());
     setUrl('http://localhost:3000/schools/dashboard');
     renderHook(() => useSessionExpiryRedirect(), { wrapper: setup().wrapper });
-    await apiClient.get('/api/accounts').catch(() => undefined);
+    await apiClient.get('/api/v4/student/account').catch(() => undefined);
     expect(navigation.replace).toHaveBeenCalledWith('/schools/login');
   });
 
@@ -106,7 +106,7 @@ describe('useSessionExpiryRedirect', () => {
     server.use(unauthorized());
     setUrl('http://parents.prepzy.test/dashboard');
     renderHook(() => useSessionExpiryRedirect(), { wrapper: setup().wrapper });
-    await apiClient.get('/api/accounts').catch(() => undefined);
+    await apiClient.get('/api/v4/student/account').catch(() => undefined);
     expect(navigation.replace).toHaveBeenCalledWith('/parents/login');
   });
 
@@ -114,7 +114,7 @@ describe('useSessionExpiryRedirect', () => {
     server.use(unauthorized());
     const { unmount } = renderHook(() => useSessionExpiryRedirect(), { wrapper: setup().wrapper });
     unmount();
-    await apiClient.get('/api/accounts').catch(() => undefined);
+    await apiClient.get('/api/v4/student/account').catch(() => undefined);
     expect(navigation.replace).not.toHaveBeenCalled();
   });
 });
@@ -157,7 +157,7 @@ describe('plan queries', () => {
   it('maps every plan of the exam (including expired) and picks the selected active one', async () => {
     let examId: string | null = null;
     server.use(
-      http.get(`${API}/api/v1/student/plans/active`, ({ request }) => {
+      http.get(`${API}/api/v4/student/plans/active`, ({ request }) => {
         examId = new URL(request.url).searchParams.get('exam_id');
         return HttpResponse.json(RAW_PLANS);
       }),
@@ -179,10 +179,10 @@ describe('plan queries', () => {
 
   it('loads the current user and purchased exams', async () => {
     server.use(
-      http.get(`${API}/api/accounts`, () =>
+      http.get(`${API}/api/v4/student/account`, () =>
         HttpResponse.json({ success: true, data: { account_id: '3', first_name: 'Asha', gender: 'female' } }),
       ),
-      http.get(`${API}/api/v1/student/exams/purchased`, () =>
+      http.get(`${API}/api/v4/student/exams/purchased`, () =>
         HttpResponse.json({ success: true, data: { exams: [{ exam_id: 2, exam_slice: 'neet-ug', exam_name: 'NEET' }] } }),
       ),
     );
@@ -211,21 +211,65 @@ describe('authApi', () => {
     expect(await authApi.classOptions()).toEqual([{ classId: 11, title: 'CLASS 11', streamName: '' }]);
   });
 
-  it('requests a login OTP and rejects unregistered numbers sent with HTTP 200', async () => {
+  it('requests a login OTP and rejects unregistered numbers (404 STUDENT_NOT_FOUND)', async () => {
     server.use(
-      http.post(`${API}/api/auth/loginWithOtp`, () =>
-        HttpResponse.json({ success: false, message: 'This phone number is not registered.' }),
+      http.post(`${API}/api/v4/auth/login-otp`, () =>
+        HttpResponse.json(
+          { success: false, message: 'This phone number is not registered.', code: 'STUDENT_NOT_FOUND', data: null },
+          { status: 404 },
+        ),
       ),
     );
-    await expect(authApi.requestLoginOtp('+919876543210', 'fp')).rejects.toThrow('not registered');
+    await expect(authApi.requestLoginOtp('+919876543210', 'fp')).rejects.toMatchObject({
+      status: 404,
+      code: 'STUDENT_NOT_FOUND',
+      message: 'This phone number is not registered.',
+    });
+  });
+
+  it('exposes the active devices when a third device signs in (403 MAX_LOGIN_SESSIONS)', async () => {
+    server.use(
+      http.post(`${API}/api/v4/auth/verify-login-otp`, () =>
+        HttpResponse.json(
+          {
+            success: false,
+            message: 'Maximum of 2 login sessions allowed for this user.',
+            code: 'MAX_LOGIN_SESSIONS',
+            data: null,
+            details: { active_sessions: ['phone', 'laptop'] },
+          },
+          { status: 403 },
+        ),
+      ),
+    );
+    await expect(authApi.verifyLoginOtp('+919876543210', '123456', 'tablet')).rejects.toMatchObject({
+      code: 'MAX_LOGIN_SESSIONS',
+      details: { active_sessions: ['phone', 'laptop'] },
+    });
+  });
+
+  it('reports an already registered number on sign-up (409 ALREADY_REGISTERED)', async () => {
+    server.use(
+      http.post(`${API}/api/v4/auth/register`, () =>
+        HttpResponse.json(
+          { success: false, message: 'Mobile Number Already Exists. Please Login.', code: 'ALREADY_REGISTERED', data: null },
+          { status: 409 },
+        ),
+      ),
+    );
+    await expect(authApi.register('+919876543210')).rejects.toMatchObject({ status: 409, code: 'ALREADY_REGISTERED' });
   });
 
   it('completes onboarding with the backend field names', async () => {
     let body: unknown;
     server.use(
-      http.post(`${API}/api/auth/v3/complete-onboarding`, async ({ request }) => {
+      http.post(`${API}/api/v4/auth/complete-onboarding`, async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ success: true, account_id: 9, target_exam: 'cbse' });
+        return HttpResponse.json({
+          success: true,
+          message: 'Onboarding completed successfully',
+          data: { account_id: 9, target_exam: 'cbse', plan_expiry_date: null },
+        });
       }),
     );
     const student = await authApi.completeOnboarding({ phone: '+91', examId: 1, classId: 12, fingerprint: 'fp' });
@@ -233,8 +277,23 @@ describe('authApi', () => {
     expect(student).toMatchObject({ accountId: 9, targetExam: 'cbse' });
   });
 
-  it('treats register without otp_verified as needing an OTP', async () => {
-    server.use(http.post(`${API}/api/v1/auth/register`, () => HttpResponse.json({ success: true, data: {} })));
+  it('reads otp_verified from register', async () => {
+    server.use(
+      http.post(`${API}/api/v4/auth/register`, () =>
+        HttpResponse.json({ success: true, message: 'OTP sent to your WhatsApp number', data: { otp_verified: false } }),
+      ),
+    );
     expect(await authApi.register('+919876543210')).toEqual({ otpVerified: false });
+  });
+
+  it('fails clearly when a success response has no data', async () => {
+    server.use(
+      http.post(`${API}/api/v4/auth/verify-login-otp`, () =>
+        HttpResponse.json({ success: true, message: 'Logged in successfully', data: null }),
+      ),
+    );
+    await expect(authApi.verifyLoginOtp('+919876543210', '123456', 'fp')).rejects.toMatchObject({
+      code: 'EMPTY_RESPONSE',
+    });
   });
 });

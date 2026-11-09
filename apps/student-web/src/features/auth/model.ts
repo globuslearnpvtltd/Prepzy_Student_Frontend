@@ -77,7 +77,6 @@ const number = (value: unknown): number | null => {
 
 /** Maps the backend account row (login, onboarding or /api/accounts) to a Student. */
 export function toStudent(raw: unknown): Student {
-  console.log('toStudent', raw );
   const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const accountId = number(row.account_id);
   if (accountId === null) throw new Error('Account response has no account_id');

@@ -32,7 +32,7 @@ const accountRow = {
 
 function handlers(parent: unknown = null) {
   return [
-    http.get(`${API}/api/accounts`, () => HttpResponse.json({ success: true, data: accountRow })),
+    http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: accountRow })),
     http.get(`${API}/api/class-list`, () =>
       HttpResponse.json({ success: true, data: [{ class_id: 12, title: 'CLASS 12' }, { class_id: 11, title: 'CLASS 11' }] }),
     ),
@@ -96,7 +96,7 @@ describe('ProfileScreen', () => {
     let saved: Record<string, unknown> | null = null;
     server.use(
       ...handlers(),
-      http.put(`${API}/api/accounts`, async ({ request }) => {
+      http.put(`${API}/api/v4/student/account`, async ({ request }) => {
         saved = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ success: true, data: accountRow });
       }),
@@ -128,7 +128,7 @@ describe('ProfileScreen', () => {
   });
 
   it('shows an error state', async () => {
-    server.use(http.get(`${API}/api/accounts`, () => HttpResponse.json({ message: 'nope' }, { status: 500 })));
+    server.use(http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ message: 'nope' }, { status: 500 })));
     renderWithProviders(<ProfileScreen />, { exam: cbse });
     expect(await screen.findByText("We couldn't load your profile")).toBeInTheDocument();
   });
@@ -225,7 +225,7 @@ describe('DeleteAccountDialog', () => {
   it('asks for confirmation, deletes and signs out', async () => {
     let deleted = false;
     server.use(
-      http.get(`${API}/api/accounts`, () => HttpResponse.json({ success: true, data: accountRow })),
+      http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: accountRow })),
       http.delete(`${API}/api/accounts/7`, () => {
         deleted = true;
         return HttpResponse.json({ success: true, message: 'Successfully deleted' });

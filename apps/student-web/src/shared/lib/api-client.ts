@@ -15,12 +15,16 @@ type ErrorBody = {
   error?: string | { code?: string; message?: string; requestId?: string; details?: unknown };
   code?: string;
   requestId?: string;
+  details?: unknown;
 };
 
 type Listener = (error: ApiError) => void;
 const listeners = { unauthorized: new Set<Listener>(), rateLimited: new Set<Listener>() };
 
-/** Lets features react to session expiry (401) or plan limits (429) without coupling to the client. */
+/**
+ * Lets features react to session expiry (401) or plan limits (429) without coupling to the client.
+ * `rateLimited` is the plan/feature limit only: the OTP request limit (429 TOO_MANY_REQUESTS) is shown by the form.
+ */
 export function onApiEvent(event: keyof typeof listeners, listener: Listener): () => void {
   listeners[event].add(listener);
   return () => listeners[event].delete(listener);
@@ -51,7 +55,7 @@ export function toApiError(status: number, body: unknown, requestId?: string | n
     code: nested?.code ?? data.code ?? `HTTP_${status}`,
     message,
     requestId: nested?.requestId ?? data.requestId ?? requestId ?? undefined,
-    details: nested?.details,
+    details: nested?.details ?? data.details,
   });
 }
 
@@ -101,7 +105,7 @@ export function createApiClient(baseUrl: string) {
     if (!response.ok) {
       const error = toApiError(response.status, data, response.headers.get('x-request-id') ?? requestId);
       if (error.isUnauthorized) listeners.unauthorized.forEach((listener) => listener(error));
-      if (error.isRateLimited) listeners.rateLimited.forEach((listener) => listener(error));
+      if (error.isPlanLimit) listeners.rateLimited.forEach((listener) => listener(error));
       throw error;
     }
     return data as T;
@@ -137,7 +141,7 @@ export function createApiClient(baseUrl: string) {
       if (!response.ok || !response.body) {
         const error = toApiError(response.status, await readBody(response), response.headers.get('x-request-id'));
         if (error.isUnauthorized) listeners.unauthorized.forEach((listener) => listener(error));
-        if (error.isRateLimited) listeners.rateLimited.forEach((listener) => listener(error));
+        if (error.isPlanLimit) listeners.rateLimited.forEach((listener) => listener(error));
         throw error;
       }
       return response.body;

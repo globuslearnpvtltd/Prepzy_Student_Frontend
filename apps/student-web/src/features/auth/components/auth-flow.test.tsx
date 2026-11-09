@@ -28,9 +28,9 @@ describe('LoginForm', () => {
   it('requests an OTP with the device id and moves to verification', async () => {
     let body: unknown;
     server.use(
-      http.post(`${API}/api/auth/loginWithOtp`, async ({ request }) => {
+      http.post(`${API}/api/v4/auth/login-otp`, async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ success: true });
+        return HttpResponse.json({ success: true, message: 'OTP sent to your WhatsApp number', data: null });
       }),
     );
     navigation.searchParams = new URLSearchParams('next=/neet/tests');
@@ -42,10 +42,18 @@ describe('LoginForm', () => {
     expect(useOnboardingStore.getState()).toMatchObject({ phone: '+919876543210', flow: 'login' });
   });
 
-  it('shows the backend message when the number is not registered (HTTP 200 + success:false)', async () => {
+  it('shows the backend message when the number is not registered (404 STUDENT_NOT_FOUND)', async () => {
     server.use(
-      http.post(`${API}/api/auth/loginWithOtp`, () =>
-        HttpResponse.json({ success: false, message: 'This phone number is not registered. Please sign up first.' }),
+      http.post(`${API}/api/v4/auth/login-otp`, () =>
+        HttpResponse.json(
+          {
+            success: false,
+            message: 'This phone number is not registered. Please sign up first.',
+            code: 'STUDENT_NOT_FOUND',
+            data: null,
+          },
+          { status: 404 },
+        ),
       ),
     );
     renderWithProviders(<LoginForm />);
@@ -58,8 +66,8 @@ describe('LoginForm', () => {
 describe('SignupForm', () => {
   it('skips the OTP step when the number was already verified', async () => {
     server.use(
-      http.post(`${API}/api/v1/auth/register`, () =>
-        HttpResponse.json({ success: true, data: { otp_verified: true } }),
+      http.post(`${API}/api/v4/auth/register`, () =>
+        HttpResponse.json({ success: true, message: 'Phone number already verified', data: { otp_verified: true } }),
       ),
     );
     renderWithProviders(<SignupForm />);
@@ -88,8 +96,12 @@ describe('OtpForm', () => {
   it('logs in, caches the student and opens their exam dashboard', async () => {
     useOnboardingStore.getState().startOtp('+919876543210', 'login');
     server.use(
-      http.post(`${API}/api/auth/verifyLoginOtp`, () =>
-        HttpResponse.json({ success: true, account_id: 7, first_name: 'Ravi', target_exam: 'NEET-UG' }),
+      http.post(`${API}/api/v4/auth/verify-login-otp`, () =>
+        HttpResponse.json({
+          success: true,
+          message: 'Logged in successfully',
+          data: { account_id: 7, first_name: 'Ravi', target_exam: 'NEET-UG' },
+        }),
       ),
     );
     const { queryClient } = renderWithProviders(<OtpForm />);
@@ -103,13 +115,25 @@ describe('OtpForm', () => {
     expect(useOnboardingStore.getState().phone).toBeNull();
   });
 
-  it('shows an error when the backend rejects the code with HTTP 200', async () => {
+  it('shows the backend message for a wrong code (400 INVALID_OTP)', async () => {
     useOnboardingStore.getState().startOtp('+919876543210', 'login');
-    server.use(http.post(`${API}/api/auth/verifyLoginOtp`, () => HttpResponse.json({ error: 'Invalid Otp' })));
+    server.use(
+      http.post(`${API}/api/v4/auth/verify-login-otp`, () =>
+        HttpResponse.json(
+          {
+            success: false,
+            message: 'The OTP entered is incorrect. Please try again.',
+            code: 'INVALID_OTP',
+            data: null,
+          },
+          { status: 400 },
+        ),
+      ),
+    );
     renderWithProviders(<OtpForm />);
     await userEvent.type(screen.getByLabelText('One-time code'), '000000');
     await userEvent.click(screen.getByRole('button', { name: 'Verify' }));
-    expect(await screen.findByText('Invalid Otp')).toBeInTheDocument();
+    expect(await screen.findByText('The OTP entered is incorrect. Please try again.')).toBeInTheDocument();
     expect(navigation.replace).not.toHaveBeenCalledWith(expect.stringContaining('dashboard'));
   });
 
@@ -134,9 +158,13 @@ describe('SetupForm', () => {
     let body: Record<string, unknown> = {};
     server.use(
       http.get(`${API}/api/neet-plan-lengths`, () => HttpResponse.json({ success: true, data: [1, 2] })),
-      http.post(`${API}/api/auth/v3/complete-onboarding`, async ({ request }) => {
+      http.post(`${API}/api/v4/auth/complete-onboarding`, async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ success: true, account_id: 9, target_exam: 'NEET-UG' });
+        return HttpResponse.json({
+          success: true,
+          message: 'Onboarding completed successfully',
+          data: { account_id: 9, target_exam: 'NEET-UG', plan_expiry_date: '2026-12-08T23:30:00.000Z' },
+        });
       }),
     );
     renderWithProviders(<SetupForm />);

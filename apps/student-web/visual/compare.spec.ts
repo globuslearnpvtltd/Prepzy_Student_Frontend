@@ -60,7 +60,7 @@ async function prepare(page: Page, base: string, exam: Exam, extra: Record<strin
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
     const path = new URL(request.url()).pathname;
     let body = extra[path] ?? MOCKS[path];
-    if (path === '/api/v1/student/plans/active')
+    if (path === '/api/v1/student/plans/active' || path === '/api/v4/student/plans/active')
       body = exam === 'board-noplan' ? { success: true, data: { plans: [] } } : plansFor(exam === 'competitive' ? 'competitive' : 'board');
     return route.fulfill({ status: 200, json: body ?? { success: true, data: [] }, headers });
   });

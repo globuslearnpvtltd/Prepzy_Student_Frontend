@@ -15,7 +15,7 @@ const cbse = getExam('cbse')!;
 const neet = getExam('neet')!;
 
 const plan = (classId: number, extra: Record<string, unknown> = {}) =>
-  http.get(`${API}/api/v1/student/plans/active`, () =>
+  http.get(`${API}/api/v4/student/plans/active`, () =>
     HttpResponse.json({
       success: true,
       data: {
@@ -36,12 +36,12 @@ const plan = (classId: number, extra: Record<string, unknown> = {}) =>
   );
 
 const account = (extra: Record<string, unknown> = {}) =>
-  http.get(`${API}/api/accounts`, () =>
+  http.get(`${API}/api/v4/student/account`, () =>
     HttpResponse.json({ success: true, data: { account_id: 1, first_name: 'Meera', last_name: 'Shah', ...extra } }),
   );
 
 const graph = (classId: number, rows = [{ subject: 'Biology', thisAttempt: 80, lastAttempt: 70 }]) =>
-  http.get(`${API}/api/v1/student/getsubjectGraphData/${classId}`, () =>
+  http.get(`${API}/api/v4/dashboard/board/classes/${classId}/subject-scores`, () =>
     HttpResponse.json({ success: true, data: { overall_percent: 72.6, result_data: rows } }),
   );
 
@@ -52,13 +52,13 @@ function boardHandlers(overrides: { courses?: unknown[]; exams?: unknown[]; subj
     plan(12),
     account(),
     graph(12),
-    http.get(`${API}/api/v1/student/fetchLearnerBoardData/class`, () =>
+    http.get(`${API}/api/v4/dashboard/board/overview`, () =>
       HttpResponse.json({
         success: true,
         data: { week_activity: week, profileProgress: { name: 'MS', image: null, completion_percentage: 40 } },
       }),
     ),
-    http.get(`${API}/api/v1/student/continue-dashboard-courses/12`, () =>
+    http.get(`${API}/api/v4/dashboard/board/classes/12/continue-courses`, () =>
       HttpResponse.json({
         success: true,
         data: {
@@ -68,7 +68,7 @@ function boardHandlers(overrides: { courses?: unknown[]; exams?: unknown[]; subj
         },
       }),
     ),
-    http.get(`${API}/api/v1/student/continue-dashboard-exams/12`, () =>
+    http.get(`${API}/api/v4/dashboard/board/classes/12/continue-exams`, () =>
       HttpResponse.json({
         success: true,
         data: {
@@ -79,7 +79,7 @@ function boardHandlers(overrides: { courses?: unknown[]; exams?: unknown[]; subj
         },
       }),
     ),
-    http.get(`${API}/api/v1/student/classes/12/subjects`, () =>
+    http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () =>
       overrides.subjects === 'error'
         ? HttpResponse.json({ message: 'boom' }, { status: 500 })
         : HttpResponse.json({
@@ -183,7 +183,7 @@ function neetHandlers(dpp: unknown = { dpp: { dpp_id: 9, dpp_name: 'DPP #14' }, 
     plan(20),
     account({ gender: 'female' }),
     graph(20),
-    http.get(`${API}/api/neet/subject-progress`, () =>
+    http.get(`${API}/api/v4/dashboard/neet/subject-progress`, () =>
       HttpResponse.json({
         success: true,
         data: [
@@ -192,13 +192,13 @@ function neetHandlers(dpp: unknown = { dpp: { dpp_id: 9, dpp_name: 'DPP #14' }, 
       }),
     ),
     http.get(`${API}/api/neet/get-live-dpp-neet`, () => HttpResponse.json({ success: true, data: dpp })),
-    http.get(`${API}/api/neet/weekly-activity/class`, () => HttpResponse.json({ success: true, data: week })),
+    http.get(`${API}/api/v4/dashboard/neet/weekly-activity`, () => HttpResponse.json({ success: true, data: week })),
   ];
 }
 
 describe('board dashboard without a plan', () => {
   const freeHandlers = () => [
-    http.get(`${API}/api/v1/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } })),
+    http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } })),
     account(),
     http.get(`${API}/api/v1/student/free-courses`, () =>
       HttpResponse.json({
@@ -210,7 +210,7 @@ describe('board dashboard without a plan', () => {
         },
       }),
     ),
-    http.get(`${API}/api/v1/student/pyq-subject-list`, () =>
+    http.get(`${API}/api/v4/dashboard/board/pyq-subjects`, () =>
       HttpResponse.json({ success: true, data: { pyq: [{ year: 2025, subject: 4, title: 'SOCIAL SCIENCE STUDIES', image: '', class: 'CLASS 12' }] } }),
     ),
   ];

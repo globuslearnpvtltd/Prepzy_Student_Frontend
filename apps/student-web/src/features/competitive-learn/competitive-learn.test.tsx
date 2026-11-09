@@ -31,7 +31,7 @@ const neet = getExam('neet')!;
 
 const ok = (body: Record<string, unknown>) => HttpResponse.json({ success: true, ...body });
 
-const plan = http.get(`${API}/api/v1/student/plans/active`, () =>
+const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
   ok({ data: { plans: [{ plan_id: 1, class_id: 20, class_name: 'NEET', duration_months: 12, expiry_date: '2099-01-01', status: 'active' }] } }),
 );
 

@@ -11,7 +11,7 @@ const cbse = getExam('cbse')!;
 
 function mockBoardPaper(onSubmit: (body: unknown) => void = () => undefined) {
   server.use(
-    http.get(`${API}/api/v1/student/plans/active`, () =>
+    http.get(`${API}/api/v4/student/plans/active`, () =>
       HttpResponse.json({
         success: true,
         data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' }] },

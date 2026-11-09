@@ -20,7 +20,7 @@ export function studentApi(exam: 'board' | 'competitive', extra: Handlers = {}):
   return {
     ...asGets(MOCKS),
     ...asPosts(POST_READS),
-    'GET /api/v1/student/plans/active': plansFor(exam),
+    'GET /api/v4/student/plans/active': plansFor(exam),
     ...extra,
   };
 }

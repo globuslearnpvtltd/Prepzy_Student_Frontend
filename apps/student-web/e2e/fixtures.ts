@@ -49,15 +49,15 @@ export async function signIn(context: BrowserContext, exam = 'neet') {
 
 /** Endpoints every signed-in NEET page needs. */
 export const neetAccount = {
-  'GET /api/accounts': {
+  'GET /api/v4/student/account': {
     success: true,
     data: { account_id: 1, first_name: 'Ravi', last_name: 'Kumar', phone: '+919876543210' },
   },
-  'GET /api/v1/student/exams/purchased': {
+  'GET /api/v4/student/exams/purchased': {
     success: true,
     data: { exams: [{ exam_id: 2, exam_slice: 'neet-ug', exam_name: 'NEET-UG' }] },
   },
-  'GET /api/v1/student/plans/active': {
+  'GET /api/v4/student/plans/active': {
     success: true,
     data: {
       plans: [

@@ -152,7 +152,7 @@ export const shellApi = {
   },
 
   async planSummary(): Promise<PlanSummary | null> {
-    const body = assertOk(await apiClient.get<Envelope<PlanSummary>>('/api/neet/v1/purchase/plan-summary'));
+    const body = assertOk(await apiClient.get<Envelope<PlanSummary>>('/api/v4/student/plans/neet-summary'));
     return body.data && typeof body.data === 'object' && 'planName' in body.data ? body.data : null;
   },
 };

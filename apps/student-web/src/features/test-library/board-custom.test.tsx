@@ -10,7 +10,7 @@ import { BoardCustomTestBuilder, BoardSavedTests } from './board-custom';
 
 const cbse = getExam('cbse')!;
 
-const plan = http.get(`${API}/api/v1/student/plans/active`, () =>
+const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'XII', duration_months: 12, status: 'active' }] } }),
 );
 const topics = Array.from({ length: 7 }, (_, i) => ({ topic_id: i + 1, topic_name: `Topic ${i + 1}` }));

@@ -32,7 +32,7 @@ import { useStudyPlanDraft } from './draft-store';
 const cbse = getExam('cbse')!;
 const today = toIso(new Date());
 
-const activePlan = http.get(`${API}/api/v1/student/plans/active`, () =>
+const activePlan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' }] } }),
 );
 

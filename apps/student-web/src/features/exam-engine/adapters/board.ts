@@ -24,7 +24,7 @@ export interface BoardEndpoints {
   result: string;
   /** Paper list per subject; absent for tests opened from Learn (chapter PYQ, mid, final, quiz, custom). */
   sets?: string;
-  /** Key in GET /api/active-exams that lists subjects for this paper type. */
+  /** Key in GET /api/v4/assessments/board/subjects (data) that lists subjects for this paper type. */
   subjectKey?: 'mock_result' | 'pyq_result';
 }
 
@@ -314,11 +314,12 @@ function listing(setsUrl: string, subjectKey: 'mock_result' | 'pyq_result'): Pic
     async listSubjects({ classId }) {
       type Subject = { subject_id: string | number; subject_title: string; exam_count?: number };
       const body = assertOk(
-        await apiClient.get<Record<string, Subject[] | boolean | undefined>>('/api/active-exams', {
-          params: { class_id: classId },
-        }),
+        await apiClient.get<{ data?: Partial<Record<'mock_result' | 'pyq_result', Subject[]>> }>(
+          '/api/v4/assessments/board/subjects',
+          { params: { class_id: classId } },
+        ),
       );
-      const subjects = (body[subjectKey] as Subject[] | undefined) ?? [];
+      const subjects = body.data?.[subjectKey] ?? [];
       return subjects.map((s) => ({ id: str(s.subject_id), title: s.subject_title, count: num(s.exam_count) ?? 0 }));
     },
 

@@ -14,11 +14,11 @@ const neet = getExam('neet')!;
 const cbse = getExam('cbse')!;
 
 const shellApis = [
-  http.get(`${API}/api/accounts`, () => HttpResponse.json({ success: true, data: { account_id: 1, first_name: 'Asha' } })),
-  http.get(`${API}/api/v1/student/exams/purchased`, () =>
+  http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: { account_id: 1, first_name: 'Asha' } })),
+  http.get(`${API}/api/v4/student/exams/purchased`, () =>
     HttpResponse.json({ success: true, data: { exams: [{ exam_id: 2, exam_slice: 'neet-ug', exam_name: 'NEET' }] } }),
   ),
-  http.get(`${API}/api/v1/student/plans/active`, () =>
+  http.get(`${API}/api/v4/student/plans/active`, () =>
     HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'X', duration_months: 12, status: 'active' }] } }),
   ),
 ];

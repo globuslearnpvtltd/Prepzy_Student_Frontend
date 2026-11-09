@@ -11,7 +11,7 @@ import { BOOK_PLACEHOLDER, SubjectPicker } from './subject-picker';
 
 const cbse = getExam('cbse')!;
 
-const plan = http.get(`${API}/api/v1/student/plans/active`, () =>
+const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({
     success: true,
     data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', stream_name: 'PCB', duration_months: 12, expiry_date: '2099-01-01', status: 'active' }] },

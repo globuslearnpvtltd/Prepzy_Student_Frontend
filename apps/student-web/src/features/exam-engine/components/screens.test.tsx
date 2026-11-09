@@ -30,7 +30,7 @@ const cbse = getExam('cbse')!;
 const neet = getExam('neet')!;
 
 const plans = (list: unknown[]) =>
-  http.get(`${API}/api/v1/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: list } }));
+  http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: list } }));
 const cbsePlan = { plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' };
 
 beforeEach(() => usePlanSelection.setState({ planId: null }));
@@ -122,7 +122,7 @@ describe('TestSets', () => {
 
   it('shows plan loading errors', async () => {
     server.use(
-      http.get(`${API}/api/v1/student/plans/active`, () => HttpResponse.json({ success: false, message: 'Plan lookup failed' })),
+      http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: false, message: 'Plan lookup failed' })),
     );
     renderWithProviders(<TestSets testType="mock" />, { exam: cbse });
     expect(await screen.findByText('Plan lookup failed')).toBeInTheDocument();
@@ -132,14 +132,13 @@ describe('TestSets', () => {
     const subjectsAsked: (string | null)[] = [];
     server.use(
       plans([cbsePlan]),
-      http.get(`${API}/api/active-exams`, () =>
+      http.get(`${API}/api/v4/assessments/board/subjects`, () =>
         HttpResponse.json({
-          success: true,
+          success: true, data: {
           mock_result: [
             { subject_id: 3, subject_title: 'Physics', exam_count: 1 },
             { subject_id: 4, subject_title: 'Chemistry', exam_count: 0 },
-          ],
-        }),
+          ] } }),
       ),
       http.get(`${API}/api/mock-exams/fetch-mock-sets`, ({ request }) => {
         const subject = new URL(request.url).searchParams.get('subject');
@@ -157,7 +156,7 @@ describe('TestSets', () => {
   });
 
   it('tells the student when their class has no subjects yet', async () => {
-    server.use(plans([cbsePlan]), http.get(`${API}/api/active-exams`, () => HttpResponse.json({ success: true })));
+    server.use(plans([cbsePlan]), http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: true })));
     renderWithProviders(<TestSets testType="pyq" />, { exam: cbse });
     expect(await screen.findByText('No papers are available for your class yet.')).toBeInTheDocument();
   });
@@ -165,15 +164,15 @@ describe('TestSets', () => {
   it('shows subject and paper loading errors', async () => {
     server.use(
       plans([cbsePlan]),
-      http.get(`${API}/api/active-exams`, () => HttpResponse.json({ success: false, message: 'Subjects down' })),
+      http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: false, message: 'Subjects down' })),
     );
     const { unmount } = renderWithProviders(<TestSets testType="mock" />, { exam: cbse });
     expect(await screen.findByText('Subjects down')).toBeInTheDocument();
     unmount();
 
     server.use(
-      http.get(`${API}/api/active-exams`, () =>
-        HttpResponse.json({ success: true, mock_result: [{ subject_id: 3, subject_title: 'Physics' }] }),
+      http.get(`${API}/api/v4/assessments/board/subjects`, () =>
+        HttpResponse.json({ success: true, data: { mock_result: [{ subject_id: 3, subject_title: 'Physics' }] } }),
       ),
       http.get(`${API}/api/mock-exams/fetch-mock-sets`, () => HttpResponse.json({ success: false, message: 'Papers down' })),
     );

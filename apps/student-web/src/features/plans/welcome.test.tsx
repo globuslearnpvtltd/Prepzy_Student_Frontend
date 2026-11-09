@@ -15,8 +15,8 @@ function base({
   referred = false,
 } = {}): Handlers {
   return [
-    http.get(`${API}/api/accounts`, () => HttpResponse.json({ success: true, data: account })),
-    http.get(`${API}/api/v1/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans } })),
+    http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: account })),
+    http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans } })),
     http.get(`${API}/api/v1/student/plans/active-for-signup`, () => HttpResponse.json({ success: true, data: { plans: signupPlans } })),
     http.get(`${API}/api/referral/status`, () => HttpResponse.json({ success: true, data: { alreadyReferred: referred } })),
   ];

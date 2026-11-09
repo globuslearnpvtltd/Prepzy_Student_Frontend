@@ -12,7 +12,7 @@ const neet = getExam('neet')!;
 
 function mockNeetPaper(onSubmit: (body: unknown) => void) {
   server.use(
-    http.get(`${API}/api/v1/student/plans/active`, () =>
+    http.get(`${API}/api/v4/student/plans/active`, () =>
       HttpResponse.json({
         success: true,
         data: { plans: [{ plan_id: 1, class_id: 20, class_name: 'NEET', duration_months: 12, status: 'active' }] },
@@ -94,7 +94,7 @@ describe('ExamPlayer', () => {
 
   it('explains plan limits instead of showing a broken page', async () => {
     server.use(
-      http.get(`${API}/api/v1/student/plans/active`, () =>
+      http.get(`${API}/api/v4/student/plans/active`, () =>
         HttpResponse.json({
           success: true,
           data: { plans: [{ plan_id: 1, class_id: 20, class_name: 'NEET', duration_months: 0, status: 'active' }] },
@@ -115,7 +115,7 @@ describe('ExamPlayer', () => {
 
   it('opens the result when the paper was already submitted', async () => {
     server.use(
-      http.get(`${API}/api/v1/student/plans/active`, () =>
+      http.get(`${API}/api/v4/student/plans/active`, () =>
         HttpResponse.json({
           success: true,
           data: { plans: [{ plan_id: 1, class_id: 20, class_name: 'NEET', duration_months: 12, status: 'active' }] },

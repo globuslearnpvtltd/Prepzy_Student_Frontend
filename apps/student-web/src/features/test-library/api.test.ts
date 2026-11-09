@@ -22,7 +22,7 @@ describe('examForCategory', () => {
 describe('libraryApi with sparse backend payloads', () => {
   it('board subjects and papers fall back to empty lists and computed stats', async () => {
     server.use(
-      http.get(`${API}/api/active-exams`, () => ok()),
+      http.get(`${API}/api/v4/assessments/board/subjects`, () => ok()),
       http.get(`${API}/api/mock-exams/fetch-mock-sets`, () => ok()),
     );
     expect(await libraryApi.boardSubjects(12, 'pyq')).toEqual([]);
@@ -114,7 +114,7 @@ describe('libraryApi with sparse backend payloads', () => {
 
   it('custom subjects accept course ids as a list or a comma string', async () => {
     server.use(
-      http.get(`${API}/api/neet/subject-progress`, () =>
+      http.get(`${API}/api/v4/dashboard/neet/subject-progress`, () =>
         ok({
           data: [
             { subject_name: 'neet-physics', course_ids: '11,12', total_chapters: 20 },
@@ -129,7 +129,7 @@ describe('libraryApi with sparse backend payloads', () => {
       { name: 'Biology', courseIds: ['13'], chapterCount: 0 },
       { name: 'Chemistry', courseIds: [], chapterCount: 0 },
     ]);
-    server.use(http.get(`${API}/api/neet/subject-progress`, () => ok()));
+    server.use(http.get(`${API}/api/v4/dashboard/neet/subject-progress`, () => ok()));
     expect(await libraryApi.customSubjects()).toEqual([]);
   });
 

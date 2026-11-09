@@ -24,35 +24,37 @@ function toIdList(value: unknown): number[] {
 
 type Envelope<T> = { success?: boolean; message?: string; error?: string; data?: T };
 
-/** Backend contract for student auth and onboarding (legacy endpoints, kept as-is). */
+/**
+ * Student auth and onboarding: the v4 routes. Every response is the standard envelope
+ * `{ success, message, data }`; failures are non-2xx `{ success: false, message, code, details? }`,
+ * which the api client throws as ApiError (e.g. code INVALID_OTP, OTP_EXPIRED, ALREADY_REGISTERED,
+ * MAX_LOGIN_SESSIONS with details.active_sessions, TOO_MANY_REQUESTS).
+ */
+const AUTH = '/api/v4/auth';
+
 export const authApi = {
   /** Step 1 of sign-up. `otpVerified` = the number was already verified earlier, skip the OTP step. */
   async register(phone: string): Promise<{ otpVerified: boolean }> {
-    const body = await apiClient.post<Envelope<{ otp_verified?: boolean }>>('/api/v1/auth/register', { phone });
-    return { otpVerified: !!unwrapData(body).otp_verified };
+    const body = await apiClient.post<Envelope<{ otp_verified: boolean }>>(`${AUTH}/register`, { phone });
+    return { otpVerified: unwrapData(body).otp_verified === true };
   },
 
   async requestLoginOtp(phone: string, fingerprint: string): Promise<void> {
-    assertOk(await apiClient.post<Envelope<never>>('/api/v4/auth/login-otp', { phone, fingerprint }));
+    assertOk(await apiClient.post<Envelope<null>>(`${AUTH}/login-otp`, { phone, fingerprint }));
   },
 
   async resendOtp(phone: string, flow: 'login' | 'signup'): Promise<void> {
-    assertOk(await apiClient.post<Envelope<never>>('/api/auth/v2/resend-otp', { phone }, { params: { flow } }));
+    assertOk(await apiClient.post<Envelope<null>>(`${AUTH}/resend-otp`, { phone }, { params: { flow } }));
   },
 
   async verifySignupOtp(phone: string, otp: string): Promise<void> {
-    assertOk(await apiClient.post<Envelope<never>>('/api/auth/v2/verify-otp', { phone, otp }));
+    assertOk(await apiClient.post<Envelope<null>>(`${AUTH}/verify-otp`, { phone, otp }));
   },
 
   /** Sets the session cookies and returns the student. */
   async verifyLoginOtp(phone: string, otp: string, fingerprint: string): Promise<Student> {
-    const body = await apiClient.post<Envelope<never> & Record<string, unknown>>('/api/v4/auth/verify-login-otp', {
-      phone,
-      otp,
-      fingerprint,
-    });
-    console.log('authApi.verifyLoginOtp', body);
-    return toStudent(assertOk(body.data));
+    const body = await apiClient.post<Envelope<unknown>>(`${AUTH}/verify-login-otp`, { phone, otp, fingerprint });
+    return toStudent(unwrapData(body));
   },
 
   async examOptions(): Promise<ExamOption[]> {
@@ -88,7 +90,7 @@ export const authApi = {
     planLength?: number;
     withCbse?: boolean;
   }): Promise<Student> {
-    const body = await apiClient.post<Envelope<never> & Record<string, unknown>>('/api/auth/v3/complete-onboarding', {
+    const body = await apiClient.post<Envelope<unknown>>(`${AUTH}/complete-onboarding`, {
       phone: input.phone,
       exam_id: input.examId,
       class_id: input.classId,
@@ -96,16 +98,16 @@ export const authApi = {
       plan_length: input.planLength,
       with_cbse: input.withCbse,
     });
-    return toStudent(assertOk(body));
+    return toStudent(unwrapData(body));
   },
 
   async me(): Promise<Student> {
-    return toStudent(unwrapData(await apiClient.get<Envelope<unknown>>('/api/accounts')));
+    return toStudent(unwrapData(await apiClient.get<Envelope<unknown>>('/api/v4/student/account')));
   },
 
   async purchasedExams(): Promise<PurchasedExam[]> {
     const body = await apiClient.get<Envelope<{ exams: { exam_id: number; exam_slice: string; exam_name: string }[] }>>(
-      '/api/v1/student/exams/purchased',
+      '/api/v4/student/exams/purchased',
     );
     return unwrapData(body).exams.map((e) => ({ examId: e.exam_id, examSlice: e.exam_slice, name: e.exam_name }));
   },
@@ -123,7 +125,7 @@ export const authApi = {
       related_exams?: number[] | string | null;
       year?: number | null;
     };
-    const body = await apiClient.get<Envelope<{ plans: RawPlan[] }>>('/api/v1/student/plans/active', {
+    const body = await apiClient.get<Envelope<{ plans: RawPlan[] }>>('/api/v4/student/plans/active', {
       params: { exam_id: examId },
     });
     return unwrapData(body).plans.map((p) => ({
@@ -141,6 +143,6 @@ export const authApi = {
   },
 
   async logout(): Promise<void> {
-    await apiClient.post('/api/auth/logoutStudent');
+    await apiClient.post(`${AUTH}/logout`);
   },
 };

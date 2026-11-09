@@ -156,9 +156,12 @@ export const libraryApi = {
   async boardSubjects(classId: number, kind: BoardPaperKind): Promise<BoardSubject[]> {
     type S = { subject_id: string | number; subject_title: string; exam_count?: unknown };
     const body = assertOk(
-      await apiClient.get<Record<string, S[] | boolean | undefined>>('/api/active-exams', { params: { exam: kind, class_id: classId } }),
+      await apiClient.get<{ data?: Partial<Record<'mock_result' | 'pyq_result', S[]>> }>(
+        '/api/v4/assessments/board/subjects',
+        { params: { class_id: classId } },
+      ),
     );
-    const list = (body[kind === 'mock' ? 'mock_result' : 'pyq_result'] as S[] | undefined) ?? [];
+    const list = body.data?.[kind === 'mock' ? 'mock_result' : 'pyq_result'] ?? [];
     return list.map((s) => ({ id: str(s.subject_id), title: s.subject_title, count: num(s.exam_count) }));
   },
 
@@ -305,7 +308,7 @@ export const libraryApi = {
 
   async customSubjects(): Promise<CustomSubject[]> {
     type Raw = { subject_name: string; total_chapters?: unknown; course_ids?: unknown };
-    const body = assertOk(await apiClient.get<{ data?: Raw[] }>('/api/neet/subject-progress'));
+    const body = assertOk(await apiClient.get<{ data?: Raw[] }>('/api/v4/dashboard/neet/subject-progress'));
     return (body.data ?? []).map((s) => {
       let ids = s.course_ids;
       if (typeof ids === 'string') ids = ids.split(',');

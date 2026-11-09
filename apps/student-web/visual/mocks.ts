@@ -149,6 +149,7 @@ export const MOCKS: Record<string, unknown> = {
     },
   },
   '/api/neet/weekly-activity/class': { success: true, data: week },
+  '/api/v4/dashboard/neet/weekly-activity': { success: true, data: week },
   '/api/neet/v1/purchase/plan-summary': {
     success: true,
     data: { planName: 'NEET Topper', planType: 'topper', status: 'active', expiryDate: '2027-05-01', daysLeft: 170 },
@@ -206,3 +207,16 @@ export const MOCKS: Record<string, unknown> = {
   ...PARENT_MOCKS, // parents portal (visual/mocks-parents.ts)
   ...VOICE_MOCKS, // live voice talk start / save (visual/mocks-voice.ts)
 };
+
+// The new app reads NEET subject progress from the v4 backend (same body).
+MOCKS['/api/v4/dashboard/neet/subject-progress'] = MOCKS['/api/neet/subject-progress'];
+// The new app reads the CBSE dashboard from the v4 backend (same bodies).
+MOCKS['/api/v4/dashboard/board/overview'] = MOCKS['/api/v1/student/fetchLearnerBoardData/class'];
+MOCKS['/api/v4/dashboard/board/classes/12/subjects'] = MOCKS['/api/v1/student/classes/12/subjects'];
+MOCKS['/api/v4/dashboard/board/classes/12/continue-courses'] = MOCKS['/api/v1/student/continue-dashboard-courses/12'];
+MOCKS['/api/v4/dashboard/board/classes/12/continue-exams'] = MOCKS['/api/v1/student/continue-dashboard-exams/12'];
+MOCKS['/api/v4/dashboard/board/classes/12/subject-scores'] = MOCKS['/api/v1/student/getsubjectGraphData/12'];
+MOCKS['/api/v4/dashboard/board/classes/20/subject-scores'] = MOCKS['/api/v1/student/getsubjectGraphData/20'];
+MOCKS['/api/v4/student/account'] = MOCKS['/api/accounts'];
+MOCKS['/api/v4/student/exams/purchased'] = MOCKS['/api/v1/student/exams/purchased'];
+MOCKS['/api/v4/student/plans/neet-summary'] = MOCKS['/api/neet/v1/purchase/plan-summary'];

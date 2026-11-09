@@ -8,7 +8,7 @@ import { BoardAssessments, BoardPaperSets } from './board';
 
 const cbse = getExam('cbse')!;
 
-const plan = http.get(`${API}/api/v1/student/plans/active`, () =>
+const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({
     success: true,
     data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'XII', duration_months: 12, status: 'active' }] },
@@ -21,12 +21,11 @@ describe('BoardAssessments: full length exams', () => {
   it('links each subject to its mock or past-year papers', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/active-exams`, () =>
+      http.get(`${API}/api/v4/assessments/board/subjects`, () =>
         HttpResponse.json({
-          success: true,
+          success: true, data: {
           mock_result: [{ subject_id: 3, subject_title: 'PHYSICS', exam_count: 4 }],
-          pyq_result: [{ subject_id: 5, subject_title: 'CHEMISTRY', exam_count: 2 }],
-        }),
+          pyq_result: [{ subject_id: 5, subject_title: 'CHEMISTRY', exam_count: 2 }] } }),
       ),
     );
     renderWithProviders(<BoardAssessments />, { exam: cbse });
@@ -41,12 +40,12 @@ describe('BoardAssessments: full length exams', () => {
   });
 
   it('says "Coming Soon" without subjects and shows load errors', async () => {
-    server.use(plan, http.get(`${API}/api/active-exams`, () => HttpResponse.json({ success: true, mock_result: [] })));
+    server.use(plan, http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: true, data: { mock_result: [] } })));
     const { unmount } = renderWithProviders(<BoardAssessments />, { exam: cbse });
     expect(await screen.findByText('Coming Soon...')).toBeInTheDocument();
     unmount();
 
-    server.use(http.get(`${API}/api/active-exams`, () => HttpResponse.json({ success: false, message: 'No subjects' })));
+    server.use(http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: false, message: 'No subjects' })));
     renderWithProviders(<BoardAssessments />, { exam: cbse });
     expect(await screen.findByText('No subjects')).toBeInTheDocument();
   });
@@ -54,7 +53,7 @@ describe('BoardAssessments: full length exams', () => {
   it('opens the custom test builder from a study-plan link and cleans the URL', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/active-exams`, () => HttpResponse.json({ success: true })),
+      http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: true })),
       http.get(`${API}/api/custom-exams/get-custom-exam-course-list/12`, () => HttpResponse.json({ success: true, courses: [] })),
     );
     window.history.replaceState(null, '', '/cbse/assessments?open=custom-test&x=1');
@@ -109,7 +108,7 @@ describe('BoardPaperSets', () => {
 
   it('shows plan errors', async () => {
     server.use(
-      http.get(`${API}/api/v1/student/plans/active`, () => HttpResponse.json({ success: false, message: 'Plan service down' })),
+      http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: false, message: 'Plan service down' })),
     );
     renderWithProviders(<BoardPaperSets kind="pyq" subjectId="3" />, { exam: cbse });
     expect(await screen.findByText('Plan service down')).toBeInTheDocument();

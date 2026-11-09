@@ -79,10 +79,10 @@ describe('learn helpers', () => {
 describe('learnApi', () => {
   it('reads subjects, continue courses and subject courses', async () => {
     server.use(
-      http.get(`${API}/api/v1/student/classes/12/subjects`, () =>
+      http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () =>
         HttpResponse.json({ success: true, data: { subjects: [{ subject_id: 1, subject_name: 'PHYSICS', course_count: 2, image: 'null' }] } }),
       ),
-      http.get(`${API}/api/v1/student/continue-dashboard-courses/12`, () =>
+      http.get(`${API}/api/v4/dashboard/board/classes/12/continue-courses`, () =>
         HttpResponse.json({
           success: true,
           data: { courses: [{ course_id: 5, course_name: 'Optics', progress_percentage: 33.6, upcoming_learn_item: { category: 'lecture', id: 8, module: 2 } }] },

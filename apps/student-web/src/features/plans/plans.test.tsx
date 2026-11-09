@@ -71,7 +71,7 @@ const common = [
   http.get(`${API}/api/subscriptions/active-coupons`, () =>
     HttpResponse.json({ coupons: [{ coupon_code: 'SAVE10', description: '10% off', expiry: '2099-01-01' }] }),
   ),
-  http.get(`${API}/api/accounts`, () => HttpResponse.json({ success: true, data: { account_id: 1, first_name: 'Ravi', phone: '+919876543210' } })),
+  http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: { account_id: 1, first_name: 'Ravi', phone: '+919876543210' } })),
 ];
 
 describe('plan normalisers', () => {
@@ -374,8 +374,8 @@ describe('welcome', () => {
   });
 
   const base = [
-    http.get(`${API}/api/accounts`, () => HttpResponse.json({ success: true, data: { account_id: 1 } })),
-    http.get(`${API}/api/v1/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } })),
+    http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: { account_id: 1 } })),
+    http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } })),
     http.get(`${API}/api/v1/student/plans/active-for-signup`, () => HttpResponse.json({ success: true, data: { plans: [{ plan_id: 44 }] } })),
   ];
 

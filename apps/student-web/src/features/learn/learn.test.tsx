@@ -23,7 +23,7 @@ import {
 const cbse = getExam('cbse')!;
 const ok = (data: unknown) => HttpResponse.json({ success: true, data });
 
-const plan = http.get(`${API}/api/v1/student/plans/active`, () =>
+const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
   ok({ plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 10', stream_name: '', duration_months: 12, expiry_date: '2099-03-31', status: 'active' }] }),
 );
 
@@ -63,10 +63,10 @@ describe('Learn page', () => {
   it('resumes courses and opens a subject’s books', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/v1/student/continue-dashboard-courses/12`, () =>
+      http.get(`${API}/api/v4/dashboard/board/classes/12/continue-courses`, () =>
         ok({ courses: [{ course_id: 5, course_name: 'Science Part 1', class_name: 'CLASS 10', subject_name: 'SCIENCE', progress_percentage: 40, upcoming_learn_item: { category: 'lecture', id: 8, module: 2 } }] }),
       ),
-      http.get(`${API}/api/v1/student/classes/12/subjects`, () =>
+      http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () =>
         ok({ subjects: [{ subject_id: 1, subject_name: 'SCIENCE', course_count: 2, subject_description: 'All about science' }, { subject_id: 4, subject_name: 'HINDI', course_count: 0 }] }),
       ),
       http.get(`${API}/api/v1/student/getCourselist-dashboard/12/1`, () =>
@@ -99,8 +99,8 @@ describe('Learn page', () => {
   it('shows section errors and empty states', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/v1/student/continue-dashboard-courses/12`, () => HttpResponse.json({ message: 'down' }, { status: 500 })),
-      http.get(`${API}/api/v1/student/classes/12/subjects`, () => ok({ subjects: [] })),
+      http.get(`${API}/api/v4/dashboard/board/classes/12/continue-courses`, () => HttpResponse.json({ message: 'down' }, { status: 500 })),
+      http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () => ok({ subjects: [] })),
     );
     renderWithProviders(<LearnScreen />, { exam: cbse });
     expect(await screen.findByText('Failed to fetch Continue Learning')).toBeInTheDocument();

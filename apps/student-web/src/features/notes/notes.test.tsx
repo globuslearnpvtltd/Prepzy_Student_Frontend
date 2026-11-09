@@ -11,7 +11,7 @@ import { NotesScreen, NotesViewScreen, SummaryVideoScreen } from './ui';
 const cbse = getExam('cbse')!;
 const ok = (data: unknown) => HttpResponse.json({ success: true, data });
 
-const plan = http.get(`${API}/api/v1/student/plans/active`, () =>
+const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
   ok({ plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 10', stream_name: '', duration_months: 12, expiry_date: '2099-03-31', status: 'active' }] }),
 );
 
@@ -59,7 +59,7 @@ describe('Notes page', () => {
   it('lists books for the chosen subject', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/v1/student/classes/12/subjects`, () =>
+      http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () =>
         ok({ subjects: [{ subject_id: 1, subject_name: 'Science' }, { subject_id: 2, subject_name: 'Maths' }] }),
       ),
       http.get(`${API}/api/v1/student/getCourselist-dashboard/12/1`, () => ok({ result: [{ course_id: 5, title: 'Science Part 1', module_count: 13 }] })),
@@ -81,7 +81,7 @@ describe('Notes page', () => {
   });
 
   it('shows an error when subjects fail', async () => {
-    server.use(plan, http.get(`${API}/api/v1/student/classes/12/subjects`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(plan, http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<NotesScreen />, { exam: cbse });
     expect(await screen.findByText('Failed To Load Notes')).toBeInTheDocument();
   });

@@ -17,18 +17,22 @@ test('unknown exams and pages show a 404', async ({ page, context }) => {
 test('login with OTP opens the NEET dashboard', async ({ page, context }) => {
   await mockApi(page, {
     ...neetAccount,
-    'POST /api/auth/loginWithOtp': { success: true },
-    'POST /api/auth/verifyLoginOtp': (body) => {
+    'POST /api/v4/auth/login-otp': { success: true, message: 'OTP sent to your WhatsApp number', data: null },
+    'POST /api/v4/auth/verify-login-otp': (body) => {
       expect(body).toMatchObject({ phone: '+919876543210', otp: '123456' });
-      return { success: true, account_id: 1, first_name: 'Ravi', target_exam: 'NEET-UG' };
+      return {
+        success: true,
+        message: 'Logged in successfully',
+        data: { account_id: 1, first_name: 'Ravi', target_exam: 'NEET-UG' },
+      };
     },
-    'GET /api/neet/subject-progress': {
+    'GET /api/v4/dashboard/neet/subject-progress': {
       success: true,
       data: [{ subject_name: 'NEET-Botany', completed_chapters: 3, total_chapters: 10, progress_percentage: 30 }],
     },
     'GET /api/neet/get-live-dpp-neet': { success: true, data: { dpp: null } },
-    'GET /api/neet/weekly-activity/class': { success: true, data: { Mon: 1 } },
-    'GET /api/v1/student/getsubjectGraphData/20': { success: true, data: { overall_percent: 50, result_data: [] } },
+    'GET /api/v4/dashboard/neet/weekly-activity': { success: true, data: { Mon: 1 } },
+    'GET /api/v4/dashboard/board/classes/20/subject-scores': { success: true, data: { overall_percent: 50, result_data: [] } },
   });
 
   await page.goto('/login');

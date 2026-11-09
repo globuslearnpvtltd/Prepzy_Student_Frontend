@@ -397,7 +397,7 @@ export const learnApi = {
   },
 
   async subjects(classId: number): Promise<LearnSubject[]> {
-    const body = assertOk(await apiClient.get<Envelope<{ subjects?: Raw[] }>>(`/api/v1/student/classes/${classId}/subjects`));
+    const body = assertOk(await apiClient.get<Envelope<{ subjects?: Raw[] }>>(`/api/v4/dashboard/board/classes/${classId}/subjects`));
     return (body.data?.subjects ?? []).map((s) => ({
       id: id(s.subject_id),
       name: text(s.subject_name) ?? '',
@@ -409,7 +409,7 @@ export const learnApi = {
 
   async continueCourses(classId: number): Promise<ContinueCourse[]> {
     const body = assertOk(
-      await apiClient.get<Envelope<{ courses?: Raw[] }>>(`/api/v1/student/continue-dashboard-courses/${classId}`),
+      await apiClient.get<Envelope<{ courses?: Raw[] }>>(`/api/v4/dashboard/board/classes/${classId}/continue-courses`),
     );
     return (body.data?.courses ?? []).map((c) => ({
       courseId: id(c.course_id),

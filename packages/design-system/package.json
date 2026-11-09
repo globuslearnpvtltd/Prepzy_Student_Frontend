@@ -1,0 +1,44 @@
+{
+  "name": "@prepzy/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Prepzy design system: one config file drives tokens, themes and every component's styling.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./design.config.ts",
+    "./styles.css": "./src/styles/design-system.css"
+  },
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "generate": "node --experimental-strip-types --no-warnings scripts/generate-css.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "storybook": "npm run generate && storybook dev -p 6006",
+    "build-storybook": "npm run generate && storybook build"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.3.1",
+    "@radix-ui/react-label": "^2.1.17",
+    "@radix-ui/react-progress": "^1.2.1",
+    "@radix-ui/react-radio-group": "^1.5.1",
+    "@radix-ui/react-slot": "^1.5.0",
+    "@radix-ui/react-tabs": "^1.2.1",
+    "clsx": "^2.1.1"
+  },
+  "devDependencies": {
+    "@storybook/addon-a11y": "^10.6.5",
+    "@storybook/addon-docs": "^10.6.5",
+    "@storybook/react-vite": "^10.6.5",
+    "@tailwindcss/vite": "^4.3.4",
+    "storybook": "^10.6.5",
+    "tailwindcss": "^4.3.4",
+    "vite": "^8.3.5"
+  }
+}

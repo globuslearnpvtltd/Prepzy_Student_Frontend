@@ -1,0 +1,55 @@
+# Pull-request checks. Deploy workflows are added when this folder replaces the old frontend.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, staging]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Design tokens are in sync with design.config.ts
+        run: npm run generate -w @prepzy/design-system -- --check
+      - run: npm run lint --workspaces --if-present
+      - run: npm run typecheck --workspaces --if-present
+      - run: npm test -w @prepzy/design-system
+      - run: npx vitest run --coverage
+        working-directory: apps/student-web
+      - name: Build
+        run: npm run build -w @prepzy/student-web
+        env:
+          NEXT_PUBLIC_ENV: staging
+          NEXT_PUBLIC_API_URL: https://api.example.test
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run generate -w @prepzy/design-system
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/student-web
+      - run: npx playwright test
+        working-directory: apps/student-web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/student-web/test-results

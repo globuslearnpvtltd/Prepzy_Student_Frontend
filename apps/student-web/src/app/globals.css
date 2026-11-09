@@ -1,0 +1,245 @@
+@import 'tailwindcss';
+@import '@prepzy/design-system/styles.css';
+
+/* Let Tailwind see utility classes used inside design-system components and stories. */
+@source '../../../../packages/design-system/src';
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    color: var(--color-foreground);
+    background-color: var(--color-canvas);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* Question, answer and feedback HTML from the backend. */
+@layer components {
+  .rich-text {
+    overflow-wrap: anywhere;
+  }
+  .rich-text :where(p, ul, ol, table, blockquote) + :where(p, ul, ol, table, blockquote) {
+    margin-top: 0.75em;
+  }
+  .rich-text :where(ul) {
+    list-style: disc;
+    padding-left: 1.5em;
+  }
+  .rich-text :where(ol) {
+    list-style: decimal;
+    padding-left: 1.5em;
+  }
+  .rich-text :where(img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-sm);
+  }
+  .rich-text :where(table) {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+  }
+  .rich-text :where(th, td) {
+    border: 1px solid var(--color-border);
+    padding: 0.25em 0.5em;
+  }
+  .rich-text mjx-container {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+}
+
+/* Competitive study notes HTML (the previous app's notes stylesheet, on design tokens). */
+@layer components {
+  .study-notes {
+    color: var(--color-neutral-800);
+    line-height: 1.6;
+  }
+  .study-notes :where(h1, h2, h3, h4) {
+    color: var(--color-brand);
+    margin: 0 0 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .study-notes :where(h1) {
+    font-size: 2rem;
+  }
+  .study-notes :where(h2) {
+    font-size: 1.5rem;
+    border-bottom: 2px solid var(--color-accent-500);
+    padding-bottom: 0.3rem;
+    margin-top: 1rem;
+  }
+  .study-notes :where(h3) {
+    font-size: 1.25rem;
+    margin-top: 1rem;
+  }
+  .study-notes :where(h4) {
+    font-size: 1.1rem;
+    margin-top: 1rem;
+    color: var(--color-accent-500);
+  }
+  .study-notes :where(a) {
+    color: var(--color-brand);
+  }
+  .study-notes :where(img.content-image) {
+    display: block;
+    margin: 1rem auto;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-card);
+  }
+  .study-notes :where(.figure-title) {
+    text-align: center;
+    font-size: 0.9rem;
+    font-style: italic;
+    color: var(--color-neutral-550);
+    margin: 0.25rem 0 1rem;
+  }
+  .study-notes :where(.exam-tip-box, .example-box, .study-alert-box) {
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-sm);
+    border-left: 5px solid;
+    margin: 1rem 0;
+    font-weight: 600;
+  }
+  .study-notes :where(.exam-tip-box) {
+    background: var(--color-accent-100);
+    border-color: var(--color-accent-500);
+    color: var(--color-accent-800);
+  }
+  .study-notes :where(.example-box) {
+    background: var(--color-brand-75);
+    border-color: var(--color-brand);
+    color: var(--color-brand);
+  }
+  .study-notes :where(.study-alert-box) {
+    background: var(--color-danger-50);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+  }
+  .study-notes table {
+    display: table;
+    width: 100%;
+  }
+  .study-notes :where(th, td) {
+    border-color: var(--color-neutral-300);
+    padding: 0.5rem 0.75rem;
+  }
+  .study-notes :where(th) {
+    background: var(--color-brand-75);
+    color: var(--color-brand);
+  }
+}
+
+/* Live voice talk (features/live-voice): bouncing voice bars, pulse ring, the "Live chat" pill and the language menu. */
+@layer components {
+  @keyframes live-talk-bar {
+    0%,
+    100% {
+      transform: scaleY(0.35);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+  @keyframes live-talk-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(1.7);
+      opacity: 0;
+    }
+  }
+  /* Grows leftward out of the 32px live icon, holds, then tucks back in (clip-path, so no layout). */
+  @keyframes live-talk-pill {
+    0% {
+      clip-path: inset(0 0 0 calc(100% - 32px) round 999px);
+    }
+    16%,
+    66% {
+      clip-path: inset(0 0 0 0 round 999px);
+    }
+    82%,
+    100% {
+      clip-path: inset(0 0 0 calc(100% - 32px) round 999px);
+    }
+  }
+  @keyframes live-talk-pill-text {
+    0%,
+    8% {
+      opacity: 0;
+      transform: translateX(10px);
+    }
+    20%,
+    60% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    70%,
+    100% {
+      opacity: 0;
+      transform: translateX(10px);
+    }
+  }
+  @keyframes live-lang-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .live-talk-bar {
+    transform-origin: center;
+    animation: live-talk-bar 0.9s ease-in-out infinite;
+  }
+  .live-talk-ring {
+    animation: live-talk-ring 1.8s ease-out infinite;
+  }
+  .live-talk-pill {
+    clip-path: inset(0 0 0 calc(100% - 32px) round 999px);
+    animation: live-talk-pill 2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+  .live-talk-pill-text {
+    opacity: 0;
+    animation: live-talk-pill-text 2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+  .live-talk-btn:hover .live-talk-pill {
+    animation: none;
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+  .live-talk-btn:hover .live-talk-pill-text {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .live-lang-menu {
+    transform-origin: top right;
+    animation: live-lang-menu-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .live-talk-bar,
+    .live-talk-ring,
+    .live-talk-pill,
+    .live-talk-pill-text,
+    .live-lang-menu {
+      animation: none;
+    }
+  }
+}

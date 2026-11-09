@@ -1,0 +1,7 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="avatar">
+<rect width="36" height="36" rx="18" fill="#F2F2F7"/>
+<path id="Ellipse" d="M21.7 13.5C21.7 15.5435 20.0435 17.2 18 17.2C15.9565 17.2 14.3 15.5435 14.3 13.5C14.3 11.4565 15.9565 9.8 18 9.8C20.0435 9.8 21.7 11.4565 21.7 13.5Z" stroke-width="1.6" stroke="#9CA3AF"/>
+<path id="Vector" d="M11 24.5C11 18.5 25 18.5 25 24.5" stroke-width="1.6" stroke-linecap="round" stroke="#9CA3AF"/>
+</g>
+</svg>

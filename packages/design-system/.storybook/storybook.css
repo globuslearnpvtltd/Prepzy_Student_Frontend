@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+@import '../src/styles/design-system.css';
+
+@source '../src';
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-foreground);
+  background-color: var(--color-canvas);
+}

@@ -1,0 +1,214 @@
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { getExam } from '@/shared/config/exams';
+import { renderWithProviders } from '@/test/render';
+import { API, server } from '@/test/server';
+import { navigation } from '@/test/setup';
+import { BoardPaperSets } from './board';
+import { CustomTestCreate, CustomTests } from './custom-tests';
+import { DailyPractice } from './daily-practice';
+import { TestLibrary } from './library';
+
+const neet = getExam('neet')!;
+const cbse = getExam('cbse')!;
+
+const plan = (classId: number) =>
+  http.get(`${API}/api/v1/student/plans/active`, () =>
+    HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: classId, class_name: 'X', duration_months: 12, status: 'active' }] } }),
+  );
+
+const mockSet = (id: number, extra: Record<string, unknown>) => ({
+  set_id: id,
+  name: `NEET Full Mock ${id}`,
+  duration: 180,
+  question_count: 180,
+  attempt_count: 0,
+  status: 'pending',
+  ongoing_session: null,
+  ...extra,
+});
+
+describe('NEET mock tests', () => {
+  it('shows stats, the ongoing test, paper cards and previous submissions', async () => {
+    server.use(
+      plan(20),
+      http.get(`${API}/api/neet/mock-exam/fetch-mock-exams`, () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            mockExams: [
+              mockSet(4, { attempt_count: 1, status: 'completed' }),
+              mockSet(5, { status: 'in_progress', ongoing_session: { remaining_seconds: 5400 } }),
+              mockSet(6, {}),
+            ],
+          },
+        }),
+      ),
+      http.get(`${API}/api/neet/mock-exam/fetch-mock-best-score`, () =>
+        HttpResponse.json({ success: true, data: { bestScore: { obtained: 486, total: 720 } } }),
+      ),
+      http.get(`${API}/api/neet/mock-exam/fetch-recent-mock-attempts`, () =>
+        HttpResponse.json({
+          success: true,
+          data: { attempts: [{ attempt_id: 1, set_id: 4, name: 'NEET Full Mock 4', total_marks: 720, total_marks_obtained: 486, attempt_date: '2026-11-10T09:30:00Z' }] },
+        }),
+      ),
+      http.get(`${API}/api/neet/mock-exam/fetch-mock-attempts`, () =>
+        HttpResponse.json({
+          success: true,
+          data: { name: 'NEET Full Mock 4', attempts: [{ attempt_id: 9, attempt_number: 1, total_marks: 720, total_marks_obtained: 400, attempt_date: '2026-11-01T00:00:00Z' }] },
+        }),
+      ),
+    );
+    renderWithProviders(<TestLibrary kind="mock" />, { exam: neet });
+
+    expect(await screen.findByText('1H 30M LEFT')).toBeInTheDocument();
+    expect(screen.getByText('486/720')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Resume Test' })).toHaveAttribute('href', '/neet/tests/mock/5');
+    expect(screen.getByRole('link', { name: 'Start Test' })).toHaveAttribute('href', '/neet/tests/mock/6');
+    expect(screen.getByRole('link', { name: 'Attempt Again' })).toHaveAttribute('href', '/neet/tests/mock/4');
+    expect(await screen.findByRole('link', { name: 'Review' })).toHaveAttribute('href', '/neet/tests/mock/result/1');
+
+    await userEvent.selectOptions(screen.getByRole('combobox'), 'completed');
+    expect(screen.queryByText('NEET Full Mock 6')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'View Attempts' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByRole('link', { name: 'Review' })).toHaveAttribute('href', '/neet/tests/mock/result/9');
+  });
+
+  it('shows an empty state and an error', async () => {
+    server.use(plan(20), http.get(`${API}/api/neet/pyq-exam/fetch-pyq-exams`, () => HttpResponse.json({ success: true, data: { pyqExams: [] } })));
+    const { unmount } = renderWithProviders(<TestLibrary kind="pyq" />, { exam: neet });
+    expect(await screen.findByText('No tests yet')).toBeInTheDocument();
+    unmount();
+
+    server.use(http.get(`${API}/api/neet/pyq-exam/fetch-pyq-exams`, () => HttpResponse.json({ success: false, message: 'Server down' }, { status: 500 })));
+    renderWithProviders(<TestLibrary kind="pyq" />, { exam: neet });
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+});
+
+describe('board paper sets', () => {
+  it('lists papers with stats and the right actions per status', async () => {
+    server.use(
+      plan(12),
+      http.get(`${API}/api/pyq-exams/fetch-pyq-sets`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get('subject')).toBe('3');
+        return HttpResponse.json({
+          success: true,
+          data: {
+            papers: [
+              { set_id: 18, set_number: 1, year: 2024, subject: 'Physics', totalQuestion: 33, status: 'pending', total_marks: 70 },
+              { set_id: 19, set_number: 1, year: 2023, subject: 'Physics', totalQuestion: 33, status: 'completed', total_marks: 70, latest_mark: 61, attempt_id: 301, attempts: 2 },
+            ],
+            stats: { totalPaper: 2, completed: 1, inProgress: 0, pending: 1 },
+          },
+        });
+      }),
+    );
+    renderWithProviders(<BoardPaperSets kind="pyq" subjectId="3" />, { exam: cbse });
+    expect(await screen.findByText('61/70')).toBeInTheDocument();
+    expect(screen.getByText('87%')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start Now' })).toHaveAttribute('href', '/cbse/tests/pyq/18');
+    expect(screen.getByRole('link', { name: 'Review' })).toHaveAttribute('href', '/cbse/tests/pyq/result/301');
+    expect(screen.getByRole('link', { name: 'Retake' })).toHaveAttribute('href', '/cbse/tests/pyq/19');
+    expect(screen.getByText('Total Papers').nextSibling).toHaveTextContent('02');
+  });
+
+  it('explains when nothing matches', async () => {
+    server.use(plan(12), http.get(`${API}/api/mock-exams/fetch-mock-sets`, () => HttpResponse.json({ success: true, data: { papers: [] } })));
+    renderWithProviders(<BoardPaperSets kind="mock" subjectId="1" />, { exam: cbse });
+    expect(await screen.findByText('No papers found')).toBeInTheDocument();
+  });
+});
+
+describe('custom tests', () => {
+  it('lists saved tests and past attempts', async () => {
+    server.use(
+      http.get(`${API}/api/neet/custom-exam/saved-tests`, () =>
+        HttpResponse.json({
+          success: true,
+          sets: [{ set_id: 2, set_number: 2, subject_name: 'NEET-Botany', module_name: 'Plant kingdom', topics: [{ title: 'Algae' }], total_questions: 10, attempt_count: 0 }],
+        }),
+      ),
+      http.get(`${API}/api/neet/custom-exam/past-attempts`, () =>
+        HttpResponse.json({
+          success: true,
+          attempts: [{ attempt_id: 64, set_id: 1, attempt_number: 1, subject_name: 'NEET-Biology', module_name: 'Cell', total_marks: 80, total_marks_obtained: 56 }],
+        }),
+      ),
+    );
+    renderWithProviders(<CustomTests />, { exam: neet });
+    expect(await screen.findByText('Plant kingdom')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute('href', '/neet/tests/custom/2');
+    await userEvent.click(screen.getByRole('tab', { name: /Past exams/ }));
+    expect(await screen.findByRole('link', { name: 'Review' })).toHaveAttribute('href', '/neet/tests/custom/result/64');
+  });
+
+  it('builds a test: subject → chapter → topics → generate opens the player', async () => {
+    let generated: unknown;
+    server.use(
+      http.get(`${API}/api/neet/subject-progress`, () =>
+        HttpResponse.json({ success: true, data: [{ subject_name: 'NEET-Botany', total_chapters: 18, course_ids: '1' }] }),
+      ),
+      http.get(`${API}/api/neet/custom-exam/chapters/1`, () =>
+        HttpResponse.json({ success: true, chapters: [{ module_id: 14, module_name: 'Cell', topic_count: 3 }] }),
+      ),
+      http.get(`${API}/api/neet/custom-exam/topics/14`, () =>
+        HttpResponse.json({ success: true, topics: [{ lecture_id: 1, title: 'Cell theory' }, { lecture_id: 2, title: 'Organelles' }] }),
+      ),
+      http.post(`${API}/api/neet/custom-exam/generate`, async ({ request }) => {
+        generated = await request.json();
+        return HttpResponse.json({ success: true, set_id: 77 });
+      }),
+    );
+    renderWithProviders(<CustomTestCreate />, { exam: neet });
+    await userEvent.click(await screen.findByRole('button', { name: /Botany/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Continue/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /3 topics/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Continue/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /Organelles/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'hard' }));
+    await userEvent.click(screen.getByRole('button', { name: /Create test/ }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/neet/tests/custom/77'));
+    expect(generated).toEqual({ module_id: 14, lecture_ids: [2], difficulty_level: 'hard' });
+  });
+});
+
+describe('daily practice', () => {
+  it("shows today's paper and the month's papers", async () => {
+    server.use(
+      http.get(`${API}/api/neet/get-live-dpp-neet`, () =>
+        HttpResponse.json({ success: true, data: { dpp: { dpp_id: 9, dpp_name: 'DPP 14 Nov' }, questionCount: 15, attempt: null } }),
+      ),
+      http.get(`${API}/api/neet/get-dpp-months`, () => HttpResponse.json({ success: true, data: { months: [{ year: 2026, month: 11, first_dpp_id: 7 }] } })),
+      http.get(`${API}/api/neet/get-dpp-list`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get('month')).toBe('11');
+        return HttpResponse.json({
+          success: true,
+          data: {
+            list: [
+              { dpp_id: 7, dpp_name: 'DPP 12 Nov', dpp_date: '2026-11-12', attempted: 1, attempt_id: 55 },
+              { dpp_id: 8, dpp_name: 'DPP 13 Nov', dpp_date: '2026-11-13', attempted: 0, attempt_id: null },
+            ],
+          },
+        });
+      }),
+    );
+    renderWithProviders(<DailyPractice />, { exam: neet });
+    expect(await screen.findByRole('link', { name: 'Start Now' })).toHaveAttribute('href', '/neet/tests/dpp/9');
+    expect(await screen.findByRole('link', { name: 'Result' })).toHaveAttribute('href', '/neet/tests/dpp/result/55');
+    expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute('href', '/neet/tests/dpp/8');
+  });
+
+  it('says when there are no papers yet', async () => {
+    server.use(
+      http.get(`${API}/api/neet/get-live-dpp-neet`, () => HttpResponse.json({ success: true, data: { dpp: null } })),
+      http.get(`${API}/api/neet/get-dpp-months`, () => HttpResponse.json({ success: true, data: { months: [] } })),
+    );
+    renderWithProviders(<DailyPractice />, { exam: neet });
+    expect(await screen.findByText('No practice papers yet')).toBeInTheDocument();
+  });
+});

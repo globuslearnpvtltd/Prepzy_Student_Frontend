@@ -1,0 +1,229 @@
+/*
+ * Structural layout for design-system components (how parts are arranged, not how they look).
+ * Visual styling — colours, sizes, radius, typography — comes only from design.config.ts.
+ */
+@layer components {
+  .pz-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    text-decoration: none;
+    user-select: none;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      opacity 150ms ease;
+  }
+
+  .pz-button__spinner {
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 9999px;
+    animation: pz-spin 0.7s linear infinite;
+  }
+
+  .pz-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .pz-card__header,
+  .pz-card__footer {
+    display: flex;
+  }
+
+  .pz-card__header {
+    flex-direction: column;
+  }
+
+  .pz-card__footer {
+    align-items: center;
+  }
+
+  .pz-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    transition:
+      border-color 150ms ease,
+      outline-color 150ms ease;
+  }
+
+  .pz-input-group {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    transition: box-shadow 200ms ease, border-color 200ms ease;
+  }
+
+  .pz-input-group__prefix {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .pz-input-group__input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+  }
+
+  .pz-textarea {
+    display: block;
+    width: 100%;
+    resize: vertical;
+  }
+
+  .pz-field {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pz-badge {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .pz-alert {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pz-spinner {
+    display: inline-block;
+    flex-shrink: 0;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 9999px;
+    animation: pz-spin 0.7s linear infinite;
+  }
+
+  .pz-skeleton {
+    display: block;
+    animation: pz-pulse 1.5s ease-in-out infinite;
+  }
+
+  .pz-progress {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .pz-progress__indicator {
+    height: 100%;
+    width: 100%;
+    transition: transform 300ms ease;
+  }
+
+  .pz-dialog__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+  }
+
+  .pz-dialog__content {
+    position: fixed;
+    z-index: 51;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+  }
+
+  .pz-dialog__footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .pz-tabs {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pz-tabs__list {
+    display: inline-flex;
+    align-self: flex-start;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .pz-tabs__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .pz-option {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    text-align: start;
+  }
+
+  .pz-option-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pz-option__label {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pz-option__marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .pz-palette-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  @keyframes pz-pulse {
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  @keyframes pz-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pz-button,
+    .pz-input {
+      transition: none;
+    }
+    .pz-button__spinner,
+    .pz-spinner {
+      animation-duration: 2s;
+    }
+    .pz-skeleton,
+    .pz-progress__indicator {
+      animation: none;
+      transition: none;
+    }
+  }
+}

@@ -1,5 +1,4 @@
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { API, server } from '@/test/server';
 import { emptySnapshot, withAnswer, withMarkToggled, withVisit } from '../attempt';
 import { AlreadySubmittedError, type TestContext } from '../model';
@@ -11,9 +10,10 @@ import {
   type RawCompetitiveQuestion,
 } from './competitive';
 import { getTestAdapter } from './index';
+import { testExam } from '@/test/exams';
 
-const cbse: TestContext = { exam: getExam('cbse')!, classId: 12 };
-const neet: TestContext = { exam: getExam('neet')!, classId: 20 };
+const cbse: TestContext = { exam: testExam('cbse'), classId: 12 };
+const neet: TestContext = { exam: testExam('neet'), classId: 20 };
 
 const boardMcq: RawBoardQuestion = {
   question_id: 1,

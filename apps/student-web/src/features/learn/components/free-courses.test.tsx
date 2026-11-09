@@ -1,11 +1,11 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { FreeCourses } from './free-courses';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
+const cbse = testExam('cbse');
 const PLACEHOLDER = '/illustrations/dashboard/free-course.jpg';
 const endpoint = `${API}/api/v1/student/free-courses`;
 

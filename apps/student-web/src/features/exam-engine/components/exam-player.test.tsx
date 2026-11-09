@@ -1,14 +1,14 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
 import { ExamPlayer } from './exam-player';
 import { ResultContent } from './result-view';
+import { testExam } from '@/test/exams';
 
-const neet = getExam('neet')!;
+const neet = testExam('neet');
 
 function mockNeetPaper(onSubmit: (body: unknown) => void) {
   server.use(

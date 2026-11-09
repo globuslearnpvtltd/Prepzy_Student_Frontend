@@ -1,7 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { navigation } from '@/test/setup';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
@@ -29,9 +28,10 @@ import {
 import { estimate } from './components/calculator';
 import { buildFaqs } from './components/info';
 import { ReferAndEarn } from './components/refer-and-earn';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
-const neet = getExam('neet')!;
+const cbse = testExam('cbse');
+const neet = testExam('neet');
 
 const rawRates = [
   { exam_id: null, conversion_type: 'percent', signup_credit_free: '25', signup_credit_paid: '50', conversion_rate_free: '10', conversion_rate_paid: '20', conversion_floor: '50', conversion_cap: '500', conversion_flat_amount: null },

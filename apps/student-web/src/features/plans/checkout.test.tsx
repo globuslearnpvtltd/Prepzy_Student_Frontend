@@ -3,7 +3,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
-import { getExam } from '@/shared/config/exams';
 import { createTestQueryClient, renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
@@ -11,13 +10,14 @@ import type { ApiPlan } from './catalog';
 import { Checkout } from './components/checkout/checkout';
 import { useBoardPayments } from './hooks';
 import type { RazorpayFailure, RazorpayOptions } from './razorpay';
+import { testExam } from '@/test/exams';
 
 vi.mock('@/shared/config/env', async (importOriginal) => {
   const actual = await importOriginal<{ env: Record<string, unknown> }>();
   return { env: { ...actual.env, razorpayKeyId: 'rzp_test_key' } };
 });
 
-const cbse = getExam('cbse')!;
+const cbse = testExam('cbse');
 
 const apiPlan = (extra: Partial<ApiPlan>): ApiPlan => ({
   price_id: 1,

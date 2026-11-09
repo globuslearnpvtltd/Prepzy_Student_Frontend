@@ -19,7 +19,7 @@ export function GetReadyExam() {
   const [upgrade, setUpgrade] = useState(false);
   const papers = useQuery({
     queryKey: ['dashboard', exam.slug, 'pyq-teasers'],
-    queryFn: dashboardApi.pyqTeasers,
+    queryFn: () => dashboardApi.pyqTeasers(exam),
     enabled: noPlan,
   });
   if (!noPlan) return null;

@@ -1,7 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
@@ -19,8 +18,9 @@ import {
   ModuleScreen,
   NcertQuestionsScreen,
 } from './ui';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
+const cbse = testExam('cbse');
 const ok = (data: unknown) => HttpResponse.json({ success: true, data });
 
 const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
@@ -63,10 +63,10 @@ describe('Learn page', () => {
   it('resumes courses and opens a subject’s books', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/v4/dashboard/board/classes/12/continue-courses`, () =>
+      http.get(`${API}/api/v4/dashboard/board/1/classes/12/continue-courses`, () =>
         ok({ courses: [{ course_id: 5, course_name: 'Science Part 1', class_name: 'CLASS 10', subject_name: 'SCIENCE', progress_percentage: 40, upcoming_learn_item: { category: 'lecture', id: 8, module: 2 } }] }),
       ),
-      http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () =>
+      http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () =>
         ok({ subjects: [{ subject_id: 1, subject_name: 'SCIENCE', course_count: 2, subject_description: 'All about science' }, { subject_id: 4, subject_name: 'HINDI', course_count: 0 }] }),
       ),
       http.get(`${API}/api/v1/student/getCourselist-dashboard/12/1`, () =>
@@ -99,8 +99,8 @@ describe('Learn page', () => {
   it('shows section errors and empty states', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/v4/dashboard/board/classes/12/continue-courses`, () => HttpResponse.json({ message: 'down' }, { status: 500 })),
-      http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () => ok({ subjects: [] })),
+      http.get(`${API}/api/v4/dashboard/board/1/classes/12/continue-courses`, () => HttpResponse.json({ message: 'down' }, { status: 500 })),
+      http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () => ok({ subjects: [] })),
     );
     renderWithProviders(<LearnScreen />, { exam: cbse });
     expect(await screen.findByText('Failed to fetch Continue Learning')).toBeInTheDocument();

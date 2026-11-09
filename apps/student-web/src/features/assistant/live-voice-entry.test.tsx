@@ -1,7 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { FakePeerConnection, installVoiceFakes, removeVoiceFakes } from '@/test/fake-webrtc';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
@@ -10,9 +9,10 @@ import { AtlasHost } from './components/atlas-host';
 import { LectureAtlas } from './components/lecture-atlas';
 import { ReviewChat } from './components/review-chat';
 import { useAtlas } from './store';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
-const neet = getExam('neet')!;
+const cbse = testExam('cbse');
+const neet = testExam('neet');
 
 const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({

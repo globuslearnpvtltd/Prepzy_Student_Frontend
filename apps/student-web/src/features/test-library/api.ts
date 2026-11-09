@@ -1,3 +1,4 @@
+import { dashboardApiBase, type ExamRef } from '@/shared/config/exams';
 import type { ExamConfig } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk } from '@/shared/lib/unwrap';
@@ -306,9 +307,9 @@ export const libraryApi = {
     }));
   },
 
-  async customSubjects(): Promise<CustomSubject[]> {
+  async customSubjects(exam: ExamRef): Promise<CustomSubject[]> {
     type Raw = { subject_name: string; total_chapters?: unknown; course_ids?: unknown };
-    const body = assertOk(await apiClient.get<{ data?: Raw[] }>('/api/v4/dashboard/neet/subject-progress'));
+    const body = assertOk(await apiClient.get<{ data?: Raw[] }>(`${dashboardApiBase(exam)}/subject-progress`));
     return (body.data ?? []).map((s) => {
       let ids = s.course_ids;
       if (typeof ids === 'string') ids = ids.split(',');

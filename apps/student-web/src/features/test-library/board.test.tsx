@@ -1,12 +1,12 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { BoardAssessments, BoardPaperSets } from './board';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
+const cbse = testExam('cbse');
 
 const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({

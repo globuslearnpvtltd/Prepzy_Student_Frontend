@@ -5,7 +5,17 @@ export const API = 'http://api.e2e.test';
 type Handler = (body: unknown, url: URL) => unknown;
 
 /** Answers the app's API calls from a table of `METHOD /path` → JSON. Unknown calls fail the test. */
-export async function mockApi(page: Page, handlers: Record<string, Handler | object>) {
+/** Active exams (GET /api/v4/exams), loaded by every exam page. */
+export const EXAM_CATALOG = [
+  { exam_id: 1, exam_name: 'CBSE', exam_slice: 'cbse', category: 'board' },
+  { exam_id: 2, exam_name: 'NEET-UG', exam_slice: 'neet-ug', category: 'competitive' },
+];
+
+export async function mockApi(page: Page, routeHandlers: Record<string, Handler | object>) {
+  const handlers: Record<string, Handler | object> = {
+    'GET /api/v4/exams': { success: true, message: 'Exams fetched', data: EXAM_CATALOG },
+    ...routeHandlers,
+  };
   await page.route(`${API}/**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());

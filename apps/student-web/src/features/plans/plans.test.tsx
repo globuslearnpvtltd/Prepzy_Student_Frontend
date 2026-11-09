@@ -1,7 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
@@ -15,14 +14,15 @@ import { BillingPage, ManagePlans } from './components/manage-plans';
 import { Welcome } from './components/welcome';
 import { formatInr, formatInrExact } from './money';
 import type { RazorpayOptions } from './razorpay';
+import { testExam } from '@/test/exams';
 
 vi.mock('@/shared/config/env', async (importOriginal) => {
   const actual = await importOriginal<{ env: Record<string, unknown> }>();
   return { env: { ...actual.env, razorpayKeyId: 'rzp_test_key' } };
 });
 
-const cbse = getExam('cbse')!;
-const neet = getExam('neet')!;
+const cbse = testExam('cbse');
+const neet = testExam('neet');
 const NOW = new Date(2026, 5, 15);
 
 const apiPlan = (extra: Partial<ApiPlan>): ApiPlan => ({

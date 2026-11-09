@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
-import { getExam } from '@/shared/config/exams';
 import { ExamProvider } from '@/shared/hooks/use-exam';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
@@ -17,6 +16,7 @@ import { BillingPage } from './components/manage-plans';
 import { Modal, WarningDialog } from './components/modal';
 import { CourseCard, PlanStatusPill } from './components/plan-bits';
 import { PlansChrome } from './components/plans-chrome';
+import { testExam } from '@/test/exams';
 
 vi.mock('@/shared/layout/app-header', () => ({
   AppHeader: ({ category }: { category: string }) => <header>header:{category}</header>,
@@ -25,8 +25,8 @@ vi.mock('@/shared/layout/exam-shell', () => ({
   AppChrome: ({ children }: { children: ReactNode }) => <div data-testid="app-chrome">{children}</div>,
 }));
 
-const cbse = getExam('cbse')!;
-const neet = getExam('neet')!;
+const cbse = testExam('cbse');
+const neet = testExam('neet');
 const DATE = new Date(2026, 8, 4);
 
 const plan = (extra: Partial<Plan> = {}): Plan => ({

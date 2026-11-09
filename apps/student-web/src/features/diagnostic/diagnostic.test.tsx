@@ -1,7 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { navigation } from '@/test/setup';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
@@ -10,8 +9,9 @@ import { overview, pickExtremes, thinkingReasonCopy } from './components/result-
 import { DiagnosticResultScreen } from './components/result-screen';
 import { DiagnosticSetupScreen } from './components/setup-screen';
 import { DiagnosticTestScreen } from './components/test-screen';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
+const cbse = testExam('cbse');
 
 const activePlan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' }] } }),

@@ -1,7 +1,7 @@
-import { getExam } from '@/shared/config/exams';
 import { pickActivePlan } from './hooks';
 import { isValidPhone, normalizePhone, planName, planTier, toStudent, type ActivePlan } from './model';
 import { otpSchema, phoneSchema } from './schemas';
+import { testExam } from '@/test/exams';
 
 describe('toStudent', () => {
   it('maps the backend account row', () => {
@@ -74,8 +74,8 @@ describe('plans', () => {
   });
 
   it('names plans like the previous app', () => {
-    const neet = getExam('neet')!;
-    const cbse = getExam('cbse')!;
+    const neet = testExam('neet');
+    const cbse = testExam('cbse');
     expect(planName(plan(), neet)).toBe('Topper NEET 2027 Plan');
     expect(planName(plan({ relatedExams: [1] }), neet)).toBe('Topper NEET 2027 + CBSE Plan');
     expect(planName(plan({ durationMonths: 1 }), neet)).toBe('Topper NEET Monthly Plan');

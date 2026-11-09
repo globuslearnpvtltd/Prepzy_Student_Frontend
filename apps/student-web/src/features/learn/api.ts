@@ -1,3 +1,4 @@
+import { dashboardApiBase, type ExamRef } from '@/shared/config/exams';
 import type { TestTypeKey } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { apiClient } from '@/shared/lib/api-client';
@@ -396,8 +397,8 @@ export const learnApi = {
     });
   },
 
-  async subjects(classId: number): Promise<LearnSubject[]> {
-    const body = assertOk(await apiClient.get<Envelope<{ subjects?: Raw[] }>>(`/api/v4/dashboard/board/classes/${classId}/subjects`));
+  async subjects(exam: ExamRef, classId: number): Promise<LearnSubject[]> {
+    const body = assertOk(await apiClient.get<Envelope<{ subjects?: Raw[] }>>(`${dashboardApiBase(exam)}/classes/${classId}/subjects`));
     return (body.data?.subjects ?? []).map((s) => ({
       id: id(s.subject_id),
       name: text(s.subject_name) ?? '',
@@ -407,9 +408,9 @@ export const learnApi = {
     }));
   },
 
-  async continueCourses(classId: number): Promise<ContinueCourse[]> {
+  async continueCourses(exam: ExamRef, classId: number): Promise<ContinueCourse[]> {
     const body = assertOk(
-      await apiClient.get<Envelope<{ courses?: Raw[] }>>(`/api/v4/dashboard/board/classes/${classId}/continue-courses`),
+      await apiClient.get<Envelope<{ courses?: Raw[] }>>(`${dashboardApiBase(exam)}/classes/${classId}/continue-courses`),
     );
     return (body.data?.courses ?? []).map((c) => ({
       courseId: id(c.course_id),

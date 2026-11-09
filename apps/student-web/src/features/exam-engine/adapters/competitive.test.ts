@@ -1,13 +1,13 @@
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { API, server } from '@/test/server';
 import { emptySnapshot, withAnswer, withMarkToggled, withVisit } from '../attempt';
 import type { TestContext } from '../model';
 import { competitiveSnapshot, toCompetitivePayload, toCompetitiveResultQuestion } from './competitive';
 import { getTestAdapter } from './index';
+import { testExam } from '@/test/exams';
 
-const neet: TestContext = { exam: getExam('neet')!, classId: 20 };
+const neet: TestContext = { exam: testExam('neet'), classId: 20 };
 const question = {
   question_id: 1,
   question_text: 'Q',

@@ -5,13 +5,16 @@ import { API, server } from '@/test/server';
 import { libraryApi, subjectName } from './api';
 import { boardCustomApi } from './board-custom-api';
 import { examForCategory } from './route-guard';
+import { testExam } from '@/test/exams';
 
-const neet = getExam('neet')!;
+const COMPETITIVE = { category: 'competitive', examId: 2 } as const;
+
+const neet = testExam('neet');
 const ok = (body: Record<string, unknown> = {}) => HttpResponse.json({ success: true, ...body });
 
 describe('examForCategory', () => {
   it('returns the exam of the right category and 404s otherwise', () => {
-    expect(examForCategory('neet', 'competitive')).toBe(neet);
+    expect(examForCategory('neet', 'competitive')).toBe(getExam('neet'));
     expect(notFound).not.toHaveBeenCalled();
     examForCategory('cbse', 'competitive');
     examForCategory('gate', 'board');
@@ -114,7 +117,7 @@ describe('libraryApi with sparse backend payloads', () => {
 
   it('custom subjects accept course ids as a list or a comma string', async () => {
     server.use(
-      http.get(`${API}/api/v4/dashboard/neet/subject-progress`, () =>
+      http.get(`${API}/api/v4/dashboard/competitive/2/subject-progress`, () =>
         ok({
           data: [
             { subject_name: 'neet-physics', course_ids: '11,12', total_chapters: 20 },
@@ -124,13 +127,13 @@ describe('libraryApi with sparse backend payloads', () => {
         }),
       ),
     );
-    expect(await libraryApi.customSubjects()).toEqual([
+    expect(await libraryApi.customSubjects(COMPETITIVE)).toEqual([
       { name: 'Physics', courseIds: ['11', '12'], chapterCount: 20 },
       { name: 'Biology', courseIds: ['13'], chapterCount: 0 },
       { name: 'Chemistry', courseIds: [], chapterCount: 0 },
     ]);
-    server.use(http.get(`${API}/api/v4/dashboard/neet/subject-progress`, () => ok()));
-    expect(await libraryApi.customSubjects()).toEqual([]);
+    server.use(http.get(`${API}/api/v4/dashboard/competitive/2/subject-progress`, () => ok()));
+    expect(await libraryApi.customSubjects(COMPETITIVE)).toEqual([]);
   });
 
   it('custom chapters, topics and generation handle empty answers', async () => {

@@ -87,7 +87,7 @@ export function NeetWelcome() {
 
 export function SubjectProgressCards() {
   const { exam } = useDashboardContext();
-  const query = useQuery({ queryKey: ['dashboard', exam.slug, 'subject-progress'], queryFn: dashboardApi.competitiveProgress });
+  const query = useQuery({ queryKey: ['dashboard', exam.slug, 'subject-progress'], queryFn: () => dashboardApi.competitiveProgress(exam) });
   return (
     <section aria-labelledby="subject-progress" className="w-full rounded-2xl p-3">
       <h2 id="subject-progress" className="mb-4 flex h-8 items-center text-[15px] leading-5 font-medium text-neutral-900">

@@ -1,12 +1,12 @@
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { API, server } from '@/test/server';
 import { withAnswer } from '../attempt';
 import { AlreadySubmittedError, type TestContext } from '../model';
 import { getTestAdapter, listableTestTypes } from './index';
+import { testExam } from '@/test/exams';
 
-const cbse: TestContext = { exam: getExam('cbse')!, classId: 12 };
-const neet: TestContext = { exam: getExam('neet')!, classId: 20 };
+const cbse: TestContext = { exam: testExam('cbse'), classId: 12 };
+const neet: TestContext = { exam: testExam('neet'), classId: 20 };
 
 const boardQuestion = {
   question_id: 1,

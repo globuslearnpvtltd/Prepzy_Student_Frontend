@@ -1,14 +1,14 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
 import { notesApi, pdfDownloadUrl, toChapterNotes, toTopics, toVideoUrl } from './api';
 import { NotesScreen, NotesViewScreen, SummaryVideoScreen } from './ui';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
+const cbse = testExam('cbse');
 const ok = (data: unknown) => HttpResponse.json({ success: true, data });
 
 const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
@@ -59,7 +59,7 @@ describe('Notes page', () => {
   it('lists books for the chosen subject', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () =>
+      http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () =>
         ok({ subjects: [{ subject_id: 1, subject_name: 'Science' }, { subject_id: 2, subject_name: 'Maths' }] }),
       ),
       http.get(`${API}/api/v1/student/getCourselist-dashboard/12/1`, () => ok({ result: [{ course_id: 5, title: 'Science Part 1', module_count: 13 }] })),
@@ -81,7 +81,7 @@ describe('Notes page', () => {
   });
 
   it('shows an error when subjects fail', async () => {
-    server.use(plan, http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(plan, http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<NotesScreen />, { exam: cbse });
     expect(await screen.findByText('Failed To Load Notes')).toBeInTheDocument();
   });

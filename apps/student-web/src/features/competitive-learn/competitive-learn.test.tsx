@@ -1,7 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { competitiveChrome } from '@/shared/config/navigation';
 import { competitiveSuggestionHref } from '@/shared/layout/shell-api';
 import { renderWithProviders } from '@/test/render';
@@ -26,8 +25,9 @@ import { CourseScreen } from './components/course-screen';
 import { NotesLibrary } from './components/notes-library';
 import { isYouTubeEnded } from './components/video-player';
 import { adjacentSteps, isChapterStep } from './steps';
+import { testExam } from '@/test/exams';
 
-const neet = getExam('neet')!;
+const neet = testExam('neet');
 
 const ok = (body: Record<string, unknown>) => HttpResponse.json({ success: true, ...body });
 

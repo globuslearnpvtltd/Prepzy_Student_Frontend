@@ -1,7 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { formatHours, syllabusCards, toActivity, weeklyAverage } from './api';
@@ -10,9 +9,10 @@ import { untilMidnight } from './competitive-widgets';
 import { Dashboard, DASHBOARD_WIDGETS } from './dashboard';
 import { toBars } from './performance-widgets';
 import { boardSubjectArt, competitiveSubjectArt } from './subject-art';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
-const neet = getExam('neet')!;
+const cbse = testExam('cbse');
+const neet = testExam('neet');
 
 const plan = (classId: number, extra: Record<string, unknown> = {}) =>
   http.get(`${API}/api/v4/student/plans/active`, () =>
@@ -41,7 +41,7 @@ const account = (extra: Record<string, unknown> = {}) =>
   );
 
 const graph = (classId: number, rows = [{ subject: 'Biology', thisAttempt: 80, lastAttempt: 70 }]) =>
-  http.get(`${API}/api/v4/dashboard/board/classes/${classId}/subject-scores`, () =>
+  http.get(`${API}/api/v4/dashboard/:category/:examId/classes/${classId}/subject-scores`, () =>
     HttpResponse.json({ success: true, data: { overall_percent: 72.6, result_data: rows } }),
   );
 
@@ -52,13 +52,13 @@ function boardHandlers(overrides: { courses?: unknown[]; exams?: unknown[]; subj
     plan(12),
     account(),
     graph(12),
-    http.get(`${API}/api/v4/dashboard/board/overview`, () =>
+    http.get(`${API}/api/v4/dashboard/board/1/overview`, () =>
       HttpResponse.json({
         success: true,
         data: { week_activity: week, profileProgress: { name: 'MS', image: null, completion_percentage: 40 } },
       }),
     ),
-    http.get(`${API}/api/v4/dashboard/board/classes/12/continue-courses`, () =>
+    http.get(`${API}/api/v4/dashboard/board/1/classes/12/continue-courses`, () =>
       HttpResponse.json({
         success: true,
         data: {
@@ -68,7 +68,7 @@ function boardHandlers(overrides: { courses?: unknown[]; exams?: unknown[]; subj
         },
       }),
     ),
-    http.get(`${API}/api/v4/dashboard/board/classes/12/continue-exams`, () =>
+    http.get(`${API}/api/v4/dashboard/board/1/classes/12/continue-exams`, () =>
       HttpResponse.json({
         success: true,
         data: {
@@ -79,7 +79,7 @@ function boardHandlers(overrides: { courses?: unknown[]; exams?: unknown[]; subj
         },
       }),
     ),
-    http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () =>
+    http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () =>
       overrides.subjects === 'error'
         ? HttpResponse.json({ message: 'boom' }, { status: 500 })
         : HttpResponse.json({
@@ -183,7 +183,7 @@ function neetHandlers(dpp: unknown = { dpp: { dpp_id: 9, dpp_name: 'DPP #14' }, 
     plan(20),
     account({ gender: 'female' }),
     graph(20),
-    http.get(`${API}/api/v4/dashboard/neet/subject-progress`, () =>
+    http.get(`${API}/api/v4/dashboard/competitive/2/subject-progress`, () =>
       HttpResponse.json({
         success: true,
         data: [
@@ -192,7 +192,7 @@ function neetHandlers(dpp: unknown = { dpp: { dpp_id: 9, dpp_name: 'DPP #14' }, 
       }),
     ),
     http.get(`${API}/api/neet/get-live-dpp-neet`, () => HttpResponse.json({ success: true, data: dpp })),
-    http.get(`${API}/api/v4/dashboard/neet/weekly-activity`, () => HttpResponse.json({ success: true, data: week })),
+    http.get(`${API}/api/v4/dashboard/competitive/2/weekly-activity`, () => HttpResponse.json({ success: true, data: week })),
   ];
 }
 
@@ -210,7 +210,7 @@ describe('board dashboard without a plan', () => {
         },
       }),
     ),
-    http.get(`${API}/api/v4/dashboard/board/pyq-subjects`, () =>
+    http.get(`${API}/api/v4/dashboard/board/1/pyq-subjects`, () =>
       HttpResponse.json({ success: true, data: { pyq: [{ year: 2025, subject: 4, title: 'SOCIAL SCIENCE STUDIES', image: '', class: 'CLASS 12' }] } }),
     ),
   ];

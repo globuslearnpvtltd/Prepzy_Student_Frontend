@@ -14,7 +14,10 @@ export interface ExamConfig {
   slug: string;
   /** Backend key (exam_table.exam_slice). */
   examSlice: string;
-  /** Backend id (exam_table.exam_id). */
+  /**
+   * Fallback only: pages get the backend's exam_id (GET /api/v4/exams) through ExamFrame / useExam.
+   * Remove once every caller reads the id from the backend catalog.
+   */
   examId: number;
   label: string;
   /** Decides the shell (navigation, header links, sidebar) and the dashboard layout. See navigation.ts. */
@@ -83,8 +86,8 @@ export function getExam(slug: string | undefined | null): ExamConfig | null {
 
 /** Finds an exam from any backend representation: slice ('neet-ug'), name ('NEET-UG', 'CBSE') or id. */
 export function findExam(value: string | number | null | undefined): ExamConfig | null {
-  if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return examList.find((exam) => exam.examId === value) ?? null;
+  if (value === null || value === undefined || value === '') return null;
   const key = value.toLowerCase();
   return examList.find((exam) => exam.slug === key || exam.examSlice === key) ?? null;
 }
@@ -92,3 +95,9 @@ export function findExam(value: string | number | null | undefined): ExamConfig 
 export function hasTestType(exam: ExamConfig, testType: string): testType is TestTypeKey {
   return (exam.testTypes as readonly string[]).includes(testType);
 }
+
+/** What a backend URL needs to know about an exam: its category and its backend exam_id. */
+export type ExamRef = Pick<ExamConfig, 'category' | 'examId'>;
+
+/** v4 dashboard base for an exam: one set of routes per category, the exam picked by its id. */
+export const dashboardApiBase = (exam: ExamRef): string => `/api/v4/dashboard/${exam.category}/${exam.examId}`;

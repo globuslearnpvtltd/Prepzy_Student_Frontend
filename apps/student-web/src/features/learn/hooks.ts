@@ -35,9 +35,10 @@ export function useLearnContext() {
 }
 
 export function useSubjects(classId: number | null) {
+  const exam = useExam();
   return useQuery({
     queryKey: learnKeys.subjects(classId),
-    queryFn: () => learnApi.subjects(classId!),
+    queryFn: () => learnApi.subjects(exam, classId!),
     enabled: classId !== null,
   });
 }

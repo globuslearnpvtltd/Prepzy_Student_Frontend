@@ -1,13 +1,13 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import type { WrittenAnswer } from '../model';
 import { AnswerBox } from './answer-box';
 import { editorAnswer } from './rich-answer-box';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
+const cbse = testExam('cbse');
 
 function Harness({ initial, onChange }: { initial: WrittenAnswer; onChange: (v: WrittenAnswer) => void }) {
   const [value, setValue] = useState(initial);

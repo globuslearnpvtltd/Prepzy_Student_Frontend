@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { useState } from 'react';
 import { usePlanSelection } from '@/features/auth';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
@@ -14,6 +13,7 @@ import { SetCard } from './set-card';
 import { CompletedDialog, SubmitDialog, SubmittingScreen } from './submit-flow';
 import { TestHub } from './test-hub';
 import { TestSets } from './test-sets';
+import { testExam } from '@/test/exams';
 
 vi.mock('@/features/assistant/ui', () => ({
   ReviewChat: ({ onClose, context }: { onClose: () => void; context: { questionId: string; attemptId: string } }) => (
@@ -26,8 +26,8 @@ vi.mock('@/features/assistant/ui', () => ({
   ),
 }));
 
-const cbse = getExam('cbse')!;
-const neet = getExam('neet')!;
+const cbse = testExam('cbse');
+const neet = testExam('neet');
 
 const plans = (list: unknown[]) =>
   http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: list } }));

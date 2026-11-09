@@ -1,5 +1,6 @@
 'use client';
 
+import type { ExamConfig } from '@/shared/config/exams';
 import { cx, Skeleton } from '@prepzy/design-system';
 import { useTestContext } from '@/features/exam-engine';
 import { useExam } from '@/shared/hooks/use-exam';
@@ -15,9 +16,9 @@ export function useDashboardContext() {
 }
 
 /** Board "learner data" (weekly hours + profile completion), shared by the activity chart and the profile card. */
-export const boardOverviewQuery = (exam: string, classId: number | null) => ({
-  queryKey: ['dashboard', exam, 'board-overview', classId] as const,
-  queryFn: () => dashboardApi.boardOverview(classId!),
+export const boardOverviewQuery = (exam: ExamConfig, classId: number | null) => ({
+  queryKey: ['dashboard', exam.slug, 'board-overview', classId] as const,
+  queryFn: () => dashboardApi.boardOverview(exam, classId!),
 });
 
 /** Inline failure message for one widget; the rest of the dashboard keeps working. */

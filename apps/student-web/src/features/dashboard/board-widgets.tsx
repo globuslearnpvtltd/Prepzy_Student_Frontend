@@ -180,7 +180,7 @@ export function ContinueAssessment() {
   const { exam, classId } = useDashboardContext();
   const query = useQuery({
     queryKey: ['dashboard', exam.slug, 'continue-tests', classId],
-    queryFn: () => dashboardApi.continueTests(classId!),
+    queryFn: () => dashboardApi.continueTests(exam, classId!),
     enabled: classId !== null,
   });
   if (query.isError) return <SectionError title="Failed to fetch Continue Assessments" error={query.error} />;
@@ -237,7 +237,7 @@ export function ContinueAssessment() {
 export function ProfileCard() {
   const { exam, classId } = useDashboardContext();
   const user = useCurrentUser();
-  const overview = useQuery({ ...boardOverviewQuery(exam.slug, classId), enabled: classId !== null });
+  const overview = useQuery({ ...boardOverviewQuery(exam, classId), enabled: classId !== null });
   const profile = overview.data?.profile;
   const name = user.data ? `Hey ${[user.data.firstName, user.data.lastName].filter(Boolean).join(' ')}` : 'Hey there!';
   const initials = profile?.initials ?? `${user.data?.firstName.charAt(0) ?? ''}${user.data?.lastName.charAt(0) ?? ''}`;

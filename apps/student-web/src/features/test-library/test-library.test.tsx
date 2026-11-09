@@ -1,7 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
@@ -9,9 +8,10 @@ import { BoardPaperSets } from './board';
 import { CustomTestCreate, CustomTests } from './custom-tests';
 import { DailyPractice } from './daily-practice';
 import { TestLibrary } from './library';
+import { testExam } from '@/test/exams';
 
-const neet = getExam('neet')!;
-const cbse = getExam('cbse')!;
+const neet = testExam('neet');
+const cbse = testExam('cbse');
 
 const plan = (classId: number) =>
   http.get(`${API}/api/v4/student/plans/active`, () =>
@@ -150,7 +150,7 @@ describe('custom tests', () => {
   it('builds a test: subject → chapter → topics → generate opens the player', async () => {
     let generated: unknown;
     server.use(
-      http.get(`${API}/api/v4/dashboard/neet/subject-progress`, () =>
+      http.get(`${API}/api/v4/dashboard/competitive/2/subject-progress`, () =>
         HttpResponse.json({ success: true, data: [{ subject_name: 'NEET-Botany', total_chapters: 18, course_ids: '1' }] }),
       ),
       http.get(`${API}/api/neet/custom-exam/chapters/1`, () =>

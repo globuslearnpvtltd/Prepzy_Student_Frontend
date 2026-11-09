@@ -179,7 +179,7 @@ export function CustomTestCreate() {
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [step, setStep] = useState(0);
 
-  const subjects = useQuery({ queryKey: ['test-library', exam.slug, 'custom-subjects'], queryFn: libraryApi.customSubjects });
+  const subjects = useQuery({ queryKey: ['test-library', exam.slug, 'custom-subjects'], queryFn: () => libraryApi.customSubjects(exam) });
   const chapters = useQuery({
     queryKey: ['test-library', 'custom-chapters', subject?.courseIds.join(',')],
     queryFn: () => libraryApi.customChapters(subject!.courseIds),

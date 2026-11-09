@@ -46,10 +46,10 @@ test.describe('board (CBSE) learning', () => {
 test.describe('competitive (NEET) learning', () => {
   test('subject → chapter → video lecture → study notes', async ({ page, context }) => {
     await signIn(context, 'neet');
-    const progress = MOCKS['/api/v4/dashboard/neet/subject-progress'] as { data: { subject_name: string }[] };
+    const progress = MOCKS['/api/v4/dashboard/competitive/2/subject-progress'] as { data: { subject_name: string }[] };
     await mockStudentApi(page, 'competitive', {
       // Physics opens the course that has chapter data in the shared mocks.
-      'GET /api/v4/dashboard/neet/subject-progress': {
+      'GET /api/v4/dashboard/competitive/2/subject-progress': {
         success: true,
         data: progress.data.map((row) => ({ ...row, course_ids: row.subject_name === 'NEET-Physics' ? [214] : [1] })),
       },

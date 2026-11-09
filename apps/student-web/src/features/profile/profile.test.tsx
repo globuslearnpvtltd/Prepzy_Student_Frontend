@@ -1,7 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { navigation } from '@/test/setup';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
@@ -10,8 +9,9 @@ import { ChangePasswordScreen } from './components/change-password-screen';
 import { DeleteAccountDialog } from './components/delete-account-dialog';
 import { sameContact, toParentDetails } from './components/parent-link';
 import { ProfileScreen } from './components/profile-screen';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
+const cbse = testExam('cbse');
 
 const accountRow = {
   account_id: 7,

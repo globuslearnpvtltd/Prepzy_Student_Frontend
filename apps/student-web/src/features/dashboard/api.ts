@@ -1,3 +1,4 @@
+import { dashboardApiBase, type ExamRef } from '@/shared/config/exams';
 import type { TestTypeKey } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk } from '@/shared/lib/unwrap';
@@ -122,9 +123,9 @@ export interface PyqTeaser {
 }
 
 export const dashboardApi = {
-  async pyqTeasers(): Promise<PyqTeaser[]> {
+  async pyqTeasers(exam: ExamRef): Promise<PyqTeaser[]> {
     type Raw = { year?: unknown; subject?: unknown; title?: unknown; image?: unknown; class?: unknown };
-    const body = assertOk(await apiClient.get<Envelope<{ pyq?: Raw[] }>>('/api/v4/dashboard/board/pyq-subjects'));
+    const body = assertOk(await apiClient.get<Envelope<{ pyq?: Raw[] }>>(`${dashboardApiBase(exam)}/pyq-subjects`));
     return (body.data?.pyq ?? []).map((p) => ({
       title: text(p.title) ?? '',
       className: text(p.class) ?? '',
@@ -134,13 +135,13 @@ export const dashboardApi = {
     }));
   },
 
-  async boardOverview(classId: number): Promise<{ activity: DayActivity[]; profile: ProfileProgress | null }> {
+  async boardOverview(exam: ExamRef, classId: number): Promise<{ activity: DayActivity[]; profile: ProfileProgress | null }> {
     type Raw = {
       week_activity?: unknown;
       profileProgress?: { name?: unknown; image?: unknown; completion_percentage?: unknown } | null;
     };
     const body = assertOk(
-      await apiClient.get<Envelope<Raw>>('/api/v4/dashboard/board/overview', {
+      await apiClient.get<Envelope<Raw>>(`${dashboardApiBase(exam)}/overview`, {
         params: { class_id: classId },
       }),
     );
@@ -157,17 +158,17 @@ export const dashboardApi = {
     };
   },
 
-  async competitiveActivity(classId: number): Promise<DayActivity[]> {
+  async competitiveActivity(exam: ExamRef, classId: number): Promise<DayActivity[]> {
     const body = assertOk(
-      await apiClient.get<Envelope<unknown>>('/api/v4/dashboard/neet/weekly-activity', { params: { class_id: classId } }),
+      await apiClient.get<Envelope<unknown>>(`${dashboardApiBase(exam)}/weekly-activity`, { params: { class_id: classId } }),
     );
     return toActivity(body.data);
   },
 
-  async subjectScores(classId: number): Promise<{ overall: number; subjects: SubjectScore[] }> {
+  async subjectScores(exam: ExamRef, classId: number): Promise<{ overall: number; subjects: SubjectScore[] }> {
     const body = assertOk(
       await apiClient.get<Envelope<{ overall_percent?: unknown; result_data?: SubjectScore[] }>>(
-        `/api/v4/dashboard/board/classes/${classId}/subject-scores`,
+        `${dashboardApiBase(exam)}/classes/${classId}/subject-scores`,
       ),
     );
     return {
@@ -180,10 +181,10 @@ export const dashboardApi = {
     };
   },
 
-  async boardSubjects(classId: number): Promise<SubjectOverview[]> {
+  async boardSubjects(exam: ExamRef, classId: number): Promise<SubjectOverview[]> {
     type Raw = { subject_id: number | string; subject_name: string; course_count?: unknown; module_count?: unknown };
     const body = assertOk(
-      await apiClient.get<Envelope<{ subjects?: Raw[] }>>(`/api/v4/dashboard/board/classes/${classId}/subjects`),
+      await apiClient.get<Envelope<{ subjects?: Raw[] }>>(`${dashboardApiBase(exam)}/classes/${classId}/subjects`),
     );
     return (body.data?.subjects ?? []).map((s) => ({
       id: String(s.subject_id),
@@ -193,7 +194,7 @@ export const dashboardApi = {
     }));
   },
 
-  async continueCourses(classId: number): Promise<ContinueCourse[]> {
+  async continueCourses(exam: ExamRef, classId: number): Promise<ContinueCourse[]> {
     type Raw = {
       course_id: number | string;
       course_name?: string;
@@ -203,7 +204,7 @@ export const dashboardApi = {
       progress_percentage?: unknown;
     };
     const body = assertOk(
-      await apiClient.get<Envelope<{ courses?: Raw[] }>>(`/api/v4/dashboard/board/classes/${classId}/continue-courses`),
+      await apiClient.get<Envelope<{ courses?: Raw[] }>>(`${dashboardApiBase(exam)}/classes/${classId}/continue-courses`),
     );
     return (body.data?.courses ?? []).map((c) => ({
       courseId: String(c.course_id),
@@ -216,7 +217,7 @@ export const dashboardApi = {
   },
 
   /** Board papers the student started but hasn't submitted (backend returns the latest 4). */
-  async continueTests(classId: number): Promise<ContinueTest[]> {
+  async continueTests(exam: ExamRef, classId: number): Promise<ContinueTest[]> {
     type Raw = {
       set_id: number | string;
       set_number?: unknown;
@@ -225,7 +226,7 @@ export const dashboardApi = {
       class_name?: string;
     };
     const body = assertOk(
-      await apiClient.get<Envelope<{ exams?: Raw[] } | Raw[]>>(`/api/v4/dashboard/board/classes/${classId}/continue-exams`),
+      await apiClient.get<Envelope<{ exams?: Raw[] } | Raw[]>>(`${dashboardApiBase(exam)}/classes/${classId}/continue-exams`),
     );
     const data = body.data;
     const rows = Array.isArray(data) ? data : (data?.exams ?? []);
@@ -242,7 +243,7 @@ export const dashboardApi = {
     });
   },
 
-  async competitiveProgress(): Promise<SubjectProgress[]> {
+  async competitiveProgress(exam: ExamRef): Promise<SubjectProgress[]> {
     type Raw = {
       subject_name: string;
       completed_chapters?: unknown;
@@ -250,7 +251,7 @@ export const dashboardApi = {
       progress_percentage?: unknown;
       course_ids?: unknown;
     };
-    const body = assertOk(await apiClient.get<Envelope<Raw[]>>('/api/v4/dashboard/neet/subject-progress'));
+    const body = assertOk(await apiClient.get<Envelope<Raw[]>>(`${dashboardApiBase(exam)}/subject-progress`));
     return (body.data ?? []).map((s) => {
       let ids = s.course_ids;
       if (typeof ids === 'string') {

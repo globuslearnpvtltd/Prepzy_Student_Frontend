@@ -26,13 +26,13 @@ test('login with OTP opens the NEET dashboard', async ({ page, context }) => {
         data: { account_id: 1, first_name: 'Ravi', target_exam: 'NEET-UG' },
       };
     },
-    'GET /api/v4/dashboard/neet/subject-progress': {
+    'GET /api/v4/dashboard/competitive/2/subject-progress': {
       success: true,
       data: [{ subject_name: 'NEET-Botany', completed_chapters: 3, total_chapters: 10, progress_percentage: 30 }],
     },
     'GET /api/neet/get-live-dpp-neet': { success: true, data: { dpp: null } },
-    'GET /api/v4/dashboard/neet/weekly-activity': { success: true, data: { Mon: 1 } },
-    'GET /api/v4/dashboard/board/classes/20/subject-scores': { success: true, data: { overall_percent: 50, result_data: [] } },
+    'GET /api/v4/dashboard/competitive/2/weekly-activity': { success: true, data: { Mon: 1 } },
+    'GET /api/v4/dashboard/competitive/2/classes/20/subject-scores': { success: true, data: { overall_percent: 50, result_data: [] } },
   });
 
   await page.goto('/login');

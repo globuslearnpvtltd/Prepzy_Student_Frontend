@@ -1,5 +1,6 @@
 'use client';
 
+import type { ExamRef } from '@/shared/config/exams';
 import { useQuery } from '@tanstack/react-query';
 import type { ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
@@ -151,8 +152,8 @@ export const shellApi = {
     return id ? String(id) : null;
   },
 
-  async planSummary(): Promise<PlanSummary | null> {
-    const body = assertOk(await apiClient.get<Envelope<PlanSummary>>('/api/v4/student/plans/neet-summary'));
+  async planSummary(exam: Pick<ExamRef, 'examId'>): Promise<PlanSummary | null> {
+    const body = assertOk(await apiClient.get<Envelope<PlanSummary>>(`/api/v4/student/plans/${exam.examId}/summary`));
     return body.data && typeof body.data === 'object' && 'planName' in body.data ? body.data : null;
   },
 };
@@ -177,11 +178,11 @@ export function useLiveDpp(exam: ExamConfig) {
   return useQuery({ queryKey: shellKeys.liveDpp(exam.slug), queryFn: () => shellApi.liveDpp(exam) });
 }
 
-/** NEET plan summary shown in the account menu (competitive exams only). */
+/** Plan summary shown in the account menu (competitive exams only), for the current exam. */
 export function usePlanSummary(exam: ExamConfig | null) {
   return useQuery({
     queryKey: shellKeys.planSummary(exam?.slug ?? ''),
-    queryFn: shellApi.planSummary,
+    queryFn: () => shellApi.planSummary(exam!),
     enabled: exam?.category === 'competitive',
     staleTime: 5 * 60_000,
   });

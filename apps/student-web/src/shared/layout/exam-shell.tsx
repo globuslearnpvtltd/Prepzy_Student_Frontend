@@ -2,13 +2,14 @@
 
 import { cx } from '@prepzy/design-system';
 import { usePathname, useRouter } from 'next/navigation';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useMemo } from 'react';
 import { AtlasHost } from '@/features/assistant/ui';
 import { rememberExam, usePurchasedExams } from '@/features/auth';
 import { findExam, getExam, REFERENCE, type ExamConfig } from '@/shared/config/exams';
 import { competitiveChrome } from '@/shared/config/navigation';
 import { routes } from '@/shared/config/routes';
 import { ExamProvider, useExam } from '@/shared/hooks/use-exam';
+import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { userMessage } from '@/shared/lib/errors';
 import { AppHeader } from './app-header';
 import { BoardBottomBar, BoardSidebar } from './board-navigation';
@@ -17,14 +18,30 @@ import { PageSpinner, StatusScreen } from './status-screens';
 
 /** Wraps every /[exam]/… page: exam context, the exam's theme and the access check. */
 export function ExamFrame({ examSlug, children }: { examSlug: string; children: React.ReactNode }) {
-  const exam = getExam(examSlug) as ExamConfig;
+  const config = getExam(examSlug) as ExamConfig;
+  const catalog = useExamCatalog();
 
-  useEffect(() => rememberExam(exam.slug), [exam.slug]);
+  useEffect(() => rememberExam(config.slug), [config.slug]);
+
+  // The exam id used for API calls comes from the backend (exam_table), matched by exam_slice and category.
+  const fromBackend = catalog.data?.find((e) => e.examSlice === config.examSlice && e.category === config.category);
+  const exam = useMemo(
+    () => (fromBackend ? { ...config, examId: fromBackend.examId } : config),
+    [config, fromBackend],
+  );
+
+  let content: React.ReactNode;
+  if (catalog.isPending) content = <PageSpinner />;
+  else if (catalog.isError) {
+    content = <StatusScreen title="We couldn't load your exams" description={userMessage(catalog.error)} />;
+  } else if (!fromBackend) {
+    content = <StatusScreen title={`${config.label} isn't available right now`} description="Please try again later." />;
+  } else content = <AccessGate exam={exam}>{children}</AccessGate>;
 
   return (
     <ExamProvider value={exam}>
       <div data-theme={exam.theme} className="bg-canvas min-h-dvh">
-        <AccessGate exam={exam}>{children}</AccessGate>
+        {content}
       </div>
     </ExamProvider>
   );

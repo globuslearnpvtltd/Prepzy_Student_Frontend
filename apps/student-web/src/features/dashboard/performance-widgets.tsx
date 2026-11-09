@@ -20,13 +20,13 @@ function useActivity() {
   const { exam, classId } = useDashboardContext();
   const competitive = exam.category === 'competitive';
   const board = useQuery({
-    ...boardOverviewQuery(exam.slug, classId),
+    ...boardOverviewQuery(exam, classId),
     enabled: !competitive && classId !== null,
     select: (data) => data.activity,
   });
   const neet = useQuery({
     queryKey: ['dashboard', exam.slug, 'activity', classId],
-    queryFn: () => dashboardApi.competitiveActivity(classId!),
+    queryFn: () => dashboardApi.competitiveActivity(exam, classId!),
     enabled: competitive && classId !== null,
   });
   return competitive ? neet : board;
@@ -67,7 +67,7 @@ export function ScoresCard() {
   const { exam, classId, noPlan } = useDashboardContext();
   const query = useQuery({
     queryKey: ['dashboard', exam.slug, 'scores', classId],
-    queryFn: () => dashboardApi.subjectScores(classId!),
+    queryFn: () => dashboardApi.subjectScores(exam, classId!),
     enabled: classId !== null,
   });
   const subjects = query.data?.subjects ?? [];

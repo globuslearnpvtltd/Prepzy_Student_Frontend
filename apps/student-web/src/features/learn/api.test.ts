@@ -15,6 +15,8 @@ import {
   toVideos,
 } from './api';
 
+const BOARD = { category: 'board', examId: 1 } as const;
+
 describe('learn helpers', () => {
   it('formats titles like the previous app', () => {
     expect(formatTitle('the laws OF motion ii')).toBe('The Laws of Motion II');
@@ -79,10 +81,10 @@ describe('learn helpers', () => {
 describe('learnApi', () => {
   it('reads subjects, continue courses and subject courses', async () => {
     server.use(
-      http.get(`${API}/api/v4/dashboard/board/classes/12/subjects`, () =>
+      http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () =>
         HttpResponse.json({ success: true, data: { subjects: [{ subject_id: 1, subject_name: 'PHYSICS', course_count: 2, image: 'null' }] } }),
       ),
-      http.get(`${API}/api/v4/dashboard/board/classes/12/continue-courses`, () =>
+      http.get(`${API}/api/v4/dashboard/board/1/classes/12/continue-courses`, () =>
         HttpResponse.json({
           success: true,
           data: { courses: [{ course_id: 5, course_name: 'Optics', progress_percentage: 33.6, upcoming_learn_item: { category: 'lecture', id: 8, module: 2 } }] },
@@ -92,8 +94,8 @@ describe('learnApi', () => {
         HttpResponse.json({ success: true, data: { result: [{ course_id: 5, title: 'Optics', unique_lecture: 4, assessment_count: 2, module_count: 3 }] } }),
       ),
     );
-    expect(await learnApi.subjects(12)).toEqual([{ id: '1', name: 'PHYSICS', courseCount: 2, image: null, description: null }]);
-    expect((await learnApi.continueCourses(12))[0]).toMatchObject({ percent: 34, next: { id: '8', moduleId: '2' } });
+    expect(await learnApi.subjects(BOARD, 12)).toEqual([{ id: '1', name: 'PHYSICS', courseCount: 2, image: null, description: null }]);
+    expect((await learnApi.continueCourses(BOARD, 12))[0]).toMatchObject({ percent: 34, next: { id: '8', moduleId: '2' } });
     expect((await learnApi.subjectCourses(12, '1'))[0]).toMatchObject({ lectureCount: 4, testCount: 2, chapterCount: 3 });
   });
 

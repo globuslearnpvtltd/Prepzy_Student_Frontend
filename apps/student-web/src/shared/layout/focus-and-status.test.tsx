@@ -1,7 +1,6 @@
 import { act, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { useExam } from '@/shared/hooks/use-exam';
 import { apiClient } from '@/shared/lib/api-client';
 import { renderWithProviders } from '@/test/render';
@@ -9,9 +8,10 @@ import { API, server } from '@/test/server';
 import { FocusChrome } from './focus-chrome';
 import { LimitDialog } from './limit-dialog';
 import { HomeLink, PageSpinner, StatusScreen } from './status-screens';
+import { testExam } from '@/test/exams';
 
-const neet = getExam('neet')!;
-const cbse = getExam('cbse')!;
+const neet = testExam('neet');
+const cbse = testExam('cbse');
 
 const shellApis = [
   http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: { account_id: 1, first_name: 'Asha' } })),

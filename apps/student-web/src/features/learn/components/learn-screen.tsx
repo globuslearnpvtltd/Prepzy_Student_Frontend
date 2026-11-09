@@ -23,7 +23,7 @@ export function ContinueLearning() {
   const [showAll, setShowAll] = useState(false);
   const query = useQuery({
     queryKey: learnKeys.continue(classId),
-    queryFn: () => learnApi.continueCourses(classId!),
+    queryFn: () => learnApi.continueCourses(exam, classId!),
     enabled: classId !== null,
   });
   if (query.isError) return <SectionError title="Failed to fetch Continue Learning" error={query.error} />;

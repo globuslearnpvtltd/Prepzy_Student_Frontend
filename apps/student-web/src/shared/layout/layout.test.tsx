@@ -2,8 +2,8 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { usePlanSelection } from '@/features/auth';
-import { getExam } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
+import { useExam } from '@/shared/hooks/use-exam';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
@@ -13,6 +13,7 @@ import { LimitDialog } from './limit-dialog';
 import { useMobileNav } from './mobile-nav-store';
 import { SectionPlaceholder } from './section-placeholder';
 import { shellApi, subjectLabel } from './shell-api';
+import { testExam } from '@/test/exams';
 
 const purchased = (...exams: [string, string][]) =>
   http.get(`${API}/api/v4/student/exams/purchased`, () =>
@@ -246,7 +247,7 @@ describe('competitive shell', () => {
       purchased(['neet-ug', 'NEET-UG'], ['cbse', 'CBSE']),
       account,
       neetPlan,
-      http.get(`${API}/api/v4/student/plans/neet-summary`, () =>
+      http.get(`${API}/api/v4/student/plans/2/summary`, () =>
         HttpResponse.json({
           success: true,
           data: { planName: 'NEET Basic', planType: 'basic', status: 'ACTIVE', expiryDate: null, daysLeft: null, isFreeForever: true },
@@ -314,7 +315,7 @@ describe('competitive shell', () => {
 });
 
 describe('daily practice resolution', () => {
-  const neet = getExam('neet')!;
+  const neet = testExam('neet');
   const live = (dpp: unknown) => () => Promise.resolve(dpp as Awaited<ReturnType<typeof shellApi.liveDpp>>);
 
   it('opens the result of a submitted paper', async () => {
@@ -365,7 +366,7 @@ describe('shell API', () => {
         }),
       ),
     );
-    const neet = getExam('neet')!;
+    const neet = testExam('neet');
     expect(await shellApi.searchSuggestions(neet, 'cell', null)).toEqual([
       { key: '0-Cell cycle', title: 'Cell cycle', context: 'in cell division', subject: 'Botany', href: null },
     ]);
@@ -417,5 +418,38 @@ describe('LimitDialog', () => {
     expect(await screen.findByRole('dialog', { name: 'Limit reached' })).toHaveTextContent('Daily doubt limit reached.');
     await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('ExamFrame exam id from the backend', () => {
+  function ShowExamId() {
+    return <p>exam id {useExam().examId}</p>;
+  }
+
+  it('uses the exam_id from /api/v4/exams, not a hard-coded one', async () => {
+    server.use(
+      http.get(`${API}/api/v4/exams`, () =>
+        HttpResponse.json({ success: true, data: [{ exam_id: 41, exam_name: 'CBSE', exam_slice: 'cbse', category: 'board' }] }),
+      ),
+      http.get(`${API}/api/v4/student/exams/purchased`, () =>
+        HttpResponse.json({ success: true, data: { exams: [{ exam_id: 41, exam_slice: 'cbse', exam_name: 'CBSE' }] } }),
+      ),
+    );
+    renderWithProviders(
+      <ExamFrame examSlug="cbse">
+        <ShowExamId />
+      </ExamFrame>,
+    );
+    expect(await screen.findByText('exam id 41')).toBeInTheDocument();
+  });
+
+  it('says so when the backend has no such active exam', async () => {
+    server.use(http.get(`${API}/api/v4/exams`, () => HttpResponse.json({ success: true, data: [] })));
+    renderWithProviders(
+      <ExamFrame examSlug="cbse">
+        <ShowExamId />
+      </ExamFrame>,
+    );
+    expect(await screen.findByText("CBSE isn't available right now")).toBeInTheDocument();
   });
 });

@@ -1,10 +1,10 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { ReportProblem } from './report-problem';
+import { testExam } from '@/test/exams';
 
 describe('report a problem', () => {
   it('sends the section and description as multipart form data', async () => {
@@ -16,7 +16,7 @@ describe('report a problem', () => {
       }),
     );
     const user = userEvent.setup();
-    renderWithProviders(<ReportProblem questionId="12" questionHtml="<p>State Gauss law.</p>" />, { exam: getExam('cbse')! });
+    renderWithProviders(<ReportProblem questionId="12" questionHtml="<p>State Gauss law.</p>" />, { exam: testExam('cbse') });
     await user.click(screen.getByRole('button', { name: 'Report a problem' }));
     expect(await screen.findByRole('dialog', { name: 'Report a Problem !' })).toHaveTextContent('State Gauss law.');
     expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled();

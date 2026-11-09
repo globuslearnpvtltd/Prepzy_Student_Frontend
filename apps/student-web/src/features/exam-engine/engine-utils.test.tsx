@@ -2,7 +2,6 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
-import { getExam } from '@/shared/config/exams';
 import { ExamProvider } from '@/shared/hooks/use-exam';
 import { createTestQueryClient } from '@/test/render';
 import { API, server } from '@/test/server';
@@ -15,9 +14,10 @@ import { resolveTestType } from './route-params';
 import { testHome } from './test-links';
 import { transcribeAudio, useVoiceAnswer } from './transcribe';
 import { MAX_IMAGE_BYTES, uploadAnswerImage } from './upload';
+import { testExam } from '@/test/exams';
 
-const cbse = getExam('cbse')!;
-const neet = getExam('neet')!;
+const cbse = testExam('cbse');
+const neet = testExam('neet');
 
 const bigFile = (type: string) => {
   const file = new File(['x'], 'big', { type });

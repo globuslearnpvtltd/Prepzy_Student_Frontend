@@ -1,11 +1,11 @@
 import { screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
-import { getExam } from '@/shared/config/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { NotesStep } from './notes-step';
+import { testExam } from '@/test/exams';
 
-const neet = getExam('neet')!;
+const neet = testExam('neet');
 const ok = (body: Record<string, unknown>) => HttpResponse.json({ success: true, ...body });
 
 const sidebar = http.get(`${API}/api/neet/ChapterSidebar/:id`, () =>

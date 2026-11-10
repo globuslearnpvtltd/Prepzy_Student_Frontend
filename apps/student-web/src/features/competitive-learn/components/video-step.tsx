@@ -15,7 +15,7 @@ export function VideoStep({ courseId, moduleId, step }: ChapterProps) {
   const exam = useExam();
   const chapter = useChapter(moduleId).data;
   const video = useSummaryVideo(moduleId);
-  const complete = useMarkComplete('video', courseId, moduleId);
+  const complete = useMarkComplete('video', moduleId);
   const parts = video.data?.parts ?? [];
   const [pickedPart, setPickedPart] = useState<string | null>(null);
   const [pickedLanguage, setPickedLanguage] = useState<string | null>(null);

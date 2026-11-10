@@ -75,10 +75,11 @@ export const useChapterPyqAttempts = (moduleId: string) =>
   useQuery({ queryKey: learnKeys.pyqAttempts(moduleId), queryFn: () => learnApi.chapterPyqAttempts(moduleId) });
 
 /** Marks the chapter's video or notes as done, then refreshes the chapter's progress everywhere. */
-export function useMarkComplete(kind: 'video' | 'notes', courseId: string, moduleId: string) {
+export function useMarkComplete(kind: 'video' | 'notes', moduleId: string) {
+  const exam = useExam();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => learnApi.markComplete(kind, courseId, moduleId),
+    mutationFn: () => learnApi.markComplete(exam, kind, moduleId),
     onSuccess: (message) => {
       toast.success(message ?? 'Marked as completed');
       void queryClient.invalidateQueries({ queryKey: learnKeys.all });

@@ -284,9 +284,9 @@ describe('ChapterScreen', () => {
         english: { 'Part 1': { title: 'Intro', video_link: 'https://cdn/en.mp4' } },
         hindi: { 'Part 1': { title: 'Intro', video_link: 'https://cdn/hi.mp4' } },
       }),
-      http.post(`${API}/api/neet/summary-video-completed`, async ({ request }) => {
-        posted = await request.json();
-        return ok({ message: 'Summary video marked as completed.' });
+      http.post(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/video/complete`, () => {
+        posted = true;
+        return ok({ message: 'Summary video marked as completed.', data: { course_id: 214, module_id: 341, progress: {} } });
       }),
     );
     const { container } = renderWithProviders(<ChapterScreen courseId="214" moduleId="341" step="video-lectures" />, { exam: neet });
@@ -298,7 +298,7 @@ describe('ChapterScreen', () => {
     expect(container.querySelector('video')).toHaveAttribute('src', 'https://cdn/hi.mp4');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Mark As Completed' })[0]!);
-    await waitFor(() => expect(posted).toEqual({ course_id: 214, module_id: 341 }));
+    await waitFor(() => expect(posted).toBe(true));
     expect((await screen.findAllByRole('button', { name: 'Completed' }))[0]).toBeDisabled();
   });
 
@@ -317,7 +317,7 @@ describe('ChapterScreen', () => {
       http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/notes`, () =>
         ok({ data: { module_name: 'Laws of Motion', module_order: 3, notes_text: '<h2>Newton</h2>', notes_pdf: 'https://cdn/n.pdf', is_completed: false } }),
       ),
-      http.post(`${API}/api/neet/summary-notes-completed`, () => {
+      http.post(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/notes/complete`, () => {
         posted = true;
         return ok({});
       }),

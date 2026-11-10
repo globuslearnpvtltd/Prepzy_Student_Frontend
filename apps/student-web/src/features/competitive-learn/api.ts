@@ -333,9 +333,9 @@ export const learnApi = {
     }
   },
 
-  async markComplete(kind: 'video' | 'notes', courseId: string, moduleId: string): Promise<string | null> {
-    const path = kind === 'video' ? '/api/neet/summary-video-completed' : '/api/neet/summary-notes-completed';
-    const body = assertOk(await apiClient.post<Envelope<unknown>>(path, { course_id: Number(courseId), module_id: Number(moduleId) }));
+  /** Marks the chapter's video or notes done (the backend also updates course progress); returns its message. */
+  async markComplete(exam: ExamRef, kind: 'video' | 'notes', moduleId: string): Promise<string | null> {
+    const body = assertOk(await apiClient.post<Envelope<unknown>>(`${learnApiBase(exam)}/chapters/${moduleId}/${kind}/complete`));
     return text(body.message);
   },
 

@@ -16,7 +16,7 @@ export function NotesStep({ courseId, moduleId, step }: ChapterProps) {
   const fromNotes = useSearchParams().get('from') === 'notes';
   const chapter = useChapter(moduleId).data;
   const notes = useStudyNotes(moduleId);
-  const complete = useMarkComplete('notes', courseId, moduleId);
+  const complete = useMarkComplete('notes', moduleId);
   const data = notes.data;
   const done = !!data?.completed || complete.isSuccess;
   const moduleName = data?.moduleName ?? chapter?.title ?? null;

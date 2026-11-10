@@ -22,8 +22,11 @@ const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
     data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', stream_name: 'PCB', duration_months: 12, expiry_date: '2099-01-01', status: 'active' }] },
   }),
 );
+/** v4 chat base of the exam a legacy base belonged to. */
+const v4Base = (base: string) => (base.includes('/neet/') ? '/api/v4/chat/competitive/2' : '/api/v4/chat/board/1');
+/** The dashboard tutor avatar (v4). */
 const avatar = (base: string) =>
-  http.post(`${API}${base}/marketingChatImageName`, () => HttpResponse.json({ success: true, data: { avatar: [{ id: 1, name: 'Atlas', image: null }] } }));
+  http.get(`${API}${v4Base(base)}/dashboard/avatar`, () => HttpResponse.json({ success: true, data: { avatar: [{ id: 1, name: 'Atlas', image: null }] } }));
 
 const conversation = {
   success: true,
@@ -43,13 +46,14 @@ beforeEach(() => {
 });
 
 describe('assistant api', () => {
-  it('picks the v1 or NEET chat API per category, and the lecture endpoints per course', () => {
-    expect(atlasEndpoints('board', { kind: 'dashboard' }).send).toBe('/api/v1/chat/dashboard_chat_interaction');
-    expect(atlasEndpoints('competitive', { kind: 'dashboard' }).history).toBe('/api/neet/chat/dashboard-chat-history');
-    const lecture = atlasEndpoints('board', { kind: 'lecture', courseId: 5 });
-    expect(lecture.conversations).toBe('/api/v1/chat/lecture-conversations/5');
-    expect(lecture.messages(9)).toBe('/api/v1/chat/fetch-lecture-messages/9');
-    expect(lecture.newChat).toBe('/api/v1/chat/lecture-new-chat/5');
+  it('picks the v4 chat routes of the exam, and the lecture endpoints per course', () => {
+    expect(atlasEndpoints({ category: 'board', examId: 1 }, { kind: 'dashboard' }).send).toBe('/api/v4/chat/board/1/dashboard/messages');
+    expect(atlasEndpoints({ category: 'competitive', examId: 2 }, { kind: 'dashboard' }).history).toBe('/api/v4/chat/competitive/2/dashboard/chats');
+    const lecture = atlasEndpoints({ category: 'board', examId: 1 }, { kind: 'lecture', courseId: 5 });
+    expect(lecture.conversations).toBe('/api/v4/chat/board/1/lectures/5/conversation');
+    expect(lecture.messages(9)).toBe('/api/v4/chat/board/1/lectures/5/chats/9/messages');
+    expect(lecture.newChat).toBe('/api/v4/chat/board/1/lectures/5/chats');
+    expect(lecture.avatar).toBe('/api/v4/chat/board/1/lectures/5/avatar');
   });
 
   it('normalises messages, conversations, history, answers and avatars', () => {
@@ -100,9 +104,9 @@ describe('Atlas on the dashboard', () => {
     server.use(
       plan,
       avatar('/api/v1/chat'),
-      http.get(`${API}/api/v1/chat/dashboard-conversations`, () => HttpResponse.json(conversation)),
-      http.get(`${API}/api/v1/chat/dashboard-chat-history`, () => HttpResponse.json({ success: true, data: { chats: [] } })),
-      http.post(`${API}/api/v1/chat/dashboard_chat_interaction`, async ({ request }) => {
+      http.get(`${API}/api/v4/chat/board/1/dashboard/conversation`, () => HttpResponse.json(conversation)),
+      http.get(`${API}/api/v4/chat/board/1/dashboard/chats`, () => HttpResponse.json({ success: true, data: { chats: [] } })),
+      http.post(`${API}/api/v4/chat/board/1/dashboard/messages`, async ({ request }) => {
         sent = await request.formData();
         return HttpResponse.json({ success: true, data: { answer: { text: '<p>F equals ma.</p>', followups: ['Give an example'] } } });
       }),
@@ -131,15 +135,15 @@ describe('Atlas on the dashboard', () => {
     server.use(
       avatar('/api/neet/chat'),
       http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } })),
-      http.get(`${API}/api/neet/chat/dashboard-conversations`, () => HttpResponse.json({ success: true, data: { latest_chat: 3, conversations: [] } })),
-      http.get(`${API}/api/neet/chat/dashboard-chat-history`, () =>
+      http.get(`${API}/api/v4/chat/competitive/2/dashboard/conversation`, () => HttpResponse.json({ success: true, data: { latest_chat: 3, conversations: [] } })),
+      http.get(`${API}/api/v4/chat/competitive/2/dashboard/chats`, () =>
         HttpResponse.json({ success: true, data: { chats: [{ chat_id: 2, title: 'Cell division', last_message_at: null }] } }),
       ),
-      http.get(`${API}/api/neet/chat/fetch-dashboard-messages/2`, () =>
+      http.get(`${API}/api/v4/chat/competitive/2/dashboard/chats/2/messages`, () =>
         HttpResponse.json({ success: true, data: { conversations: [{ message_id: 9, text: 'Mitosis has four phases.', is_student: 0 }] } }),
       ),
-      http.put(`${API}/api/neet/chat/dashboard-new-chat`, () => HttpResponse.json({ success: true, data: { latest_chat: 11 } })),
-      http.post(`${API}/api/neet/chat/dashboard_chat_interaction`, () => {
+      http.post(`${API}/api/v4/chat/competitive/2/dashboard/chats`, () => HttpResponse.json({ success: true, data: { latest_chat: 11 } })),
+      http.post(`${API}/api/v4/chat/competitive/2/dashboard/messages`, () => {
         interactions += 1;
         return HttpResponse.json({ message: 'boom' }, { status: 500 });
       }),
@@ -165,7 +169,7 @@ describe('Atlas on the dashboard', () => {
   });
 
   it('opens from the mobile Ask sheet: Atlas opens the panel, Socrates opens the solver', async () => {
-    server.use(plan, avatar('/api/v1/chat'), http.get(`${API}/api/v1/chat/dashboard-conversations`, () => HttpResponse.json(conversation)));
+    server.use(plan, avatar('/api/v1/chat'), http.get(`${API}/api/v4/chat/board/1/dashboard/conversation`, () => HttpResponse.json(conversation)));
     renderWithProviders(<AtlasHost />, { exam: cbse });
     act(() => useAtlas.getState().setAskSheet(true));
     const sheet = await screen.findByRole('dialog', { name: 'Have a Question/Problem?' });
@@ -178,7 +182,7 @@ describe('Atlas on the dashboard', () => {
   });
 
   it('opens on the previous app’s window event and from openAtlas()', async () => {
-    server.use(plan, avatar('/api/v1/chat'), http.get(`${API}/api/v1/chat/dashboard-conversations`, () => HttpResponse.json(conversation)));
+    server.use(plan, avatar('/api/v1/chat'), http.get(`${API}/api/v4/chat/board/1/dashboard/conversation`, () => HttpResponse.json(conversation)));
     renderWithProviders(<AtlasHost />, { exam: cbse });
     act(() => window.dispatchEvent(new Event('prepzy:open-atlas')));
     expect(await screen.findByRole('dialog', { name: 'Atlas chat' })).toBeInTheDocument();
@@ -193,12 +197,11 @@ describe('lecture tutor', () => {
     let sent: FormData | null = null;
     server.use(
       plan,
-      http.post(`${API}/api/v1/chat/marketingChatImageName`, async ({ request }) => {
-        expect(await request.json()).toEqual({ page: 'lecture', course_id: 5 });
-        return HttpResponse.json({ success: true, data: { avatar: [{ id: 2, name: 'Vedica', image: null }] } });
-      }),
-      http.get(`${API}/api/v1/chat/lecture-conversations/5`, () => HttpResponse.json({ success: true, data: { latest_chat: 40, conversations: [] } })),
-      http.post(`${API}/api/v1/chat/lecture_chat_interaction`, async ({ request }) => {
+      http.get(`${API}/api/v4/chat/board/1/lectures/5/avatar`, () =>
+        HttpResponse.json({ success: true, data: { avatar: [{ id: 2, name: 'Vedica', image: null }] } }),
+      ),
+      http.get(`${API}/api/v4/chat/board/1/lectures/5/conversation`, () => HttpResponse.json({ success: true, data: { latest_chat: 40, conversations: [] } })),
+      http.post(`${API}/api/v4/chat/board/1/lectures/5/messages`, async ({ request }) => {
         sent = await request.formData();
         return HttpResponse.json({ success: true, data: { answer: { text: 'Look at the graph.' } } });
       }),
@@ -209,8 +212,7 @@ describe('lecture tutor', () => {
     expect(await within(panel).findByText('Ask Vedica anything')).toBeInTheDocument();
     await userEvent.type(within(panel).getByRole('textbox'), 'Explain slope{Enter}');
     expect(await within(panel).findByText('Look at the graph.')).toBeInTheDocument();
-    expect(Object.fromEntries(['course_id', 'module_id', 'lecture_id', 'chat_id', 'avatar'].map((k) => [k, sent!.get(k)]))).toEqual({
-      course_id: '5',
+    expect(Object.fromEntries(['module_id', 'lecture_id', 'chat_id', 'avatar'].map((k) => [k, sent!.get(k)]))).toEqual({
       module_id: '6',
       lecture_id: '7',
       chat_id: '40',
@@ -236,10 +238,10 @@ describe('post-submission chat (Discuss with Vedica)', () => {
   it('loads the history and streams the reply (board: form data)', async () => {
     let form: FormData | null = null;
     server.use(
-      http.get(`${API}/api/chat/post-assessment-conversations/3/8/21`, () =>
-        HttpResponse.json({ success: true, conversations: [{ message_id: 1, text: 'Earlier question', is_student: 1 }] }),
+      http.get(`${API}/api/v4/chat/board/1/review/3/8/21/messages`, () =>
+        HttpResponse.json({ success: true, data: { conversations: [{ message_id: 1, text: 'Earlier question', is_student: 1 }] } }),
       ),
-      http.post(`${API}/api/chat/post_assessment_chat_interaction`, async ({ request }) => {
+      http.post(`${API}/api/v4/chat/board/1/review/3/8/21/messages`, async ({ request }) => {
         form = await request.formData();
         return sse(['data: {"token":"Work is "}\n\n', 'data: {"token":"F·d."}\n\ndata: {"followups":["Units?"]}\n\n', 'data: [DONE]\n\n']);
       }),
@@ -256,8 +258,8 @@ describe('post-submission chat (Discuss with Vedica)', () => {
   it('sends JSON for NEET and shows an error when the stream fails', async () => {
     let body: unknown = null;
     server.use(
-      http.get(`${API}/api/neet/chat/post-assessment-conversations/3/8/21`, () => HttpResponse.json({ success: true, conversations: [] })),
-      http.post(`${API}/api/neet/chat/post_assessment_chat_interaction`, async ({ request }) => {
+      http.get(`${API}/api/v4/chat/competitive/2/review/3/8/21/messages`, () => HttpResponse.json({ success: true, data: { conversations: [] } })),
+      http.post(`${API}/api/v4/chat/competitive/2/review/3/8/21/messages`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ message: 'down' }, { status: 503 });
       }),
@@ -268,7 +270,7 @@ describe('post-submission chat (Discuss with Vedica)', () => {
     expect(screen.getByText(/Vedica already has your answer and the explanation/)).toBeInTheDocument();
     await userEvent.type(screen.getByRole('textbox'), 'Explain{Enter}');
     expect(await screen.findByText('Sorry, something went wrong. Please try again.')).toBeInTheDocument();
-    expect(body).toMatchObject({ assessment_id: 3, text: 'Explain', correct_option_id: 1 });
+    expect(body).toMatchObject({ text: 'Explain', correct_option_id: 1 });
     await userEvent.click(screen.getByRole('button', { name: 'Close chat' }));
     expect(onClose).toHaveBeenCalled();
   });
@@ -318,7 +320,7 @@ describe('composer', () => {
       configurable: true,
       value: { getUserMedia: vi.fn(() => Promise.resolve({ getTracks: () => [{ stop }] })) },
     });
-    server.use(http.post(`${API}/api/chat/transcribe`, () => HttpResponse.json({ success: true, transcribedText: 'what is torque' })));
+    server.use(http.post(`${API}/api/v4/chat/transcribe`, () => HttpResponse.json({ success: true, message: 'Audio transcribed', data: { text: 'what is torque' } })));
     renderWithProviders(<Composer placeholder="Ask" onSend={() => undefined} allowVoice />);
     await userEvent.click(screen.getByRole('button', { name: 'Speak your question' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));

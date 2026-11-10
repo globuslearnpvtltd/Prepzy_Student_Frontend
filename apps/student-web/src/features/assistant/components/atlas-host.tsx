@@ -85,9 +85,9 @@ export function AtlasHost() {
   const voiceConfig = useMemo<VoiceConfig>(
     () =>
       exam.category === 'competitive'
-        ? { variant: 'neet-dashboard', classId: plan.data?.classId ?? null }
-        : { variant: 'dashboard', classId: plan.data?.classId ?? null, className: plan.data?.className ?? null },
-    [exam.category, plan.data?.classId, plan.data?.className],
+        ? { variant: 'neet-dashboard', exam, classId: plan.data?.classId ?? null }
+        : { variant: 'dashboard', exam, classId: plan.data?.classId ?? null, className: plan.data?.className ?? null },
+    [exam, plan.data?.classId, plan.data?.className],
   );
   return (
     // The provider lives here so a live talk keeps running while the student moves between pages.

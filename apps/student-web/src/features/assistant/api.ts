@@ -1,4 +1,4 @@
-import type { ExamCategory } from '@/shared/config/exams';
+import type { ExamRef } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/errors';
 import { assertOk } from '@/shared/lib/unwrap';
@@ -25,29 +25,19 @@ export type AtlasSurface =
   | { kind: 'dashboard' }
   | { kind: 'lecture'; courseId: number; moduleId?: number | null; lectureId?: number | null };
 
-/** Board exams use the v1 chat API, competitive exams the NEET one (same shapes). */
-const chatBase = (category: ExamCategory) => (category === 'competitive' ? '/api/neet/chat' : '/api/v1/chat');
+/** v4 chat routes of an exam: one set per category, the exam picked by its id (from the catalog). */
+export const chatApiBase = (exam: ExamRef) => `/api/v4/chat/${exam.category}/${exam.examId}`;
 
-export function atlasEndpoints(category: ExamCategory, surface: AtlasSurface) {
-  const base = chatBase(category);
-  if (surface.kind === 'lecture') {
-    const course = surface.courseId;
-    return {
-      conversations: `${base}/lecture-conversations/${course}`,
-      messages: (chatId: number) => `${base}/fetch-lecture-messages/${chatId}`,
-      history: `${base}/lecture-chat-history/${course}`,
-      newChat: `${base}/lecture-new-chat/${course}`,
-      send: `${base}/lecture_chat_interaction`,
-      avatar: `${base}/marketingChatImageName`,
-    };
-  }
+/** Atlas routes of a surface: the dashboard chats of the exam, or the lecture tutor's chats of one course. */
+export function atlasEndpoints(exam: ExamRef, surface: AtlasSurface) {
+  const base = surface.kind === 'lecture' ? `${chatApiBase(exam)}/lectures/${surface.courseId}` : `${chatApiBase(exam)}/dashboard`;
   return {
-    conversations: `${base}/dashboard-conversations`,
-    messages: (chatId: number) => `${base}/fetch-dashboard-messages/${chatId}`,
-    history: `${base}/dashboard-chat-history`,
-    newChat: `${base}/dashboard-new-chat`,
-    send: `${base}/dashboard_chat_interaction`,
-    avatar: `${base}/marketingChatImageName`,
+    conversations: `${base}/conversation`,
+    messages: (chatId: number) => `${base}/chats/${chatId}/messages`,
+    history: `${base}/chats`,
+    newChat: `${base}/chats`,
+    send: `${base}/messages`,
+    avatar: `${base}/avatar`,
   };
 }
 
@@ -160,20 +150,19 @@ export interface SendInput {
 }
 
 export const assistantApi = {
-  conversation: async (category: ExamCategory, surface: AtlasSurface) =>
-    toConversation(await apiClient.get(atlasEndpoints(category, surface).conversations)),
+  conversation: async (exam: ExamRef, surface: AtlasSurface) =>
+    toConversation(await apiClient.get(atlasEndpoints(exam, surface).conversations)),
 
-  messages: async (category: ExamCategory, surface: AtlasSurface, chatId: number) =>
-    toConversation(await apiClient.get(atlasEndpoints(category, surface).messages(chatId))).messages,
+  messages: async (exam: ExamRef, surface: AtlasSurface, chatId: number) =>
+    toConversation(await apiClient.get(atlasEndpoints(exam, surface).messages(chatId))).messages,
 
-  history: async (category: ExamCategory, surface: AtlasSurface) =>
-    toHistory(await apiClient.get(atlasEndpoints(category, surface).history)),
+  history: async (exam: ExamRef, surface: AtlasSurface) =>
+    toHistory(await apiClient.get(atlasEndpoints(exam, surface).history)),
 
   /** Starts a fresh conversation; returns its id. */
-  newChat: async (category: ExamCategory, surface: AtlasSurface) =>
-    toConversation(await apiClient.put(atlasEndpoints(category, surface).newChat)).chatId,
+  newChat: async (exam: ExamRef, surface: AtlasSurface) => toConversation(await apiClient.post(atlasEndpoints(exam, surface).newChat)).chatId,
 
-  send: async (category: ExamCategory, surface: AtlasSurface, input: SendInput): Promise<AtlasAnswer> => {
+  send: async (exam: ExamRef, surface: AtlasSurface, input: SendInput): Promise<AtlasAnswer> => {
     const form = new FormData();
     form.append('text', input.text);
     if (input.className) form.append('class_name', input.className);
@@ -181,26 +170,19 @@ export const assistantApi = {
     if (input.chatId !== null) form.append('chat_id', String(input.chatId));
     if (input.image) form.append('image', input.image, input.image.name || 'image.jpg');
     if (surface.kind === 'lecture') {
-      form.append('course_id', String(surface.courseId));
       if (surface.moduleId) form.append('module_id', String(surface.moduleId));
       if (surface.lectureId) form.append('lecture_id', String(surface.lectureId));
     }
     if (input.avatarName) form.append('avatar', input.avatarName);
-    return toAnswer(await apiClient.post(atlasEndpoints(category, surface).send, form, { timeout: 90_000 }));
+    return toAnswer(await apiClient.post(atlasEndpoints(exam, surface).send, form, { timeout: 90_000 }));
   },
 
-  avatar: async (category: ExamCategory, surface: AtlasSurface) =>
-    toAvatar(
-      await apiClient.post(
-        atlasEndpoints(category, surface).avatar,
-        surface.kind === 'lecture' ? { page: 'lecture', course_id: surface.courseId } : { page: 'dashboard' },
-      ),
-    ),
+  avatar: async (exam: ExamRef, surface: AtlasSurface) => toAvatar(await apiClient.get(atlasEndpoints(exam, surface).avatar)),
 
-  /** Read-aloud: text → MP3 (POST /api/v1/chat/speech, base64 in `audio.audioContent`). */
+  /** Read-aloud: text → MP3 (POST /api/v4/chat/speech, base64 in `data.audio.audioContent`). */
   speech: async (text: string): Promise<Blob> => {
-    const body = asRaw(await apiClient.post('/api/v1/chat/speech', { audio_text: text, identifier: 'dashboard' }, { timeout: 60_000 }));
-    const content = str(asRaw(body.audio).audioContent) ?? str(body.audio);
+    const body = asRaw(await apiClient.post('/api/v4/chat/speech', { audio_text: text, identifier: 'dashboard' }, { timeout: 60_000 }));
+    const content = str(asRaw(asRaw(asRaw(body.data).audio)).audioContent);
     if (!content) throw new ApiError({ status: 502, code: 'NO_AUDIO', message: "Couldn't read this answer aloud." });
     const base64 = content.includes(',') ? content.split(',')[1]! : content;
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
@@ -230,21 +212,23 @@ export interface ReviewContext {
   selectedOptionId?: number | string | null;
 }
 
-const reviewBase = (category: ExamCategory) => (category === 'competitive' ? '/api/neet/chat' : '/api/chat');
+/** The review chat of one question of an attempt. */
+const reviewPath = (exam: ExamRef, ctx: ReviewContext) =>
+  `${chatApiBase(exam)}/review/${ctx.assessmentId}/${ctx.questionId}/${ctx.attemptId}/messages`;
 
 export const reviewApi = {
-  history: async (category: ExamCategory, ctx: ReviewContext): Promise<ChatMessage[]> => {
+  history: async (exam: ExamRef, ctx: ReviewContext): Promise<ChatMessage[]> => {
     const body = asRaw(
-      await apiClient.get(`${reviewBase(category)}/post-assessment-conversations/${ctx.assessmentId}/${ctx.questionId}/${ctx.attemptId}`, {
-        params: category === 'competitive' ? undefined : { sub_question_id: ctx.subQuestionId ?? undefined },
+      await apiClient.get(reviewPath(exam, ctx), {
+        params: exam.category === 'competitive' ? undefined : { sub_question_id: ctx.subQuestionId ?? undefined },
       }),
     );
-    return toArray(body.conversations).map(toMessage);
+    return toArray(asRaw(body.data).conversations).map(toMessage);
   },
 
   /** Streams the tutor's reply (SSE); `onText` gets the answer so far. */
   ask: async (
-    category: ExamCategory,
+    exam: ExamRef,
     ctx: ReviewContext,
     text: string,
     onText: (text: string) => void,
@@ -252,13 +236,9 @@ export const reviewApi = {
     /** Board only: a photo with the question. */
     image?: File | null,
   ): Promise<StreamedReply> => {
-    const path = `${reviewBase(category)}/post_assessment_chat_interaction`;
     let body: unknown;
-    if (category === 'competitive') {
+    if (exam.category === 'competitive') {
       body = {
-        assessment_id: ctx.assessmentId,
-        question_id: ctx.questionId,
-        attempt_id: ctx.attemptId,
         text,
         question: ctx.questionText,
         question_diagram: ctx.questionDiagram ?? '',
@@ -269,9 +249,6 @@ export const reviewApi = {
       };
     } else {
       const form = new FormData();
-      form.append('assessment_id', String(ctx.assessmentId));
-      form.append('question_id', String(ctx.questionId));
-      form.append('attempt_id', String(ctx.attemptId));
       if (ctx.subQuestionId) form.append('sub_question_id', String(ctx.subQuestionId));
       form.append('text', text);
       form.append('question', ctx.questionText);
@@ -286,7 +263,7 @@ export const reviewApi = {
       if (image) form.append('image', image, image.name || 'image.jpg');
       body = form;
     }
-    const stream = await apiClient.stream(path, body, { signal });
+    const stream = await apiClient.stream(reviewPath(exam, ctx), body, { signal });
     return readReply(stream, onText, signal);
   },
 };

@@ -10,15 +10,20 @@ import {
   type VoiceVariant,
 } from './types';
 
-/** Start (SDP offer → answer) and save (transcript) endpoints per tutor. */
-export const VOICE_ENDPOINTS: Record<VoiceVariant, { start: string; save: string }> = {
-  lecture: { start: '/api/v1/chat/lecture-voice/start', save: '/api/v1/chat/lecture-voice/save' },
-  'neet-lecture': { start: '/api/neet/chat/lecture-voice/start', save: '/api/neet/chat/lecture-voice/save' },
-  dashboard: { start: '/api/v1/chat/dashboard-voice/start', save: '/api/v1/chat/dashboard-voice/save' },
-  'neet-dashboard': { start: '/api/neet/chat/dashboard-voice/start', save: '/api/neet/chat/dashboard-voice/save' },
-  'post-assessment': { start: '/api/v1/chat/post-assessment-voice/start', save: '/api/v1/chat/post-assessment-voice/save' },
-  'neet-post-assessment': { start: '/api/neet/chat/post-assessment-voice/start', save: '/api/neet/chat/post-assessment-voice/save' },
-};
+/**
+ * Start (SDP offer → answer) and save (transcript) routes of a tutor: the v4 voice routes of the page's exam,
+ * scoped to the dashboard, the lecture's course, or the reviewed question of an attempt.
+ */
+export function voiceEndpoints(config: VoiceConfig): { start: string; save: string } {
+  const { variant, exam, courseId, postAssessment: pa } = config;
+  const scope = isDashboardVariant(variant)
+    ? 'dashboard'
+    : isPostAssessmentVariant(variant)
+      ? `review/${pa?.assessment_id}/${pa?.question_id}/${pa?.attempt_id}`
+      : `lectures/${courseId}`;
+  const base = `/api/v4/chat/${exam.category}/${exam.examId}/voice/${scope}`;
+  return { start: `${base}/start`, save: `${base}/save` };
+}
 
 /** At most this many earlier turns go to the voice agent as history. */
 export const HISTORY_LIMIT = 20;
@@ -92,7 +97,7 @@ export const liveVoiceApi = {
   /** Sends the SDP offer; returns the voice service's SDP answer. */
   start: async (config: VoiceConfig, input: StartInput): Promise<RTCSessionDescriptionInit> => {
     const body = await apiClient.post(
-      VOICE_ENDPOINTS[config.variant].start,
+      voiceEndpoints(config).start,
       { sdp: input.offer.sdp, type: input.offer.type, ...startScope(config), language: input.language, history: toHistory(input.history) },
       { timeout: 30_000 },
     );
@@ -105,7 +110,7 @@ export const liveVoiceApi = {
 
   /** Saves the call's transcript into the text chat; returns that chat's id. */
   save: async (config: VoiceConfig, chatId: number | null, turns: VoiceTurn[]): Promise<number | null> => {
-    const body = await apiClient.post(VOICE_ENDPOINTS[config.variant].save, {
+    const body = await apiClient.post(voiceEndpoints(config).save, {
       chat_id: chatId,
       ...saveScope(config),
       turns: turns.map(({ role, text, image }) => ({ role, text, image })),

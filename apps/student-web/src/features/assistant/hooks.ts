@@ -41,13 +41,13 @@ export function useAtlasChat(exam: ExamConfig, surface: AtlasSurface, enabled = 
 
   const conversation = useQuery({
     queryKey: atlasKeys.conversation(exam.slug, surface),
-    queryFn: () => assistantApi.conversation(exam.category, surface),
+    queryFn: () => assistantApi.conversation(exam, surface),
     enabled,
     staleTime: Infinity,
   });
   const avatar = useQuery({
     queryKey: atlasKeys.avatar(exam.slug, surface),
-    queryFn: () => assistantApi.avatar(exam.category, surface),
+    queryFn: () => assistantApi.avatar(exam, surface),
     enabled,
     staleTime: Infinity,
   });
@@ -66,7 +66,7 @@ export function useAtlasChat(exam: ExamConfig, surface: AtlasSurface, enabled = 
 
   const send = useMutation({
     mutationFn: ({ text, image }: { text: string; image: File | null }) =>
-      assistantApi.send(exam.category, surface, {
+      assistantApi.send(exam, surface, {
         text,
         image,
         chatId,
@@ -88,7 +88,7 @@ export function useAtlasChat(exam: ExamConfig, surface: AtlasSurface, enabled = 
   });
 
   const openChat = useMutation({
-    mutationFn: (id: number) => assistantApi.messages(exam.category, surface, id),
+    mutationFn: (id: number) => assistantApi.messages(exam, surface, id),
     onSuccess: (list, id) => {
       setChatId(id);
       setMessages(list);
@@ -100,7 +100,7 @@ export function useAtlasChat(exam: ExamConfig, surface: AtlasSurface, enabled = 
 
   /** Re-reads a chat from the server (e.g. after a live talk was saved into it). */
   const reload = useMutation({
-    mutationFn: (id: number) => assistantApi.messages(exam.category, surface, id),
+    mutationFn: (id: number) => assistantApi.messages(exam, surface, id),
     onSuccess: (list, id) => {
       setChatId(id);
       setMessages(list);
@@ -109,7 +109,7 @@ export function useAtlasChat(exam: ExamConfig, surface: AtlasSurface, enabled = 
   });
 
   const newChat = useMutation({
-    mutationFn: () => assistantApi.newChat(exam.category, surface),
+    mutationFn: () => assistantApi.newChat(exam, surface),
     onSuccess: (id) => {
       setChatId(id);
       setMessages([]);
@@ -148,7 +148,7 @@ export function useAtlasChat(exam: ExamConfig, surface: AtlasSurface, enabled = 
 export function useAtlasHistory(exam: ExamConfig, surface: AtlasSurface, enabled: boolean) {
   return useQuery({
     queryKey: atlasKeys.history(exam.slug, surface),
-    queryFn: () => assistantApi.history(exam.category, surface),
+    queryFn: () => assistantApi.history(exam, surface),
     enabled,
   });
 }
@@ -206,7 +206,7 @@ export function useReviewChat(exam: ExamConfig, ctx: ReviewContext, enabled: boo
 
   const history = useQuery({
     queryKey: ['atlas', exam.slug, 'review', ctx.assessmentId, ctx.questionId, ctx.attemptId, ctx.subQuestionId ?? null],
-    queryFn: () => reviewApi.history(exam.category, ctx),
+    queryFn: () => reviewApi.history(exam, ctx),
     enabled,
   });
   useEffect(() => {
@@ -232,7 +232,7 @@ export function useReviewChat(exam: ExamConfig, ctx: ReviewContext, enabled: boo
       const update = (patch: Partial<ReviewMessage>) =>
         setMessages((list) => list.map((m) => (m.id === replyId ? { ...m, ...patch } : m)));
       try {
-        const reply = await reviewApi.ask(exam.category, ctx, trimmed, (partial) => update({ text: partial }), controller.signal, image);
+        const reply = await reviewApi.ask(exam, ctx, trimmed, (partial) => update({ text: partial }), controller.signal, image);
         setFollowups(reply.followups);
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -241,7 +241,7 @@ export function useReviewChat(exam: ExamConfig, ctx: ReviewContext, enabled: boo
         if (abort.current === controller) setStreaming(false);
       }
     },
-    [exam.category, ctx, streaming],
+    [exam, ctx, streaming],
   );
 
   /** Puts a finished live talk's turns into the thread (the save to the server runs in the background). */

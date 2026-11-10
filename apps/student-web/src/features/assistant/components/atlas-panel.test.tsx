@@ -11,11 +11,14 @@ const cbse = testExam('cbse');
 const neet = testExam('neet');
 
 const noPlan = http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } }));
-const avatar = (base: string, name: string | null = 'Atlas') =>
-  http.post(`${API}${base}/marketingChatImageName`, () =>
-    HttpResponse.json({ success: true, data: { avatar: name ? [{ id: 1, name, image: null }] : [] } }),
-  );
-const emptyHistory = (base: string) => http.get(`${API}${base}/dashboard-chat-history`, () => HttpResponse.json({ success: true, data: { chats: [] } }));
+/** v4 chat base of the exam a legacy base belonged to. */
+const v4Base = (base: string) => (base.includes('/neet/') ? '/api/v4/chat/competitive/2' : '/api/v4/chat/board/1');
+/** The tutor avatar of the dashboard and of any lecture (v4). */
+const avatar = (base: string, name: string | null = 'Atlas') => {
+  const body = () => HttpResponse.json({ success: true, data: { avatar: name ? [{ id: 1, name, image: null }] : [] } });
+  return [http.get(`${API}${v4Base(base)}/dashboard/avatar`, body), http.get(`${API}${v4Base(base)}/lectures/:courseId/avatar`, body)];
+};
+const emptyHistory = (base: string) => http.get(`${API}${v4Base(base)}/dashboard/chats`, () => HttpResponse.json({ success: true, data: { chats: [] } }));
 
 /** A fake <audio> player: records play/pause and lets a test end playback. */
 class FakeAudio {
@@ -48,8 +51,8 @@ describe('AtlasPanel', () => {
     let calls = 0;
     server.use(
       noPlan,
-      avatar('/api/v1/chat'),
-      http.get(`${API}/api/v1/chat/dashboard-conversations`, () => {
+      ...avatar('/api/v1/chat'),
+      http.get(`${API}/api/v4/chat/board/1/dashboard/conversation`, () => {
         calls += 1;
         return calls === 1
           ? HttpResponse.json({ message: 'down' }, { status: 500 })
@@ -70,9 +73,9 @@ describe('AtlasPanel', () => {
     let spoken: unknown = null;
     server.use(
       noPlan,
-      avatar('/api/v1/chat'),
+      ...avatar('/api/v1/chat'),
       emptyHistory('/api/v1/chat'),
-      http.get(`${API}/api/v1/chat/dashboard-conversations`, () =>
+      http.get(`${API}/api/v4/chat/board/1/dashboard/conversation`, () =>
         HttpResponse.json({
           success: true,
           data: {
@@ -90,12 +93,12 @@ describe('AtlasPanel', () => {
           },
         }),
       ),
-      http.post(`${API}/api/v1/chat/dashboard_chat_interaction`, () =>
+      http.post(`${API}/api/v4/chat/board/1/dashboard/messages`, () =>
         HttpResponse.json({ success: true, data: { answer: { text: 'Angle of incidence equals reflection.', followups: ['Show a ray diagram'] } } }),
       ),
-      http.post(`${API}/api/v1/chat/speech`, async ({ request }) => {
+      http.post(`${API}/api/v4/chat/speech`, async ({ request }) => {
         spoken = await request.json();
-        return HttpResponse.json({ audio: { audioContent: `data:audio/mpeg;base64,${btoa('mp3')}` } });
+        return HttpResponse.json({ success: true, data: { audio: { audioContent: `data:audio/mpeg;base64,${btoa('mp3')}` } } });
       }),
     );
     renderWithProviders(<AtlasPanel exam={cbse} surface={{ kind: 'dashboard' }} {...panelProps} />);
@@ -127,11 +130,11 @@ describe('AtlasPanel', () => {
   it('keeps the button usable when read-aloud has no audio', async () => {
     server.use(
       noPlan,
-      avatar('/api/v1/chat'),
-      http.get(`${API}/api/v1/chat/dashboard-conversations`, () =>
+      ...avatar('/api/v1/chat'),
+      http.get(`${API}/api/v4/chat/board/1/dashboard/conversation`, () =>
         HttpResponse.json({ success: true, data: { latest_chat: 4, conversations: [{ message_id: 2, text: 'Hello', is_student: 0 }] } }),
       ),
-      http.post(`${API}/api/v1/chat/speech`, () => HttpResponse.json({ success: true })),
+      http.post(`${API}/api/v4/chat/speech`, () => HttpResponse.json({ success: true, data: {} })),
     );
     renderWithProviders(<AtlasPanel exam={cbse} surface={{ kind: 'dashboard' }} {...panelProps} />);
     const read = await screen.findByRole('button', { name: 'Read aloud' });
@@ -145,14 +148,14 @@ describe('AtlasPanel', () => {
     let historyCalls = 0;
     server.use(
       noPlan,
-      avatar('/api/neet/chat'),
-      http.get(`${API}/api/neet/chat/dashboard-chat-history`, () => {
+      ...avatar('/api/neet/chat'),
+      http.get(`${API}/api/v4/chat/competitive/2/dashboard/chats`, () => {
         historyCalls += 1;
         return historyCalls === 1
           ? HttpResponse.json({ message: 'down' }, { status: 500 })
           : HttpResponse.json({ success: true, data: { chats: [{ chat_id: 4, title: 'Optics', last_message_at: null }] } });
       }),
-      http.get(`${API}/api/neet/chat/dashboard-conversations`, () =>
+      http.get(`${API}/api/v4/chat/competitive/2/dashboard/conversation`, () =>
         HttpResponse.json({
           success: true,
           data: { latest_chat: 4, conversations: [{ message_id: 2, text: 'Answer', is_student: 0, sources: { Subject: 'Physics', Book: 'NCERT' } }] },
@@ -176,10 +179,10 @@ describe('AtlasPanel', () => {
     let newChats = 0;
     server.use(
       noPlan,
-      avatar('/api/v1/chat'),
+      ...avatar('/api/v1/chat'),
       emptyHistory('/api/v1/chat'),
-      http.get(`${API}/api/v1/chat/dashboard-conversations`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
-      http.put(`${API}/api/v1/chat/dashboard-new-chat`, () => {
+      http.get(`${API}/api/v4/chat/board/1/dashboard/conversation`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
+      http.post(`${API}/api/v4/chat/board/1/dashboard/chats`, () => {
         newChats += 1;
         return HttpResponse.json({ success: true, data: { latest_chat: 2 } });
       }),
@@ -210,10 +213,10 @@ describe('AtlasPanel', () => {
   it('names the lecture tutor from the avatar, or falls back per category', async () => {
     server.use(
       noPlan,
-      avatar('/api/neet/chat', null),
-      avatar('/api/v1/chat', null),
-      http.get(`${API}/api/neet/chat/lecture-conversations/5`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
-      http.get(`${API}/api/v1/chat/lecture-conversations/5`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
+      ...avatar('/api/neet/chat', null),
+      ...avatar('/api/v1/chat', null),
+      http.get(`${API}/api/v4/chat/competitive/2/lectures/5/conversation`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
+      http.get(`${API}/api/v4/chat/board/1/lectures/5/conversation`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
     );
     const surface = { kind: 'lecture' as const, courseId: 5, moduleId: null, lectureId: null };
     const { unmount } = renderWithProviders(<AtlasPanel exam={neet} surface={surface} {...panelProps} />);
@@ -232,9 +235,9 @@ describe('LectureAtlas', () => {
   it('opens from a custom opener and closes back to the launcher', async () => {
     server.use(
       noPlan,
-      avatar('/api/neet/chat', 'Vedica, Biology tutor'),
-      http.get(`${API}/api/neet/chat/lecture-conversations/9`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
-      http.get(`${API}/api/neet/chat/lecture-chat-history/9`, () => HttpResponse.json({ success: true, data: { chats: [] } })),
+      ...avatar('/api/neet/chat', 'Vedica, Biology tutor'),
+      http.get(`${API}/api/v4/chat/competitive/2/lectures/9/conversation`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
+      http.get(`${API}/api/v4/chat/competitive/2/lectures/9/chats`, () => HttpResponse.json({ success: true, data: { chats: [] } })),
     );
     renderWithProviders(
       <LectureAtlas courseId={9} moduleId="" lectureId={null}>

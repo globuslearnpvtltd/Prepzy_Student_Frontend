@@ -105,9 +105,9 @@ describe('uploadAnswerImage', () => {
 
 describe('transcribeAudio', () => {
   it('returns trimmed text and rejects silence', async () => {
-    server.use(http.post(`${API}/api/chat/transcribe`, () => HttpResponse.json({ success: true, transcribedText: ' hi ' })));
+    server.use(http.post(`${API}/api/v4/chat/transcribe`, () => HttpResponse.json({ success: true, message: 'Audio transcribed', data: { text: ' hi ' } })));
     expect(await transcribeAudio(new Blob(['a']))).toBe('hi');
-    server.use(http.post(`${API}/api/chat/transcribe`, () => HttpResponse.json({ success: true, transcribedText: '  ' })));
+    server.use(http.post(`${API}/api/v4/chat/transcribe`, () => HttpResponse.json({ success: true, message: 'Audio transcribed', data: { text: '  ' } })));
     await expect(transcribeAudio(new Blob(['a'], { type: 'audio/ogg' }))).rejects.toThrow("couldn't hear anything");
   });
 });
@@ -148,7 +148,7 @@ describe('useVoiceAnswer', () => {
 
   it('records, transcribes on stop and hands back the text', async () => {
     getUserMedia.mockResolvedValue(stream);
-    server.use(http.post(`${API}/api/chat/transcribe`, () => HttpResponse.json({ success: true, transcribedText: 'photosynthesis' })));
+    server.use(http.post(`${API}/api/v4/chat/transcribe`, () => HttpResponse.json({ success: true, message: 'Audio transcribed', data: { text: 'photosynthesis' } })));
     const onText = vi.fn();
     const onError = vi.fn();
     const { result } = renderHook(() => useVoiceAnswer(onText, onError));
@@ -166,7 +166,7 @@ describe('useVoiceAnswer', () => {
 
   it('reports transcription failures', async () => {
     getUserMedia.mockResolvedValue(stream);
-    server.use(http.post(`${API}/api/chat/transcribe`, () => HttpResponse.json({ success: true })));
+    server.use(http.post(`${API}/api/v4/chat/transcribe`, () => HttpResponse.json({ success: true, message: 'Audio transcribed', data: { text: '' } })));
     const onError = vi.fn();
     const { result } = renderHook(() => useVoiceAnswer(vi.fn(), onError));
     await act(() => result.current.start());

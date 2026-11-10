@@ -7,7 +7,9 @@ import { LiveTalkMiniBar, LiveTalkSummary, LiveVoiceLayer, LiveVoiceProvider, us
 import { formatClock, formatDuration, htmlToPlain, splitAvatarName, splitReply, tokenizeSpoken, voiceReplyToPlain } from './text';
 import type { VoiceConfig } from './types';
 
-const CONFIG: VoiceConfig = { variant: 'lecture', courseId: 7, lectureId: 70 };
+const BOARD = { category: 'board', examId: 1 } as const;
+const CONFIG: VoiceConfig = { variant: 'lecture', exam: BOARD, courseId: 7, lectureId: 70 };
+const VOICE_BASE: Record<string, string> = { lecture: '/api/v4/chat/board/1/voice/lectures/7', dashboard: '/api/v4/chat/board/1/voice/dashboard' };
 const AVATAR = { name: 'CV Raman, The Physicist', image: null };
 
 let fakes: VoiceFakes;
@@ -16,11 +18,11 @@ let saves: Record<string, unknown>[];
 
 function backend(kind = 'lecture') {
   server.use(
-    http.post(`${API}/api/v1/chat/${kind}-voice/start`, async ({ request }) => {
+    http.post(`${API}${VOICE_BASE[kind]}/start`, async ({ request }) => {
       starts.push((await request.json()) as Record<string, unknown>);
       return HttpResponse.json({ success: true, data: { sdp: 'answer-sdp', type: 'answer' } });
     }),
-    http.post(`${API}/api/v1/chat/${kind}-voice/save`, async ({ request }) => {
+    http.post(`${API}${VOICE_BASE[kind]}/save`, async ({ request }) => {
       saves.push((await request.json()) as Record<string, unknown>);
       return HttpResponse.json({ success: true, data: { chat_id: 5 } });
     }),
@@ -143,7 +145,7 @@ describe('live talk screens', () => {
   it('switches the tutor language mid-call (reconnects) and remembers it', async () => {
     backend('dashboard');
     fakes.permission.state = 'granted';
-    renderVoice({ variant: 'dashboard', classId: 10 });
+    renderVoice({ variant: 'dashboard', exam: BOARD, classId: 10 });
     await userEvent.click(screen.getByRole('button', { name: 'Start talk' }));
     const talk = await screen.findByRole('dialog', { name: 'Live talk with CV Raman' });
     await waitFor(() => expect(starts).toHaveLength(1));
@@ -188,7 +190,7 @@ describe('live talk screens', () => {
     expect(screen.queryByRole('dialog', { name: 'Microphone access' })).not.toBeInTheDocument();
     expect(fakes.getUserMedia).not.toHaveBeenCalled();
 
-    server.use(http.post(`${API}/api/v1/chat/lecture-voice/start`, () => HttpResponse.json({ message: 'off' }, { status: 503 })));
+    server.use(http.post(`${API}/api/v4/chat/board/1/voice/lectures/7/start`, () => HttpResponse.json({ message: 'off' }, { status: 503 })));
     fakes.permission.state = 'granted';
     await userEvent.click(screen.getByRole('button', { name: 'Start talk' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Live talk is unavailable');

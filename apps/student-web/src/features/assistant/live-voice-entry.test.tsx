@@ -20,18 +20,24 @@ const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
     data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', stream_name: 'PCB', duration_months: 12, expiry_date: '2099-01-01', status: 'active' }] },
   }),
 );
-const avatar = (base: string, name = 'Atlas') =>
-  http.post(`${API}${base}/marketingChatImageName`, () => HttpResponse.json({ success: true, data: { avatar: [{ id: 1, name, image: 'tutor.png' }] } }));
+/** v4 chat base of the exam a legacy base belonged to. */
+const v4Base = (base: string) => (base.includes('/neet/') ? '/api/v4/chat/competitive/2' : '/api/v4/chat/board/1');
+/** The tutor avatar of the dashboard and of any lecture (v4). */
+const avatar = (base: string, name = 'Atlas') => {
+  const body = () => HttpResponse.json({ success: true, data: { avatar: [{ id: 1, name, image: 'tutor.png' }] } });
+  return [http.get(`${API}${v4Base(base)}/dashboard/avatar`, body), http.get(`${API}${v4Base(base)}/lectures/:courseId/avatar`, body)];
+};
 
 let starts: { path: string; body: Record<string, unknown> }[];
 let saves: { path: string; body: Record<string, unknown> }[];
-const voiceBackend = (base: string, kind: string) =>
+/** Answers the v4 voice routes (start / save of any tutor) of the exam a legacy base belonged to. */
+const voiceBackend = (base: string) =>
   server.use(
-    http.post(`${API}${base}/${kind}-voice/start`, async ({ request }) => {
+    http.post(`${API}${v4Base(base)}/voice/*/start`, async ({ request }) => {
       starts.push({ path: new URL(request.url).pathname, body: (await request.json()) as Record<string, unknown> });
       return HttpResponse.json({ success: true, data: { sdp: 'answer-sdp', type: 'answer' } });
     }),
-    http.post(`${API}${base}/${kind}-voice/save`, async ({ request }) => {
+    http.post(`${API}${v4Base(base)}/voice/*/save`, async ({ request }) => {
       saves.push({ path: new URL(request.url).pathname, body: (await request.json()) as Record<string, unknown> });
       return HttpResponse.json({ success: true, data: { chat_id: 7 } });
     }),
@@ -53,12 +59,12 @@ describe('live talk entry points', () => {
     let reloads = 0;
     server.use(
       plan,
-      avatar('/api/v1/chat'),
-      http.get(`${API}/api/v1/chat/dashboard-conversations`, () =>
+      ...avatar('/api/v1/chat'),
+      http.get(`${API}/api/v4/chat/board/1/dashboard/conversation`, () =>
         HttpResponse.json({ success: true, data: { latest_chat: 7, conversations: [{ message_id: 1, text: '<p>What is inertia?</p>', is_student: 1 }] } }),
       ),
-      http.get(`${API}/api/v1/chat/dashboard-chat-history`, () => HttpResponse.json({ success: true, data: { chats: [] } })),
-      http.get(`${API}/api/v1/chat/fetch-dashboard-messages/7`, () => {
+      http.get(`${API}/api/v4/chat/board/1/dashboard/chats`, () => HttpResponse.json({ success: true, data: { chats: [] } })),
+      http.get(`${API}/api/v4/chat/board/1/dashboard/chats/7/messages`, () => {
         reloads += 1;
         return HttpResponse.json({
           success: true,
@@ -72,7 +78,7 @@ describe('live talk entry points', () => {
         });
       }),
     );
-    voiceBackend('/api/v1/chat', 'dashboard');
+    voiceBackend('/api/v1/chat');
     renderWithProviders(<AtlasHost />, { exam: cbse });
     await userEvent.click(screen.getByRole('button', { name: 'Ask Atlas' }));
     const panel = await screen.findByRole('dialog', { name: 'Atlas chat' });
@@ -82,7 +88,7 @@ describe('live talk entry points', () => {
     await screen.findByRole('dialog', { name: 'Live talk with Atlas' });
     await waitFor(() => expect(starts).toHaveLength(1));
     expect(starts[0]).toMatchObject({
-      path: '/api/v1/chat/dashboard-voice/start',
+      path: '/api/v4/chat/board/1/voice/dashboard/start',
       body: { class_id: 12, class_name: 'CLASS 12', language: 'english', history: [{ role: 'user', text: 'What is inertia?' }] },
     });
     emit({ type: 'ready' });
@@ -106,7 +112,7 @@ describe('live talk entry points', () => {
     expect(within(reopened).getAllByText('Mass measures inertia.')).toHaveLength(1);
     // Typing moves on: the card goes and the thread shows the saved turns.
     server.use(
-      http.post(`${API}/api/v1/chat/dashboard_chat_interaction`, () =>
+      http.post(`${API}/api/v4/chat/board/1/dashboard/messages`, () =>
         HttpResponse.json({ success: true, data: { answer: { text: 'Sure.', followups: [] } } }),
       ),
     );
@@ -119,10 +125,10 @@ describe('live talk entry points', () => {
   it('Atlas (NEET dashboard) uses the NEET voice endpoint and hangs up on pages with their own tutor', async () => {
     server.use(
       plan,
-      avatar('/api/neet/chat'),
-      http.get(`${API}/api/neet/chat/dashboard-conversations`, () => HttpResponse.json({ success: true, data: { latest_chat: null, conversations: [] } })),
+      ...avatar('/api/neet/chat'),
+      http.get(`${API}/api/v4/chat/competitive/2/dashboard/conversation`, () => HttpResponse.json({ success: true, data: { latest_chat: null, conversations: [] } })),
     );
-    voiceBackend('/api/neet/chat', 'dashboard');
+    voiceBackend('/api/neet/chat');
     navigation.pathname = '/neet/dashboard';
     const view = renderWithProviders(<AtlasHost />, { exam: neet });
     act(() => useAtlas.getState().openAtlas());
@@ -130,7 +136,7 @@ describe('live talk entry points', () => {
     await within(panel).findByText('Ask Atlas anything');
     await userEvent.click(within(panel).getByRole('button', { name: 'Talk live with your tutor' }));
     await waitFor(() => expect(starts).toHaveLength(1));
-    expect(starts[0]).toEqual({ path: '/api/neet/chat/dashboard-voice/start', body: expect.objectContaining({ class_id: 12 }) });
+    expect(starts[0]).toEqual({ path: '/api/v4/chat/competitive/2/voice/dashboard/start', body: expect.objectContaining({ class_id: 12 }) });
     expect(starts[0]!.body).not.toHaveProperty('class_name');
     emit({ type: 'ready' });
 
@@ -142,10 +148,10 @@ describe('live talk entry points', () => {
   it('lecture chat: board lectures send course + lecture, NEET chapters course + module + class', async () => {
     server.use(
       plan,
-      avatar('/api/v1/chat', 'CV Raman, The Physicist'),
-      http.get(`${API}/api/v1/chat/lecture-conversations/5`, () => HttpResponse.json({ success: true, data: { latest_chat: 2, conversations: [] } })),
+      ...avatar('/api/v1/chat', 'CV Raman, The Physicist'),
+      http.get(`${API}/api/v4/chat/board/1/lectures/5/conversation`, () => HttpResponse.json({ success: true, data: { latest_chat: 2, conversations: [] } })),
     );
-    voiceBackend('/api/v1/chat', 'lecture');
+    voiceBackend('/api/v1/chat');
     const board = renderWithProviders(<LectureAtlas courseId={5} moduleId={6} lectureId={50} />, { exam: cbse });
     await userEvent.click(await screen.findByRole('button', { name: 'Ask CV Raman' }));
     const panel = await screen.findByRole('dialog', { name: 'CV Raman chat' });
@@ -153,29 +159,29 @@ describe('live talk entry points', () => {
     await userEvent.click(within(panel).getByRole('button', { name: 'Talk live with your tutor' }));
     await screen.findByRole('dialog', { name: 'Live talk with CV Raman' });
     await waitFor(() => expect(starts).toHaveLength(1));
-    expect(starts[0]).toMatchObject({ path: '/api/v1/chat/lecture-voice/start', body: { course_id: 5, lecture_id: 50 } });
+    expect(starts[0]).toMatchObject({ path: '/api/v4/chat/board/1/voice/lectures/5/start', body: { course_id: 5, lecture_id: 50 } });
     expect(starts[0]!.body).not.toHaveProperty('class_id');
     // Leaving the lecture hangs up.
     board.unmount();
     expect(FakePeerConnection.last!.closed).toBe(true);
 
     server.use(
-      avatar('/api/neet/chat', 'Vedica, Biology tutor'),
-      http.get(`${API}/api/neet/chat/lecture-conversations/9`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
+      ...avatar('/api/neet/chat', 'Vedica, Biology tutor'),
+      http.get(`${API}/api/v4/chat/competitive/2/lectures/9/conversation`, () => HttpResponse.json({ success: true, data: { latest_chat: 1, conversations: [] } })),
     );
-    voiceBackend('/api/neet/chat', 'lecture');
+    voiceBackend('/api/neet/chat');
     renderWithProviders(<LectureAtlas courseId={9} moduleId={90} />, { exam: neet });
     await userEvent.click(await screen.findByRole('button', { name: 'Ask Vedica' }));
     const neetPanel = await screen.findByRole('dialog', { name: 'Vedica chat' });
     await within(neetPanel).findByText('Ask Vedica anything');
     await userEvent.click(within(neetPanel).getByRole('button', { name: 'Talk live with your tutor' }));
     await waitFor(() => expect(starts).toHaveLength(2));
-    expect(starts[1]).toMatchObject({ path: '/api/neet/chat/lecture-voice/start', body: { course_id: 9, module_id: 90, class_id: 12 } });
+    expect(starts[1]).toMatchObject({ path: '/api/v4/chat/competitive/2/voice/lectures/9/start', body: { course_id: 9, module_id: 90, class_id: 12 } });
   });
 
   it('Vedica (board result): "Talk live" sends the evaluated question; the ended talk lands in the thread', async () => {
-    server.use(http.get(`${API}/api/chat/post-assessment-conversations/3/8/21`, () => HttpResponse.json({ success: true, conversations: [] })));
-    voiceBackend('/api/v1/chat', 'post-assessment');
+    server.use(http.get(`${API}/api/v4/chat/board/1/review/3/8/21/messages`, () => HttpResponse.json({ success: true, data: { conversations: [] } })));
+    voiceBackend('/api/v1/chat');
     const context = {
       assessmentId: 3,
       questionId: 8,
@@ -196,7 +202,7 @@ describe('live talk entry points', () => {
     const talk = await screen.findByRole('dialog', { name: 'Live talk with Vedica' });
     await waitFor(() => expect(starts).toHaveLength(1));
     expect(starts[0]).toMatchObject({
-      path: '/api/v1/chat/post-assessment-voice/start',
+      path: '/api/v4/chat/board/1/voice/review/3/8/21/start',
       body: {
         question: 'Define work.',
         sample_answer: 'W = F·d',
@@ -224,14 +230,14 @@ describe('live talk entry points', () => {
     expect(await screen.findByText('Where did I lose marks?')).toBeInTheDocument();
     expect(screen.getByText(/Worked solution:/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Live talk ended, 0 s · saved to chat/));
-    expect(saves[0]).toMatchObject({ path: '/api/v1/chat/post-assessment-voice/save', body: { assessment_id: 3, question_id: 8, attempt_id: 21, sub_question_id: 4 } });
+    expect(saves[0]).toMatchObject({ path: '/api/v4/chat/board/1/voice/review/3/8/21/save', body: { assessment_id: 3, question_id: 8, attempt_id: 21, sub_question_id: 4 } });
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByText(/Live talk ended/)).not.toBeInTheDocument();
   });
 
   it('Vedica (NEET result) talks about the MCQ; closing the chat hangs up', async () => {
-    server.use(http.get(`${API}/api/neet/chat/post-assessment-conversations/3/8/21`, () => HttpResponse.json({ success: true, conversations: [] })));
-    voiceBackend('/api/neet/chat', 'post-assessment');
+    server.use(http.get(`${API}/api/v4/chat/competitive/2/review/3/8/21/messages`, () => HttpResponse.json({ success: true, data: { conversations: [] } })));
+    voiceBackend('/api/neet/chat');
     const onClose = vi.fn();
     const context = {
       assessmentId: 3,
@@ -254,7 +260,7 @@ describe('live talk entry points', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Talk live with Vedica' }));
     await waitFor(() => expect(starts).toHaveLength(1));
     expect(starts[0]).toMatchObject({
-      path: '/api/neet/chat/post-assessment-voice/start',
+      path: '/api/v4/chat/competitive/2/voice/review/3/8/21/start',
       body: { question: 'Powerhouse of the cell?', options: context.options, correct_option_id: 2, selected_option_id: 1, explanation: 'Mitochondria make ATP.' },
     });
     emit({ type: 'ready' });

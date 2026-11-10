@@ -117,9 +117,9 @@ describe('board player', () => {
     mockBoardPaper();
     let contentType = '';
     server.use(
-      http.post(`${API}/api/chat/transcribe`, ({ request }) => {
+      http.post(`${API}/api/v4/chat/transcribe`, ({ request }) => {
         contentType = request.headers.get('content-type') ?? '';
-        return HttpResponse.json({ success: true, transcribedText: 'Flux is proportional to charge' });
+        return HttpResponse.json({ success: true, message: 'Audio transcribed', data: { text: 'Flux is proportional to charge' } });
       }),
     );
     class FakeRecorder {

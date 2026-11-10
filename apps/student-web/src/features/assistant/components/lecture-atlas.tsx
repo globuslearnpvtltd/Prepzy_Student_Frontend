@@ -31,7 +31,7 @@ export function LectureAtlas({ courseId, moduleId, lectureId, children }: Lectur
   );
   const avatar = useQuery({
     queryKey: atlasKeys.avatar(exam.slug, surface),
-    queryFn: () => assistantApi.avatar(exam.category, surface),
+    queryFn: () => assistantApi.avatar(exam, surface),
     staleTime: Infinity,
   });
   const plan = useActivePlan(exam);
@@ -39,9 +39,9 @@ export function LectureAtlas({ courseId, moduleId, lectureId, children }: Lectur
   const voiceConfig = useMemo<VoiceConfig>(
     () =>
       exam.category === 'competitive'
-        ? { variant: 'neet-lecture', courseId: Number(courseId), moduleId: toNumber(moduleId), classId: plan.data?.classId ?? null }
-        : { variant: 'lecture', courseId: Number(courseId), lectureId: toNumber(lectureId) },
-    [exam.category, courseId, moduleId, lectureId, plan.data?.classId],
+        ? { variant: 'neet-lecture', exam, courseId: Number(courseId), moduleId: toNumber(moduleId), classId: plan.data?.classId ?? null }
+        : { variant: 'lecture', exam, courseId: Number(courseId), lectureId: toNumber(lectureId) },
+    [exam, courseId, moduleId, lectureId, plan.data?.classId],
   );
   const close = () => {
     setOpen(false);

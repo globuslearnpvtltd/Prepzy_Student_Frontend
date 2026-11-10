@@ -15,7 +15,7 @@ import {
   type VoiceConfig,
   type VoiceTurn,
 } from '@/features/live-voice';
-import type { ExamCategory } from '@/shared/config/exams';
+import type { ExamRef } from '@/shared/config/exams';
 import { useExam } from '@/shared/hooks/use-exam';
 import type { ReviewContext } from '../api';
 import { useReadAloud, useReviewChat } from '../hooks';
@@ -26,12 +26,13 @@ export const VEDICA_IMAGE = '/illustrations/tests/vedica.jpg';
 const VEDICA = { name: 'Vedica', image: VEDICA_IMAGE };
 
 /** What Vedica's live talk knows about the question: the same fields as her text chat. */
-export function reviewVoiceConfig(category: ExamCategory, ctx: ReviewContext): VoiceConfig {
+export function reviewVoiceConfig(exam: ExamRef, ctx: ReviewContext): VoiceConfig {
   const ids = { assessment_id: ctx.assessmentId, question_id: ctx.questionId, attempt_id: ctx.attemptId };
   const question = htmlToPlain(ctx.questionText);
-  if (category === 'competitive') {
+  if (exam.category === 'competitive') {
     return {
       variant: 'neet-post-assessment',
+      exam,
       postAssessment: {
         ...ids,
         question,
@@ -45,6 +46,7 @@ export function reviewVoiceConfig(category: ExamCategory, ctx: ReviewContext): V
   }
   return {
     variant: 'post-assessment',
+    exam,
     postAssessment: {
       ...ids,
       sub_question_id: ctx.subQuestionId ?? null,
@@ -71,7 +73,7 @@ export function ReviewChat({ context, open, onClose }: { context: ReviewContext;
   // The result page rebuilds the context on every render; key the config on its content.
   const contextKey = JSON.stringify(context);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the context's content
-  const voiceConfig = useMemo(() => reviewVoiceConfig(exam.category, context), [exam.category, contextKey]);
+  const voiceConfig = useMemo(() => reviewVoiceConfig(exam, context), [exam, contextKey]);
   if (!open) return null;
   return (
     <LiveVoiceProvider config={voiceConfig}>

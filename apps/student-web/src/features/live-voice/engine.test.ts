@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { onApiEvent } from '@/shared/lib/api-client';
 import { FakeAudioContext, FakePeerConnection, installVoiceFakes, removeVoiceFakes, type VoiceFakes } from '@/test/fake-webrtc';
 import { API, server } from '@/test/server';
-import { VOICE_ENDPOINTS } from './api';
+import { voiceEndpoints } from './api';
 import { VoiceEngine } from './engine';
 import { createVoiceStore, LANGUAGE_STORAGE_KEY, type VoiceStore } from './store';
 import type { VoiceConfig, VoiceVariant } from './types';
@@ -38,13 +38,16 @@ const NEET_QUESTION = {
   explanation: 'Mitochondria are the powerhouse.',
 };
 
+const BOARD = { category: 'board', examId: 1 } as const;
+const NEET = { category: 'competitive', examId: 2 } as const;
+
 const CONFIGS: Record<VoiceVariant, VoiceConfig> = {
-  lecture: { variant: 'lecture', courseId: 7, lectureId: 70 },
-  'neet-lecture': { variant: 'neet-lecture', courseId: 8, moduleId: 80, classId: 12 },
-  dashboard: { variant: 'dashboard', classId: 10, className: 'Class 10' },
-  'neet-dashboard': { variant: 'neet-dashboard', classId: 12 },
-  'post-assessment': { variant: 'post-assessment', postAssessment: BOARD_QUESTION },
-  'neet-post-assessment': { variant: 'neet-post-assessment', postAssessment: NEET_QUESTION },
+  lecture: { variant: 'lecture', exam: BOARD, courseId: 7, lectureId: 70 },
+  'neet-lecture': { variant: 'neet-lecture', exam: NEET, courseId: 8, moduleId: 80, classId: 12 },
+  dashboard: { variant: 'dashboard', exam: BOARD, classId: 10, className: 'Class 10' },
+  'neet-dashboard': { variant: 'neet-dashboard', exam: NEET, classId: 12 },
+  'post-assessment': { variant: 'post-assessment', exam: BOARD, postAssessment: BOARD_QUESTION },
+  'neet-post-assessment': { variant: 'neet-post-assessment', exam: NEET, postAssessment: NEET_QUESTION },
 };
 
 const OPTS = { avatar: { name: 'CV Raman, The Physicist', image: 'raman.png' }, chatId: 41, history: [{ role: 'user' as const, text: 'What is light?' }] };
@@ -55,7 +58,7 @@ let saves: { path: string; body: Record<string, unknown> }[];
 
 /** Answers every start / save endpoint (or a given status for start). */
 function backend(startStatus = 200, startData: unknown = { sdp: 'answer-sdp', type: 'answer' }) {
-  for (const { start, save } of Object.values(VOICE_ENDPOINTS)) {
+  for (const { start, save } of Object.values(CONFIGS).map(voiceEndpoints)) {
     server.use(
       http.post(`${API}${start}`, async ({ request }) => {
         starts.push({ path: start, body: (await request.json()) as Record<string, unknown> });
@@ -91,13 +94,13 @@ afterEach(() => removeVoiceFakes());
 
 describe('VoiceEngine: start', () => {
   it.each([
-    ['lecture', '/api/v1/chat/lecture-voice/start', { course_id: 7, lecture_id: 70 }],
-    ['neet-lecture', '/api/neet/chat/lecture-voice/start', { course_id: 8, module_id: 80, class_id: 12 }],
-    ['dashboard', '/api/v1/chat/dashboard-voice/start', { class_id: 10, class_name: 'Class 10' }],
-    ['neet-dashboard', '/api/neet/chat/dashboard-voice/start', { class_id: 12 }],
+    ['lecture', '/api/v4/chat/board/1/voice/lectures/7/start', { course_id: 7, lecture_id: 70 }],
+    ['neet-lecture', '/api/v4/chat/competitive/2/voice/lectures/8/start', { course_id: 8, module_id: 80, class_id: 12 }],
+    ['dashboard', '/api/v4/chat/board/1/voice/dashboard/start', { class_id: 10, class_name: 'Class 10' }],
+    ['neet-dashboard', '/api/v4/chat/competitive/2/voice/dashboard/start', { class_id: 12 }],
     [
       'post-assessment',
-      '/api/v1/chat/post-assessment-voice/start',
+      '/api/v4/chat/board/1/voice/review/3/8/21/start',
       {
         question: 'Define work.',
         sample_answer: 'Work = F·d',
@@ -112,7 +115,7 @@ describe('VoiceEngine: start', () => {
     ],
     [
       'neet-post-assessment',
-      '/api/neet/chat/post-assessment-voice/start',
+      '/api/v4/chat/competitive/2/voice/review/4/9/22/start',
       { question: 'Which organelle makes ATP?', question_diagram: '', options: NEET_QUESTION.options, correct_option_id: 2, selected_option_id: 1, explanation: 'Mitochondria are the powerhouse.' },
     ],
   ] as const)('%s sends the SDP offer with its scope, language and history', async (variant, path, scope) => {
@@ -185,7 +188,7 @@ describe('VoiceEngine: start', () => {
     expect(FakeAudioContext.instances[0]!.closed).toBe(true);
     await waitFor(() => expect(store.get().lastSession?.saved).toBe(true));
     expect(store.get().savedChatId).toBe(99);
-    expect(saves[0]!.path).toBe('/api/v1/chat/dashboard-voice/save');
+    expect(saves[0]!.path).toBe('/api/v4/chat/board/1/voice/dashboard/save');
     expect(saves[0]!.body).toEqual({
       chat_id: 41,
       class_id: 10,
@@ -211,7 +214,7 @@ describe('VoiceEngine: start', () => {
     pc.events.emit({ type: 'bot_end', text: 'Hello! <solution>x = 2</solution>' });
     engine.end();
     await waitFor(() => expect(saves).toHaveLength(1));
-    expect(saves[0]!.path).toBe(VOICE_ENDPOINTS[variant].save);
+    expect(saves[0]!.path).toBe(voiceEndpoints(CONFIGS[variant]).save);
     expect(saves[0]!.body).toEqual({
       chat_id: 41,
       ...scope,

@@ -8,9 +8,6 @@ type Handlers = Parameters<typeof mockApi>[1];
 export const asGets = (mocks: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(mocks).map(([path, json]) => [`GET ${path}`, json as object]));
 
-/** Reads the app sends as POST (the backend's convention for these endpoints). */
-const POST_READS = ['/api/v1/chat/marketingChatImageName', '/api/neet/chat/marketingChatImageName'];
-const asPosts = (paths: string[]) => Object.fromEntries(paths.map((path) => [`POST ${path}`, MOCKS[path] as object]));
 
 /**
  * Every student read from visual/mocks*.ts, signed in as a board (CBSE, class 12) or competitive (NEET) student.
@@ -19,7 +16,6 @@ const asPosts = (paths: string[]) => Object.fromEntries(paths.map((path) => [`PO
 export function studentApi(exam: 'board' | 'competitive', extra: Handlers = {}): Handlers {
   return {
     ...asGets(MOCKS),
-    ...asPosts(POST_READS),
     'GET /api/v4/student/plans/active': plansFor(exam),
     ...extra,
   };

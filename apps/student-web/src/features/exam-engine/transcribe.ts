@@ -5,12 +5,12 @@ import { apiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/errors';
 import { assertOk } from '@/shared/lib/unwrap';
 
-/** Speech-to-text for written answers (POST /api/chat/transcribe, form field `audio`). */
+/** Speech-to-text for written answers and the chat mic (POST /api/v4/chat/transcribe, form field `audio`). */
 export async function transcribeAudio(audio: Blob): Promise<string> {
   const form = new FormData();
   form.append('audio', new File([audio], 'answer.webm', { type: audio.type || 'audio/webm' }));
-  const body = assertOk(await apiClient.post<{ success?: boolean; transcribedText?: string }>('/api/chat/transcribe', form));
-  const text = body.transcribedText?.trim();
+  const body = assertOk(await apiClient.post<{ success?: boolean; data?: { text?: string } }>('/api/v4/chat/transcribe', form));
+  const text = body.data?.text?.trim();
   if (!text) throw new ApiError({ status: 422, code: 'NO_SPEECH', message: "We couldn't hear anything. Please try again." });
   return text;
 }

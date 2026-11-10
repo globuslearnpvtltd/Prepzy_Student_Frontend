@@ -275,3 +275,15 @@ MOCKS[`${neetLearn}/chapters/341/notes`] = MOCKS['/api/neet/get-summar-notes/341
 MOCKS[`${neetLearn}/chapters/341/practice`] = MOCKS['/api/neet/unit-test-assessment/341'];
 MOCKS[`${neetLearn}/practice/5231/attempts`] = asAttempts('/api/neet/quiz-exam/previous-attempts/5231');
 MOCKS['/api/v4/learn/modules/341/pyq-attempts'] = asAttempts('/api/neet/chapter-pyq-exam/previous-attempts/341');
+// The new app's Atlas (dashboard) chat reads the v4 chat routes (same bodies as the old keys above).
+for (const [legacy, v4Chat] of [
+  ['/api/v1/chat', '/api/v4/chat/board/1'],
+  ['/api/neet/chat', '/api/v4/chat/competitive/2'],
+] as const) {
+  MOCKS[`${v4Chat}/dashboard/conversation`] = MOCKS[`${legacy}/dashboard-conversations`];
+  MOCKS[`${v4Chat}/dashboard/chats`] = MOCKS[`${legacy}/dashboard-chat-history`];
+  MOCKS[`${v4Chat}/dashboard/avatar`] = MOCKS[`${legacy}/marketingChatImageName`];
+}
+// Lecture tutor avatars (board course 5, NEET course 214), same body as the old avatar key.
+MOCKS['/api/v4/chat/board/1/lectures/5/avatar'] = MOCKS['/api/v1/chat/marketingChatImageName'];
+MOCKS['/api/v4/chat/competitive/2/lectures/214/avatar'] = MOCKS['/api/neet/chat/marketingChatImageName'];

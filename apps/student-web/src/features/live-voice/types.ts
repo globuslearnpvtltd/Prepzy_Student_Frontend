@@ -1,3 +1,5 @@
+import type { ExamRef } from '@/shared/config/exams';
+
 /** Where the call happens and what the tutor talks about. */
 // "lecture": board lecture tutor (course + lecture). "neet-lecture": NEET chapter tutor (course + module).
 // "dashboard": board Atlas (the student's class). "neet-dashboard": NEET Atlas (backend picks the class).
@@ -112,6 +114,8 @@ export interface NeetPostAssessmentVoiceContext {
 /** What a surface tells the provider: which tutor, and the ids / question it is about. */
 export interface VoiceConfig {
   variant: VoiceVariant;
+  /** The exam of the page (its category and backend id pick the v4 voice routes). */
+  exam: ExamRef;
   courseId?: number | null;
   lectureId?: number | null;
   moduleId?: number | null;

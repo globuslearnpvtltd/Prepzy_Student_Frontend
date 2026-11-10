@@ -1,6 +1,7 @@
-import type { ExamConfig } from '@/shared/config/exams';
+import { LEARN_API, learnApiBase, type ExamRef } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/errors';
+import { assertOk } from '@/shared/lib/unwrap';
 
 type Raw = Record<string, unknown>;
 
@@ -159,9 +160,10 @@ export function toChapters(body: unknown): Chapter[] {
 
 const LEVELS: Record<string, string> = { '1': 'Easy', '2': 'Medium', '3': 'Hard' };
 
+/** End-of-chapter (`difficulty`: easy / medium / hard) and PYQ (`difficulty_level`) questions of a chapter. */
 export function toBankQuestions(body: unknown): BankQuestion[] {
   return toArray(asRaw(asRaw(body).data).questions).map((raw) => {
-    const difficulty = str(raw.difficulty_level);
+    const difficulty = str(raw.difficulty) ?? str(raw.difficulty_level);
     const level = difficulty ? formatSubject(difficulty) : (LEVELS[String(raw.question_level)] ?? null);
     const setName = str(raw.set_name);
     const year = raw.year === null || raw.year === undefined ? null : String(raw.year);
@@ -200,7 +202,7 @@ export function toConceptCards(body: unknown): { cards: ConceptCard[]; sources: 
 
 export function toTutorReply(body: unknown): TutorReply {
   const data = asRaw(body);
-  const text = str(data.llm_responses);
+  const text = str(data.text);
   if (!text) throw new ApiError({ status: 502, code: 'EMPTY_REPLY', message: "Socrates couldn't reply. Please try again." });
   return {
     chatId: num(data.chat_id),
@@ -325,6 +327,9 @@ export function removeLatexTables(text: string): string {
 
 /* ------------------------------------------------ requests ------------------------------------------------ */
 
+/** v4 doubt solver routes of an exam (one set per category, the exam picked by its id). */
+export const doubtsApiBase = (exam: ExamRef) => `/api/v4/chat/${exam.category}/${exam.examId}/doubts`;
+
 export interface TutorRequest {
   chatId: number;
   text: string;
@@ -335,10 +340,9 @@ export interface TutorRequest {
   attachedImageUrls?: string[];
 }
 
-function tutorForm({ chatId, text, className, subject, images, imageUrls, attachedImageUrls }: TutorRequest) {
+function tutorForm({ text, className, subject, images, imageUrls, attachedImageUrls }: TutorRequest) {
   const form = new FormData();
   form.append('text', text);
-  form.append('chat_id', String(chatId));
   form.append('class_name', String(className ?? ''));
   form.append('sub_name', String(subject?.title ?? ''));
   images?.forEach((image) => form.append('image', image, image.name || 'image.jpg'));
@@ -348,61 +352,76 @@ function tutorForm({ chatId, text, className, subject, images, imageUrls, attach
 }
 
 export const solverApi = {
-  books: async (exam: ExamConfig, classId: number | null) =>
+  /** Board: the textbooks of the student's class. Competitive: every textbook of the exam. */
+  books: async (exam: ExamRef, classId: number | null) =>
     toBooks(
-      exam.category === 'competitive'
-        ? await apiClient.get('/api/neet/doubt-solver-subjects')
-        : await apiClient.get('/api/v2/get-textbooks', { params: { class_id: classId } }),
+      asRaw(
+        assertOk(
+          await apiClient.get(`${learnApiBase(exam)}/textbooks`, {
+            params: exam.category === 'competitive' ? undefined : { class_id: classId },
+          }),
+        ),
+      ).data,
       exam.category === 'competitive',
     ),
 
-  chapters: async (bookId: number) => toChapters(await apiClient.get(`/api/v1/learn/module-outline/${bookId}`)),
+  chapters: async (bookId: number) => toChapters(assertOk(await apiClient.get(`${LEARN_API}/courses/${bookId}/outline`))),
 
-  bankQuestions: async (chapterId: number, tab: BankTab) =>
-    toBankQuestions(
-      tab === 'end'
-        ? await apiClient.get(`/api/v1/learn/chapter-unsolved/${chapterId}`, { params: { all: 1 } })
-        : await apiClient.get(`/api/v1/learn/chapter-pyqs/${chapterId}`),
-    ),
+  /**
+   * End of chapter: the NCERT questions (board); competitive chapters have none, so a daily sample of the
+   * chapter's questions. PYQs: the chapter's previous-year questions.
+   */
+  bankQuestions: async (exam: ExamRef, chapterId: number, tab: BankTab) => {
+    const path =
+      tab === 'pyq'
+        ? `${LEARN_API}/modules/${chapterId}/pyqs`
+        : exam.category === 'competitive'
+          ? `${learnApiBase(exam)}/chapters/${chapterId}/questions`
+          : `${LEARN_API}/modules/${chapterId}/ncert-questions`;
+    return toBankQuestions(assertOk(await apiClient.get(path)));
+  },
 
-  /** Is this a real question for the subject? (maths has its own checker) */
-  checkQuestion: async (subject: SolverSubject | null, query: string): Promise<boolean> => {
+  /** Is this a real question for the subject? (the backend uses the maths checker for MATHEMATICS) */
+  checkQuestion: async (exam: ExamRef, subject: SolverSubject | null, query: string): Promise<boolean> => {
     const body = asRaw(
-      subject?.title === 'MATHEMATICS'
-        ? await apiClient.post('/api/chat/check_valid_maths_query', { query }, { timeout: 60_000 })
-        : await apiClient.post('/api/chat/check-valid-subject-query', { query, sub_name: subject?.title }, { timeout: 60_000 }),
+      assertOk(await apiClient.post(`${doubtsApiBase(exam)}/check`, { query, sub_name: subject?.title ?? '' }, { timeout: 60_000 })),
     );
-    return body.result === 'true' || body.result === true;
+    return asRaw(body.data).valid === true;
   },
 
   /** Reads a photo of a question (OCR): text with LaTeX, plus described diagrams. */
-  extractQuestion: async (file: File): Promise<{ text: string; diagrams: { description: string; base64: string }[] }> => {
+  extractQuestion: async (exam: ExamRef, file: File): Promise<{ text: string; diagrams: { description: string; base64: string }[] }> => {
     const form = new FormData();
     form.append('image', file);
-    const body = asRaw(await apiClient.post('/api/chat/extract-question-from-image', form, { timeout: 90_000 }));
-    const diagrams = toArray(body.diagrams).map((d) => ({ description: str(d.description) ?? '', base64: str(d.base64) ?? '' }));
-    return { text: removeLatexTables(str(body.final_string) ?? ''), diagrams };
+    const data = asRaw(asRaw(assertOk(await apiClient.post(`${doubtsApiBase(exam)}/extract-question`, form, { timeout: 90_000 }))).data);
+    const diagrams = toArray(data.diagrams).map((d) => ({ description: str(d.description) ?? '', base64: str(d.base64) ?? '' }));
+    return { text: removeLatexTables(str(data.text) ?? ''), diagrams };
   },
 
-  /** Opens a solver chat (counts against the plan's doubt limit). */
-  createChat: async (input: { subjectId: number | null; classId: number | null; examId: number }) => {
-    const body = asRaw(
-      await apiClient.post('/api/chat/step_solver_chat/create', { subject_id: input.subjectId, class_id: input.classId, exam_id: input.examId }),
-    );
-    const chatId = num(body.chat_id);
+  /** Opens a solver chat (counts against the plan's doubt limit of the class). */
+  createChat: async (exam: ExamRef, input: { subjectId: number | null; classId: number | null }) => {
+    const body = asRaw(assertOk(await apiClient.post(`${doubtsApiBase(exam)}/chats`, { subject_id: input.subjectId, class_id: input.classId })));
+    const chatId = num(asRaw(body.data).chat_id);
     if (!chatId) throw new ApiError({ status: 502, code: 'NO_CHAT', message: "Couldn't start solving. Please try again." });
     return chatId;
   },
 
   /** One tutoring turn (JSON reply; this endpoint doesn't stream). */
-  ask: async (request: TutorRequest) =>
-    toTutorReply(await apiClient.post('/api/chat/step_solver_chat_interaction/v2', tutorForm(request), { timeout: 120_000 })),
+  ask: async (exam: ExamRef, request: TutorRequest) =>
+    toTutorReply(
+      asRaw(assertOk(await apiClient.post(`${doubtsApiBase(exam)}/chats/${request.chatId}/ask`, tutorForm(request), { timeout: 120_000 }))).data,
+    ),
 
-  conceptCards: async (request: TutorRequest) =>
-    toConceptCards(await apiClient.post('/api/chat/step_solver_concept_card/v1', tutorForm(request), { timeout: 120_000 })),
+  conceptCards: async (exam: ExamRef, request: TutorRequest) =>
+    toConceptCards(
+      asRaw(
+        assertOk(await apiClient.post(`${doubtsApiBase(exam)}/chats/${request.chatId}/concept-cards`, tutorForm(request), { timeout: 120_000 })),
+      ).data,
+    ),
 
-  messages: async (chatId: number) => toSolverMessages(await apiClient.get(`/api/chat/step_solver_chat/${chatId}/messages`)),
+  messages: async (exam: ExamRef, chatId: number) =>
+    toSolverMessages(asRaw(assertOk(await apiClient.get(`${doubtsApiBase(exam)}/chats/${chatId}/messages`))).data),
 
-  history: async (classId: number) =>
-    toDoubtHistory(await apiClient.get('/api/chat/step_solver_chat/history', { params: { class_id: classId } })),
+  history: async (exam: ExamRef, classId: number) =>
+    toDoubtHistory(assertOk(await apiClient.get(`${doubtsApiBase(exam)}/chats`, { params: { class_id: classId } }))),
 };

@@ -94,6 +94,7 @@ function OptionCard({ title, text, action, onClick, art }: { title: string; text
 
 /** Step 3: type a question (or snap a photo); it's checked for the subject, then Socrates starts. */
 export function AskDoubt({ onSolve }: { onSolve: (payload: SolvePayload) => void }) {
+  const exam = useExam();
   const { subject } = useSolver();
   const [busy, setBusy] = useState<null | 'reading' | 'checking'>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +108,7 @@ export function AskDoubt({ onSolve }: { onSolve: (payload: SolvePayload) => void
       let images: string[] = [];
       if (image) {
         setBusy('reading');
-        const read = await solverApi.extractQuestion(image);
+        const read = await solverApi.extractQuestion(exam, image);
         if (!read.text && !text) {
           setError("We couldn't read a question in that photo. Please try another or type it.");
           return;
@@ -119,7 +120,7 @@ export function AskDoubt({ onSolve }: { onSolve: (payload: SolvePayload) => void
         images = read.diagrams.filter((d) => d.base64).map((d) => (d.base64.startsWith('data:') ? d.base64 : `data:image/png;base64,${d.base64}`));
       }
       setBusy('checking');
-      const valid = await solverApi.checkQuestion(subject, problem);
+      const valid = await solverApi.checkQuestion(exam, subject, problem);
       if (!valid) {
         setError(`This doesn't look like a valid ${subjectName} problem. Please edit the problem.`);
         return;

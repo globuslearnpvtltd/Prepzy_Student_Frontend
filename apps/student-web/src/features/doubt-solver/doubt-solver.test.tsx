@@ -20,11 +20,13 @@ import {
   toSolverMessages,
   toTutorReply,
 } from './api';
+import { doubtsApiBase as doubts } from './api';
 import { DoubtSolverScreen, resolveStep } from './components/doubt-solver-screen';
 import { matchesSearch } from './components/question-bank';
 import { bookTransform, wrapOffset } from './components/subject-picker';
 import { useSolver } from './store';
 import { testExam } from '@/test/exams';
+import { learnApiBase } from '@/shared/config/exams';
 
 const cbse = testExam('cbse');
 const neet = testExam('neet');
@@ -84,8 +86,8 @@ describe('doubt solver api', () => {
       toConceptCards({ concept_cards: [{ card_no: 2, title: 'B' }, { card_no: 1, title: 'A', explanation: 'e' }, { card_no: 3 }], sources: { Book: 'NCERT' } }),
     ).toMatchObject({ cards: [{ cardNo: 1 }, { cardNo: 2 }], sources: { book: 'NCERT', chapter: null } });
     expect(toConceptCards({ sources: {} }).sources).toBeNull();
-    expect(toTutorReply({ llm_responses: 'Hi', chat_id: 4, is_first_query: true, current_card_no: 1 })).toMatchObject({ chatId: 4, isFirst: true, cardNo: 1 });
-    expect(() => toTutorReply({ llm_responses: '' })).toThrow(/couldn't reply/);
+    expect(toTutorReply({ text: 'Hi', chat_id: 4, is_first_query: true, current_card_no: 1 })).toMatchObject({ chatId: 4, isFirst: true, cardNo: 1 });
+    expect(() => toTutorReply({ text: '' })).toThrow(/couldn't reply/);
   });
 
   it('restores messages and history, hiding the diagram notes the tutor got', () => {
@@ -135,9 +137,9 @@ describe('doubt solver api', () => {
 
 describe('Ask Socrates flow', () => {
   it('picks a subject, then goes to the start options', async () => {
-    server.use(plan(), http.get(`${API}/api/v2/get-textbooks`, ({ request }) => {
+    server.use(plan(), http.get(`${API}${learnApiBase(cbse)}/textbooks`, ({ request }) => {
       expect(new URL(request.url).searchParams.get('class_id')).toBe('12');
-      return HttpResponse.json(textbooks);
+      return HttpResponse.json({ success: true, data: textbooks });
     }));
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     const next = screen.getByRole('button', { name: 'Next' });
@@ -155,7 +157,13 @@ describe('Ask Socrates flow', () => {
   });
 
   it('uses the NEET subject list', async () => {
-    server.use(plan(20), http.get(`${API}/api/neet/doubt-solver-subjects`, () => HttpResponse.json(textbooks)));
+    server.use(
+      plan(20),
+      http.get(`${API}${learnApiBase(neet)}/textbooks`, ({ request }) => {
+        expect(new URL(request.url).searchParams.has('class_id')).toBe(false);
+        return HttpResponse.json({ success: true, data: textbooks });
+      }),
+    );
     renderWithProviders(<DoubtSolverScreen />, { exam: neet });
     expect(await screen.findByRole('button', { name: 'Hindi, Aroh' })).toBeInTheDocument();
   });
@@ -179,21 +187,29 @@ describe('Ask Socrates flow', () => {
     let tutorText: FormDataEntryValue | null = null;
     server.use(
       plan(),
-      http.post(`${API}/api/chat/check-valid-subject-query`, async ({ request }) => {
-        const body = (await request.json()) as { query: string };
-        return HttpResponse.json({ result: body.query.includes('force') ? 'true' : 'false' });
+      http.post(`${API}${doubts(cbse)}/check`, async ({ request }) => {
+        const body = (await request.json()) as { query: string; sub_name: string };
+        expect(body.sub_name).toBe('PHYSICS');
+        return HttpResponse.json({ success: true, data: { valid: body.query.includes('force') } });
       }),
-      http.post(`${API}/api/chat/step_solver_chat/create`, async ({ request }) => {
+      http.post(`${API}${doubts(cbse)}/chats`, async ({ request }) => {
         created = await request.json();
-        return HttpResponse.json({ chat_id: 90 });
+        return HttpResponse.json({ success: true, data: { chat_id: 90 } });
       }),
-      http.post(`${API}/api/chat/step_solver_concept_card/v1`, () =>
-        HttpResponse.json({ concept_cards: [{ card_no: 1, title: 'Second law', explanation: '$F=ma$' }, { card_no: 2, title: 'Units' }], sources: { Chapter: 'Laws of Motion' } }),
+      http.post(`${API}${doubts(cbse)}/chats/90/concept-cards`, () =>
+        HttpResponse.json({
+          success: true,
+          data: { concept_cards: [{ card_no: 1, title: 'Second law', explanation: '$F=ma$' }, { card_no: 2, title: 'Units' }], sources: { Chapter: 'Laws of Motion' } },
+        }),
       ),
-      http.post(`${API}/api/chat/step_solver_chat_interaction/v2`, async ({ request }) => {
+      http.post(`${API}${doubts(cbse)}/chats/90/ask`, async ({ request }) => {
         const form = await request.formData();
         tutorText = form.get('text');
-        return HttpResponse.json({ chat_id: 90, llm_responses: 'What is the mass?', is_first_query: form.get('text') !== '2 kg', current_card_no: form.get('text') === '2 kg' ? 2 : 1 });
+        expect(form.get('sub_name')).toBe('PHYSICS');
+        return HttpResponse.json({
+          success: true,
+          data: { chat_id: 90, text: 'What is the mass?', image: null, is_first_query: form.get('text') !== '2 kg', current_card_no: form.get('text') === '2 kg' ? 2 : 1, reached_final_solution: false },
+        });
       }),
     );
     useSolver.getState().chooseBook(physicsBook);
@@ -212,7 +228,7 @@ describe('Ask Socrates flow', () => {
     // With a question in the store the screen switches to the chat.
     const conversation = await screen.findByRole('list', { name: 'Conversation' });
     expect(await within(conversation).findByText('What is the mass?')).toBeInTheDocument();
-    expect(created).toEqual({ subject_id: 1, class_id: 12, exam_id: 1 });
+    expect(created).toEqual({ subject_id: 1, class_id: 12 });
     expect(tutorText).toBe('A force of 10 N acts on 2 kg');
     expect(useSolver.getState().chatId).toBe(90);
     const decks = await screen.findAllByRole('region', { name: 'Concept cards' });
@@ -233,12 +249,14 @@ describe('Ask Socrates flow', () => {
     let checked = '';
     server.use(
       plan(),
-      http.post(`${API}/api/chat/extract-question-from-image`, () =>
-        HttpResponse.json({ final_string: 'Solve $x^2=4$', diagrams: [{ description: 'A parabola', base64: 'AAA' }] }),
+      http.post(`${API}${doubts(cbse)}/extract-question`, () =>
+        HttpResponse.json({ success: true, data: { text: 'Solve $x^2=4$', diagrams: [{ description: 'A parabola', base64: 'AAA', image_url: null }], image_url: null } }),
       ),
-      http.post(`${API}/api/chat/check_valid_maths_query`, async ({ request }) => {
-        checked = ((await request.json()) as { query: string }).query;
-        return HttpResponse.json({ result: 'true' });
+      http.post(`${API}${doubts(cbse)}/check`, async ({ request }) => {
+        const body = (await request.json()) as { query: string; sub_name: string };
+        expect(body.sub_name).toBe('MATHEMATICS');
+        checked = body.query;
+        return HttpResponse.json({ success: true, data: { valid: true } });
       }),
     );
     URL.createObjectURL = vi.fn(() => 'blob:q');
@@ -257,11 +275,13 @@ describe('Ask Socrates flow', () => {
     let calls = 0;
     server.use(
       plan(),
-      http.post(`${API}/api/chat/step_solver_chat/create`, () => HttpResponse.json({ chat_id: 5 })),
-      http.post(`${API}/api/chat/step_solver_concept_card/v1`, () => HttpResponse.json({ concept_cards: [] })),
-      http.post(`${API}/api/chat/step_solver_chat_interaction/v2`, () => {
+      http.post(`${API}${doubts(cbse)}/chats`, () => HttpResponse.json({ success: true, data: { chat_id: 5 } })),
+      http.post(`${API}${doubts(cbse)}/chats/5/concept-cards`, () => HttpResponse.json({ success: true, data: { concept_cards: [], sources: null } })),
+      http.post(`${API}${doubts(cbse)}/chats/5/ask`, () => {
         calls += 1;
-        return calls === 1 ? HttpResponse.json({ message: 'down' }, { status: 500 }) : HttpResponse.json({ llm_responses: 'Back now.' });
+        return calls === 1
+          ? HttpResponse.json({ success: false, code: 'TUTOR_UNAVAILABLE', message: 'down', data: null }, { status: 502 })
+          : HttpResponse.json({ success: true, data: { chat_id: 5, text: 'Back now.' } });
       }),
     );
     useSolver.setState({ subject: { id: 1, title: 'PHYSICS' }, problem: { problem: 'Q', display: 'Q', images: [] } });
@@ -274,16 +294,34 @@ describe('Ask Socrates flow', () => {
     expect(navigation.push).toHaveBeenCalledWith('/cbse/dashboard?atlas=1');
   });
 
+  it('goes back to asking when the plan’s doubt limit is reached', async () => {
+    let asked = false;
+    server.use(
+      plan(),
+      http.post(`${API}${doubts(cbse)}/chats`, () =>
+        HttpResponse.json({ success: false, code: 'FEATURE_LIMIT_REACHED', message: 'Limit reached', data: null }, { status: 429 }),
+      ),
+      http.post(`${API}${doubts(cbse)}/chats/:chatId/ask`, () => {
+        asked = true;
+        return HttpResponse.json({ success: true, data: { text: 'x' } });
+      }),
+    );
+    useSolver.setState({ subject: { id: 1, title: 'PHYSICS' }, problem: { problem: 'Q', display: 'Q', images: [] } });
+    renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    await waitFor(() => expect(useSolver.getState().problem).toBeNull());
+    expect(asked).toBe(false);
+  });
+
   it('reopens a previous doubt from history', async () => {
     server.use(
       plan(),
-      http.get(`${API}/api/chat/step_solver_chat/history`, () =>
+      http.get(`${API}${doubts(cbse)}/chats`, () =>
         HttpResponse.json({ success: true, data: { chats: [{ chat_id: 33, title: 'Old doubt', subject_id: 3, subject_name: 'MATHEMATICS', first_message: 'Integrate x' }] } }),
       ),
-      http.get(`${API}/api/chat/step_solver_chat/33/messages`, () =>
-        HttpResponse.json({ conversations: [{ message_id: 1, is_student: 1, text: 'Integrate x' }, { message_id: 2, is_student: 0, text: 'Recall the power rule.' }] }),
+      http.get(`${API}${doubts(cbse)}/chats/33/messages`, () =>
+        HttpResponse.json({ success: true, data: { conversations: [{ message_id: 1, is_student: 1, text: 'Integrate x' }, { message_id: 2, is_student: 0, text: 'Recall the power rule.' }] } }),
       ),
-      http.post(`${API}/api/chat/step_solver_concept_card/v1`, () => HttpResponse.json({ concept_cards: [{ card_no: 1, title: 'Power rule' }] })),
+      http.post(`${API}${doubts(cbse)}/chats/33/concept-cards`, () => HttpResponse.json({ success: true, data: { concept_cards: [{ card_no: 1, title: 'Power rule' }], sources: null } })),
     );
     useSolver.getState().chooseBook(physicsBook);
     navigation.searchParams = new URLSearchParams('step=ask');
@@ -300,13 +338,13 @@ describe('Ask Socrates flow', () => {
   it('question bank: choose a chapter, switch tabs, search and solve a question', async () => {
     server.use(
       plan(),
-      http.get(`${API}/api/v1/learn/module-outline/11`, () =>
-        HttpResponse.json({ data: { finalList: [{ category: 'module', id: 401, title: 'ELECTRIC CHARGES', module_order: 1 }] } }),
+      http.get(`${API}/api/v4/learn/courses/11/outline`, () =>
+        HttpResponse.json({ success: true, data: { finalList: [{ category: 'module', id: 401, title: 'ELECTRIC CHARGES', module_order: 1 }] } }),
       ),
-      http.get(`${API}/api/v1/learn/chapter-unsolved/401`, () =>
-        HttpResponse.json({ data: { questions: [{ id: 1, question_text: '<p>State Coulomb law</p>' }, { id: 2, question_text: '<p>Define $\\epsilon_0$</p>' }] } }),
+      http.get(`${API}/api/v4/learn/modules/401/ncert-questions`, () =>
+        HttpResponse.json({ success: true, data: { questions: [{ id: 1, question_text: '<p>State Coulomb law</p>', difficulty: 'easy' }, { id: 2, question_text: '<p>Define $\\epsilon_0$</p>' }] } }),
       ),
-      http.get(`${API}/api/v1/learn/chapter-pyqs/401`, () => HttpResponse.json({ data: { questions: [] } })),
+      http.get(`${API}/api/v4/learn/modules/401/pyqs`, () => HttpResponse.json({ success: true, data: { questions: [] } })),
     );
     useSolver.getState().chooseBook(physicsBook);
     navigation.searchParams = new URLSearchParams('step=question-bank');
@@ -323,5 +361,25 @@ describe('Ask Socrates flow', () => {
     expect(useSolver.getState().problem).toMatchObject({ display: 'State Coulomb law' });
     expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=chat');
     expect(matchesSearch({ html: 'Find $x$', options: [], subQuestions: [] } as never, '')).toBe(true);
+  });
+
+  it("question bank (NEET): end of chapter is the exam's sample of the chapter's questions", async () => {
+    server.use(
+      plan(20),
+      http.get(`${API}/api/v4/learn/courses/71/outline`, () =>
+        HttpResponse.json({ success: true, data: { finalList: [{ category: 'module', id: 341, title: 'LAWS OF MOTION', module_order: 1 }] } }),
+      ),
+      http.get(`${API}${learnApiBase(neet)}/chapters/341/questions`, () =>
+        HttpResponse.json({ success: true, data: { questions: [{ id: 9, type: 'mcq', question_text: '<p>A block slides</p>', difficulty: 'hard', options: [{ option_text: '1' }] }], total: 1 } }),
+      ),
+    );
+    useSolver.getState().chooseBook({ ...physicsBook, bookId: 71 });
+    navigation.pathname = '/neet/doubt-solver';
+    navigation.searchParams = new URLSearchParams('step=question-bank');
+    renderWithProviders(<DoubtSolverScreen />, { exam: neet });
+    await userEvent.click(await screen.findByRole('button', { name: /Laws Of Motion/ }));
+    const list = await screen.findByRole('list', { name: 'Questions' });
+    expect(within(list).getByText('A block slides')).toBeInTheDocument();
+    expect(within(list).getByText('Hard')).toBeInTheDocument();
   });
 });

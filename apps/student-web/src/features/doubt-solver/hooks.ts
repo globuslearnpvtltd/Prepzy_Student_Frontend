@@ -13,8 +13,8 @@ import { useSolver } from './store';
 export const solverKeys = {
   books: (exam: string, classId: number | null) => ['doubt-solver', exam, 'books', classId] as const,
   chapters: (bookId: number) => ['doubt-solver', 'chapters', bookId] as const,
-  bank: (chapterId: number, tab: BankTab) => ['doubt-solver', 'bank', chapterId, tab] as const,
-  history: (classId: number | null) => ['doubt-solver', 'history', classId] as const,
+  bank: (exam: string, chapterId: number, tab: BankTab) => ['doubt-solver', exam, 'bank', chapterId, tab] as const,
+  history: (exam: string, classId: number | null) => ['doubt-solver', exam, 'history', classId] as const,
 };
 
 export function useBooks(exam: ExamConfig) {
@@ -37,10 +37,10 @@ export function useChapters(bookId: number | null) {
   });
 }
 
-export function useBankQuestions(chapterId: number | null, tab: BankTab) {
+export function useBankQuestions(exam: ExamConfig, chapterId: number | null, tab: BankTab) {
   return useQuery({
-    queryKey: solverKeys.bank(chapterId ?? 0, tab),
-    queryFn: () => solverApi.bankQuestions(chapterId as number, tab),
+    queryKey: solverKeys.bank(exam.slug, chapterId ?? 0, tab),
+    queryFn: () => solverApi.bankQuestions(exam, chapterId as number, tab),
     enabled: !!chapterId,
     staleTime: 10 * 60_000,
   });
@@ -50,8 +50,8 @@ export function useDoubtHistory(exam: ExamConfig, enabled: boolean) {
   const plan = useActivePlan(exam);
   const classId = plan.data?.classId ?? null;
   return useQuery({
-    queryKey: solverKeys.history(classId),
-    queryFn: () => solverApi.history(classId as number),
+    queryKey: solverKeys.history(exam.slug, classId),
+    queryFn: () => solverApi.history(exam, classId as number),
     enabled: enabled && classId !== null,
   });
 }
@@ -120,7 +120,7 @@ export function useSolverChat(exam: ExamConfig) {
   const loadCards = useCallback(
     async (request: TutorRequest) => {
       try {
-        const result = await solverApi.conceptCards(request);
+        const result = await solverApi.conceptCards(exam, request);
         if (!mounted.current || chatIdRef.current !== request.chatId) return;
         setCards(result.cards);
         setSources(result.sources);
@@ -130,16 +130,16 @@ export function useSolverChat(exam: ExamConfig) {
         if (mounted.current) setCardsLoaded(true);
       }
     },
-    [],
+    [exam],
   );
 
   const ensureChat = useCallback(async () => {
     if (chatIdRef.current) return chatIdRef.current;
-    const id = await solverApi.createChat({ subjectId: subject?.id || null, classId: plan.data?.classId ?? null, examId: exam.examId });
+    const id = await solverApi.createChat(exam, { subjectId: subject?.id || null, classId: plan.data?.classId ?? null });
     chatIdRef.current = id;
     setChatId(id);
     return id;
-  }, [subject?.id, plan.data?.classId, exam.examId, setChatId]);
+  }, [exam, subject?.id, plan.data?.classId, setChatId]);
 
   const turn = useCallback(
     async (request: Omit<TutorRequest, 'chatId'>, messageId: string) => {
@@ -148,7 +148,7 @@ export function useSolverChat(exam: ExamConfig) {
         const isNew = !chatIdRef.current;
         const chatId = await ensureChat();
         if (isNew) void loadCards({ ...request, chatId });
-        const reply = await solverApi.ask({ ...request, chatId });
+        const reply = await solverApi.ask(exam, { ...request, chatId });
         if (!mounted.current || chatIdRef.current !== chatId) return;
         setMessages((list) => [...list, { id: newId(), fromStudent: false, text: reply.text, images: reply.image ? [reply.image] : [] }]);
         if (reply.cardNo !== null) {
@@ -173,7 +173,7 @@ export function useSolverChat(exam: ExamConfig) {
         if (mounted.current) setThinking(false);
       }
     },
-    [ensureChat, loadCards, clearProblem],
+    [exam, ensureChat, loadCards, clearProblem],
   );
 
   // Start the question, or reload a past doubt.
@@ -183,7 +183,7 @@ export function useSolverChat(exam: ExamConfig) {
     if (storedChatId) {
       chatIdRef.current = storedChatId;
       void solverApi
-        .messages(storedChatId)
+        .messages(exam, storedChatId)
         .then((rows) => mounted.current && setMessages(rows))
         .catch(() => undefined);
       void loadCards({ chatId: storedChatId, text: problem.problem, className: classNameToSend, subject });
@@ -197,7 +197,7 @@ export function useSolverChat(exam: ExamConfig) {
       : { text: problem.problem, className: classNameToSend, subject, imageUrls: online };
     retries.current.set(id, request);
     void turn(request, id);
-  }, [problem, storedChatId, plan.isFetched, classNameToSend, subject, turn, loadCards]);
+  }, [exam, problem, storedChatId, plan.isFetched, classNameToSend, subject, turn, loadCards]);
 
   useEffect(() => {
     const down = () => setOffline(true);

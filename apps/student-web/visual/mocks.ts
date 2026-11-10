@@ -287,3 +287,18 @@ for (const [legacy, v4Chat] of [
 // Lecture tutor avatars (board course 5, NEET course 214), same body as the old avatar key.
 MOCKS['/api/v4/chat/board/1/lectures/5/avatar'] = MOCKS['/api/v1/chat/marketingChatImageName'];
 MOCKS['/api/v4/chat/competitive/2/lectures/214/avatar'] = MOCKS['/api/neet/chat/marketingChatImageName'];
+// The new app's doubt solver (Socrates) reads v4 routes; same data as the old keys in mocks-assistant.ts.
+MOCKS['/api/v4/learn/competitive/2/textbooks'] = v4(MOCKS['/api/neet/doubt-solver-subjects']);
+MOCKS['/api/v4/learn/courses/11/outline'] = MOCKS['/api/v1/learn/module-outline/11'];
+MOCKS['/api/v4/learn/modules/401/ncert-questions'] = MOCKS['/api/v1/learn/chapter-unsolved/401'];
+MOCKS['/api/v4/learn/modules/401/pyqs'] = MOCKS['/api/v1/learn/chapter-pyqs/401'];
+for (const doubts of ['/api/v4/chat/board/1/doubts', '/api/v4/chat/competitive/2/doubts']) {
+  MOCKS[`${doubts}/check`] = v4({ valid: true });
+  MOCKS[`${doubts}/extract-question`] = v4({ text: '', diagrams: [], image_url: null });
+  // GET (history) and POST (start a doubt) share the path here (mocks are per path): one body serves both.
+  const history = MOCKS['/api/chat/step_solver_chat/history'] as { data: object };
+  MOCKS[`${doubts}/chats`] = v4({ ...history.data, chat_id: 900 });
+  const reply = MOCKS['/api/chat/step_solver_chat_interaction/v2'] as { chat_id: number; llm_responses: string; is_first_query: boolean; current_card_no: number };
+  MOCKS[`${doubts}/chats/900/ask`] = v4({ ...reply, text: reply.llm_responses, image: null, reached_final_solution: false });
+  MOCKS[`${doubts}/chats/900/concept-cards`] = v4(MOCKS['/api/chat/step_solver_concept_card/v1']);
+}

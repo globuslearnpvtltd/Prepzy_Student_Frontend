@@ -4,10 +4,12 @@ import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
+import { doubtsApiBase } from '../api';
 import { useSolver } from '../store';
 import { DoubtSolverScreen } from './doubt-solver-screen';
 import { BOOK_PLACEHOLDER, SubjectPicker } from './subject-picker';
 import { testExam } from '@/test/exams';
+import { learnApiBase } from '@/shared/config/exams';
 
 const cbse = testExam('cbse');
 
@@ -22,7 +24,8 @@ const book = (id: number, subject: string, title: string, image: string | null =
   subject_name: subject,
   textbooks: [{ id: id * 10 + 1, class_name: 'CLASS 12', textbook_name: title, textbook_image: image }],
 });
-const textbooks = (subjects: ReturnType<typeof book>[]) => http.get(`${API}/api/v2/get-textbooks`, () => HttpResponse.json({ subject_courses: subjects }));
+const textbooks = (subjects: ReturnType<typeof book>[]) =>
+  http.get(`${API}${learnApiBase(cbse)}/textbooks`, () => HttpResponse.json({ success: true, data: { class_id: 12, subject_courses: subjects } }));
 const sixBooks = [
   book(1, 'PHYSICS', 'Physics Part 1', 'https://cdn.test/phy.png'),
   book(2, 'CHEMISTRY', 'Chemistry Part 1'),
@@ -37,10 +40,10 @@ const question = { problem: 'Q', display: 'Q', images: [] };
 
 /** An existing chat: restored messages and no concept cards (so the "Ask a new question" card shows). */
 const existingChat = (id: number) => [
-  http.get(`${API}/api/chat/step_solver_chat/${id}/messages`, () =>
-    HttpResponse.json({ conversations: [{ message_id: 1, is_student: 1, text: 'Q' }, { message_id: 2, is_student: 0, text: 'Think about forces.' }] }),
+  http.get(`${API}${doubtsApiBase(cbse)}/chats/${id}/messages`, () =>
+    HttpResponse.json({ success: true, data: { conversations: [{ message_id: 1, is_student: 1, text: 'Q' }, { message_id: 2, is_student: 0, text: 'Think about forces.' }] } }),
   ),
-  http.post(`${API}/api/chat/step_solver_concept_card/v1`, () => HttpResponse.json({ concept_cards: [] })),
+  http.post(`${API}${doubtsApiBase(cbse)}/chats/${id}/concept-cards`, () => HttpResponse.json({ success: true, data: { concept_cards: [], sources: null } })),
 ];
 
 beforeEach(() => {
@@ -77,7 +80,7 @@ describe('DoubtSolverScreen navigation', () => {
   });
 
   it('leaves the question bank with the browser back, or to change the subject', async () => {
-    server.use(plan, http.get(`${API}/api/v1/learn/module-outline/11`, () => HttpResponse.json({ data: { finalList: [] } })));
+    server.use(plan, http.get(`${API}/api/v4/learn/courses/11/outline`, () => HttpResponse.json({ success: true, data: { finalList: [] } })));
     useSolver.getState().chooseBook(physicsBook);
     navigation.searchParams = new URLSearchParams('step=question-bank');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
@@ -133,7 +136,7 @@ describe('DoubtSolverScreen navigation', () => {
     server.use(
       plan,
       ...existingChat(8),
-      http.get(`${API}/api/chat/step_solver_chat/history`, () => {
+      http.get(`${API}${doubtsApiBase(cbse)}/chats`, () => {
         calls += 1;
         return calls === 1
           ? HttpResponse.json({ message: 'down' }, { status: 500 })
@@ -165,7 +168,7 @@ describe('DoubtSolverScreen navigation', () => {
       plan,
       ...existingChat(8),
       ...existingChat(9),
-      http.get(`${API}/api/chat/step_solver_chat/history`, () =>
+      http.get(`${API}${doubtsApiBase(cbse)}/chats`, () =>
         HttpResponse.json({ success: true, data: { chats: [{ chat_id: 9, title: 'Older', first_message: 'Find g\n\nDiagrams:\nDiagram 1: a pendulum' }] } }),
       ),
     );
@@ -230,7 +233,7 @@ describe('SubjectPicker', () => {
   });
 
   it('says when the subjects fail to load', async () => {
-    server.use(plan, http.get(`${API}/api/v2/get-textbooks`, () => HttpResponse.json({ message: 'down' }, { status: 500 })));
+    server.use(plan, http.get(`${API}${learnApiBase(cbse)}/textbooks`, () => HttpResponse.json({ message: 'down' }, { status: 500 })));
     renderWithProviders(picker(), { exam: cbse });
     expect(await screen.findByText("Couldn't load your subjects.")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();

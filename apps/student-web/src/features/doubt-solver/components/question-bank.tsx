@@ -4,6 +4,7 @@ import { cx } from '@prepzy/design-system';
 import { ChevronLeft, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { ChatText } from '@/features/assistant/ui';
+import { useExam } from '@/shared/hooks/use-exam';
 import { buildSolvePayload, formatSubject, htmlToText, shortSubject, type BankQuestion, type BankTab, type SolvePayload } from '../api';
 import { useBankQuestions, useChapters } from '../hooks';
 import { useSolver } from '../store';
@@ -27,13 +28,14 @@ export function matchesSearch(question: BankQuestion, query: string): boolean {
 
 /** Chapter-wise end-of-chapter questions and PYQs for the chosen book; "Solve" hands one to Socrates. */
 export function QuestionBank({ onBack, onChangeSubject, onSolve }: { onBack: () => void; onChangeSubject: () => void; onSolve: (payload: SolvePayload) => void }) {
+  const exam = useExam();
   const { book, subject } = useSolver();
   const chapters = useChapters(book?.bookId ?? null);
   const [chapterId, setChapterId] = useState<number | null>(null);
   const [tab, setTab] = useState<BankTab>('end');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
-  const questions = useBankQuestions(chapterId, tab);
+  const questions = useBankQuestions(exam, chapterId, tab);
   const chapter = chapters.data?.find((c) => c.id === chapterId) ?? null;
   const filtered = useMemo(() => (questions.data ?? []).filter((q) => matchesSearch(q, query)), [questions.data, query]);
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));

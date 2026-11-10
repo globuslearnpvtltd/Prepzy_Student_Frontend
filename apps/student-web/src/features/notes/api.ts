@@ -98,14 +98,14 @@ export const pdfDownloadUrl = (pdf: string) => `${pdf}${pdf.includes('?') ? '&' 
 
 export const notesApi = {
   async courseNotes(courseId: string): Promise<ChapterNotes[]> {
-    const body = assertOk(await apiClient.get<{ data?: { notes?: Raw[] } }>(`/api/v1/notes/notes/${courseId}`));
+    const body = assertOk(await apiClient.get<{ data?: { notes?: Raw[] } }>(`/api/v4/notes/courses/${courseId}`));
     return (body.data?.notes ?? []).map(toChapterNotes);
   },
 
   async summaryVideo(noteId: string): Promise<SummaryVideo> {
-    // The legacy endpoint resolves a playable (signed) video link; v1 returns the raw list.
-    const body = assertOk(await apiClient.get<{ notes?: Raw; data?: { notes?: Raw } }>(`/api/notes/summary-video/${noteId}`));
-    const notes = body.notes ?? body.data?.notes ?? {};
+    // The backend re-signs expiring HeyGen links, so video_link is playable.
+    const body = assertOk(await apiClient.get<{ data?: Raw }>(`/api/v4/notes/summary-video/${noteId}`));
+    const notes = body.data ?? {};
     const narrations = parseJson(notes.narrations);
     return {
       noteId: String(notes.note_id ?? noteId),

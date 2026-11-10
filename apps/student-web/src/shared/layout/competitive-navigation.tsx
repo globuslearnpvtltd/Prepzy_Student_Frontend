@@ -10,6 +10,7 @@ import { planName, useActivePlan } from '@/features/auth';
 import type { ExamConfig } from '@/shared/config/exams';
 import { isActivePath, navigationFor, type NavItem } from '@/shared/config/navigation';
 import { routes } from '@/shared/config/routes';
+import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { useMobileNav } from './mobile-nav-store';
 import { shellApi, shellKeys } from './shell-api';
 
@@ -45,6 +46,7 @@ export function remainingPercent(expiryDate: string, durationMonths: number, now
 
 function PlanCard({ exam, onNavigate }: { exam: ExamConfig; onNavigate: () => void }) {
   const plan = useActivePlan(exam).data;
+  const catalog = useExamCatalog();
   if (!plan) return null;
   const hasExpiry = !!plan.expiryDate && plan.durationMonths > 0 && !Number.isNaN(new Date(plan.expiryDate).getTime());
   return (
@@ -58,7 +60,7 @@ function PlanCard({ exam, onNavigate }: { exam: ExamConfig; onNavigate: () => vo
           <span className="bg-success size-2 rounded-full" />
           Active plan
         </span>
-        <p className="text-foreground mt-2 text-[15px] leading-snug font-bold">{planName(plan, exam)}</p>
+        <p className="text-foreground mt-2 text-[15px] leading-snug font-bold">{planName(plan, exam, catalog.data)}</p>
         {hasExpiry && plan.expiryDate && (
           <>
             <p className="text-foreground-muted mt-0.5 text-[12px]">Ends {formatDate(plan.expiryDate)}</p>

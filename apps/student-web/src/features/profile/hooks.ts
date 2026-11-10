@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { authKeys, forgetExam } from '@/features/auth';
 import { routes } from '@/shared/config/routes';
+import { useExam } from '@/shared/hooks/use-exam';
 import { profileApi, type ProfileUpdate } from './api';
 
 export const profileKeys = {
@@ -17,7 +18,8 @@ export function useProfile() {
 }
 
 export function useClassOptions() {
-  return useQuery({ queryKey: profileKeys.classes, queryFn: profileApi.classes, staleTime: 60 * 60_000 });
+  const exam = useExam();
+  return useQuery({ queryKey: [...profileKeys.classes, exam.examId], queryFn: () => profileApi.classes(exam), staleTime: 60 * 60_000 });
 }
 
 /** Saving refreshes both the profile and the session user (header name, initials). */

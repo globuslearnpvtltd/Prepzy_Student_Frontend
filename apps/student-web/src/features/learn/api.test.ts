@@ -90,8 +90,8 @@ describe('learnApi', () => {
           data: { courses: [{ course_id: 5, course_name: 'Optics', progress_percentage: 33.6, upcoming_learn_item: { category: 'lecture', id: 8, module: 2 } }] },
         }),
       ),
-      http.get(`${API}/api/v1/student/getCourselist-dashboard/12/1`, () =>
-        HttpResponse.json({ success: true, data: { result: [{ course_id: 5, title: 'Optics', unique_lecture: 4, assessment_count: 2, module_count: 3 }] } }),
+      http.get(`${API}/api/v4/learn/classes/12/subjects/1/courses`, () =>
+        HttpResponse.json({ success: true, data: { courses: [{ course_id: 5, title: 'Optics', unique_lecture: 4, assessment_count: 2, module_count: 3 }] } }),
       ),
     );
     expect(await learnApi.subjects(BOARD, 12)).toEqual([{ id: '1', name: 'PHYSICS', courseCount: 2, image: null, description: null }]);
@@ -101,7 +101,7 @@ describe('learnApi', () => {
 
   it('reads the outline and a chapter', async () => {
     server.use(
-      http.get(`${API}/api/v1/learn/module-outline/5`, () =>
+      http.get(`${API}/api/v4/learn/courses/5/outline`, () =>
         HttpResponse.json({
           success: true,
           data: {
@@ -113,7 +113,7 @@ describe('learnApi', () => {
           },
         }),
       ),
-      http.get(`${API}/api/v1/learn/module-details/2/5`, () =>
+      http.get(`${API}/api/v4/learn/courses/5/modules/2`, () =>
         HttpResponse.json({
           success: true,
           data: {
@@ -139,48 +139,58 @@ describe('learnApi', () => {
 
   it('reads lectures, transcripts and progress steps', async () => {
     server.use(
-      http.get(`${API}/api/v1/learn/lectures/8`, () =>
+      http.get(`${API}/api/v4/learn/lectures/8`, () =>
         HttpResponse.json({ success: true, data: { lecture: { lecture_id: 8, title: 'Mirrors', course_id: 5, module_id: 2, videos: '[{"language":"english","link":"abc"}]' } } }),
       ),
-      http.get(`${API}/api/v1/learn/transcript/8`, () => HttpResponse.json({ success: true, data: { transcript: 'Hello<br />' } })),
-      http.put(`${API}/api/v1/learn/progress-update/course/5/lecture/8/complete`, () =>
+      http.get(`${API}/api/v4/learn/lectures/8/transcript`, () => HttpResponse.json({ success: true, data: { transcript: 'Hello<br />' } })),
+      http.put(`${API}/api/v4/learn/courses/5/lectures/8/complete`, () =>
         HttpResponse.json({ success: true, data: { activity: null } }),
       ),
-      http.post(`${API}/api/v1/learn/previousActivity`, () =>
-        HttpResponse.json({ success: false, message: 'No data', data: { activity: null } }),
+      http.get(`${API}/api/v4/learn/courses/5/previous-activity`, () =>
+        HttpResponse.json({ success: true, message: 'Previous activity fetched', data: { activity: null } }),
       ),
-      http.post(`${API}/api/lectures/8/refresh-videos`, () => HttpResponse.json({ success: true, data: { videos: [{ language: 'english', link: 'new' }] } })),
-      http.get(`${API}/api/v1/learn/chapter-ncert-questions/2/count`, () => HttpResponse.error()),
+      http.post(`${API}/api/v4/learn/lectures/8/refresh-videos`, () => HttpResponse.json({ success: true, data: { videos: [{ language: 'english', link: 'new' }] } })),
+      http.get(`${API}/api/v4/learn/modules/2/ncert-questions/count`, () => HttpResponse.error()),
     );
     expect(await learnApi.lecture('8')).toMatchObject({ courseId: '5', moduleId: '2', videos: [{ language: 'english', link: 'abc' }] });
     expect(await learnApi.transcript('8')).toBe('Hello<br />');
     expect(await learnApi.completeLecture('5', '8')).toBeNull();
     expect(await learnApi.previousActivity('5', '8')).toBeNull();
     expect(await learnApi.refreshVideos('8')).toEqual([{ language: 'english', link: 'new' }]);
+    server.use(http.post(`${API}/api/v4/learn/lectures/8/refresh-videos`, () => HttpResponse.json({ success: false, code: 'VIDEO_REFRESH_FAILED' }, { status: 502 })));
+    expect(await learnApi.refreshVideos('8')).toBeNull();
     expect(await learnApi.ncertCount('2')).toBe(0);
   });
 
   it('reads the course catalogue', async () => {
     server.use(
-      http.get(`${API}/api/class-list`, () => HttpResponse.json({ success: true, data: [{ class_id: 1, title: 'Class 11', stream_name: 'PCM' }] })),
-      http.get(`${API}/api/v2/get-textbooks`, () =>
-        HttpResponse.json({ subject_courses: [{ subject_id: 3, subject_name: 'Physics', textbooks: [{ id: 7, class_id: 1, textbook_name: 'Part 1' }] }] }),
+      http.get(`${API}/api/v4/learn/board/1/classes`, () =>
+        HttpResponse.json({ success: true, data: { classes: [{ class_id: 1, title: 'Class 11', stream_name: 'PCM' }] } }),
       ),
-      http.get(`${API}/api/courses/7`, () =>
-        HttpResponse.json({ success: true, data: { course_id: 7, class: 1, title: 'Part 1', assessCounts: { quiz: 2, unit_test: 1 }, outcomes: '["Waves"]', lectureCount: 9 } }),
-      ),
-      http.get(`${API}/api/course_outline_overview/7`, () =>
+      http.get(`${API}/api/v4/learn/board/1/textbooks`, () =>
         HttpResponse.json({
-          finalList: [
-            { category: 'module', id: 1, module_order: 1, title: 'units', lectures: [{ category: 'lecture', lecture_order: 1, title: 'intro' }, { category: 'assessment', type: 'quiz', title: 'q' }] },
-            { category: 'assessment', type: 'mid_term_exam' },
-          ],
+          success: true,
+          data: { class_id: null, subject_courses: [{ subject_id: 3, subject_name: 'Physics', textbooks: [{ id: 7, class_id: 1, textbook_name: 'Part 1' }] }] },
         }),
       ),
-      http.get(`${API}/api/subscribed-class`, () => HttpResponse.json({ success: true, data: { classIds: [1] } })),
+      http.get(`${API}/api/v4/learn/courses/7`, () =>
+        HttpResponse.json({ success: true, data: { course_id: 7, class: 1, title: 'Part 1', assessCounts: { quiz: 2, unit_test: 1 }, outcomes: '["Waves"]', lectureCount: 9 } }),
+      ),
+      http.get(`${API}/api/v4/learn/courses/7/curriculum`, () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            finalList: [
+              { category: 'module', id: 1, module_order: 1, title: 'units', lectures: [{ category: 'lecture', lecture_order: 1, title: 'intro' }, { category: 'assessment', type: 'quiz', title: 'q' }] },
+              { category: 'assessment', type: 'mid_term_exam' },
+            ],
+          },
+        }),
+      ),
+      http.get(`${API}/api/v4/learn/classes/subscribed`, () => HttpResponse.json({ success: true, data: { classIds: [1] } })),
     );
-    expect(await learnApi.classes()).toEqual([{ id: '1', title: 'Class 11 - PCM' }]);
-    expect((await learnApi.textbooks(''))[0]!.textbooks[0]).toMatchObject({ name: 'Part 1', subjectName: 'Physics' });
+    expect(await learnApi.classes(BOARD)).toEqual([{ id: '1', title: 'Class 11 - PCM' }]);
+    expect((await learnApi.textbooks(BOARD, ''))[0]!.textbooks[0]).toMatchObject({ name: 'Part 1', subjectName: 'Physics' });
     expect(await learnApi.course('7')).toMatchObject({ classId: '1', quizCount: 3, outcomes: ['Waves'], lectureCount: 9 });
     const curriculum = await learnApi.curriculum('7');
     expect(curriculum[0]).toMatchObject({ title: 'Chapter 1 - Units', items: [{ label: '1 .', lecture: true }, { label: 'Quiz: .' }] });

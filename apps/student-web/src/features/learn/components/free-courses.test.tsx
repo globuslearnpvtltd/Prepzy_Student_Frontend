@@ -7,7 +7,7 @@ import { testExam } from '@/test/exams';
 
 const cbse = testExam('cbse');
 const PLACEHOLDER = '/illustrations/dashboard/free-course.jpg';
-const endpoint = `${API}/api/v1/student/free-courses`;
+const endpoint = `${API}/api/v4/learn/free-courses`;
 
 describe('FreeCourses', () => {
   it('lists free courses linking to the course, with a placeholder for missing or broken art', async () => {

@@ -19,8 +19,8 @@ export function CoursesScreen() {
   const searchParams = useSearchParams();
   const [classId, setClassId] = useState(searchParams.get('class') ?? '');
   const [subjectId, setSubjectId] = useState(searchParams.get('subject') ?? '');
-  const classes = useQuery({ queryKey: ['learn', 'classes'], queryFn: learnApi.classes, staleTime: 10 * 60_000 });
-  const textbooks = useQuery({ queryKey: ['learn', 'textbooks', classId], queryFn: () => learnApi.textbooks(classId) });
+  const classes = useQuery({ queryKey: ['learn', 'classes', exam.examId], queryFn: () => learnApi.classes(exam), staleTime: 10 * 60_000 });
+  const textbooks = useQuery({ queryKey: ['learn', 'textbooks', exam.examId, classId], queryFn: () => learnApi.textbooks(exam, classId) });
 
   const subjects: TextbookSubject[] = textbooks.data ?? [];
   const selected = subjects.find((s) => s.id === subjectId);

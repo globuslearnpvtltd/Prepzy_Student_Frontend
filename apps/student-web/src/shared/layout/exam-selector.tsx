@@ -19,7 +19,7 @@ export function useOwnedExams(): OwnedExam[] {
   const purchased = usePurchasedExams();
   return (purchased.data ?? []).flatMap((p) => {
     const exam = findExam(p.examSlice);
-    return exam ? [{ exam, name: p.name || exam.label }] : [];
+    return exam ? [{ exam: { ...exam, examId: p.examId }, name: p.name || exam.label }] : [];
   });
 }
 

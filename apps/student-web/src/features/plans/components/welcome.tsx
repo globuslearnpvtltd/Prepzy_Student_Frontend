@@ -5,10 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, Check, TrendingUp, X } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useActivePlan, useCurrentUser } from '@/features/auth';
 import { DEFAULT_EXAM, findExam, getExam, type ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
+import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
+import { PageSpinner, StatusScreen } from '@/shared/layout/status-screens';
 import { userMessage } from '@/shared/lib/errors';
 import { isPlanCategory, plansApi } from '../api';
 import { formatInr, formatShortDate } from '../money';
@@ -219,11 +221,23 @@ function Rings({ className }: { className?: string }) {
 }
 
 /** /welcome — shown once after sign-up: the free Topper month, a coupon or referral code, then the dashboard. */
+/** Picks the exam (URL, then the student's target exam) and its exam_id from the backend catalog. */
 export function Welcome() {
-  const router = useRouter();
   const params = useSearchParams();
   const user = useCurrentUser();
-  const exam = getExam(params.get('exam')) ?? findExam(user.data?.targetExam) ?? getExam(DEFAULT_EXAM)!;
+  const catalog = useExamCatalog();
+  const design = getExam(params.get('exam')) ?? findExam(user.data?.targetExam) ?? getExam(DEFAULT_EXAM)!;
+  const fromBackend = catalog.data?.find((e) => e.examSlice === design.examSlice && e.category === design.category);
+  const exam = useMemo(() => (fromBackend ? { ...design, examId: fromBackend.examId } : null), [design, fromBackend]);
+
+  if (catalog.isError) return <StatusScreen title="We couldn't load your exams" description={userMessage(catalog.error)} />;
+  if (!exam) return <PageSpinner />;
+  return <WelcomeContent exam={exam} />;
+}
+
+function WelcomeContent({ exam }: { exam: ExamConfig }) {
+  const router = useRouter();
+  const params = useSearchParams();
   const plan = useActivePlan(exam);
   const category = isPlanCategory(exam.category) ? exam.category : 'board';
   const dashboard = routes.dashboard(exam.slug);

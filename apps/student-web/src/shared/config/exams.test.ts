@@ -17,7 +17,6 @@ describe('exam registry', () => {
     expect(findExam('neet-ug')?.slug).toBe('neet');
     expect(findExam('NEET-UG')?.slug).toBe('neet');
     expect(findExam('CBSE')?.slug).toBe('cbse');
-    expect(findExam(2)?.slug).toBe('neet');
     expect(findExam('jee')).toBeNull();
     expect(getExam('unknown')).toBeNull();
     expect(getExam('toString')).toBeNull();

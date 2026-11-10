@@ -1,11 +1,12 @@
+import { LEARN_API, learnApiBase, type ExamRef } from '@/shared/config/exams';
 import { isApiError } from '@/shared/lib/errors';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk } from '@/shared/lib/unwrap';
 import { subjectLabel } from '@/shared/layout/shell-api';
 
 /**
- * Competitive (NEET) learn & notes endpoints. The backend sends counters as numbers or numeric strings and a
- * few misspelt paths (sumamry-video, get-summar-notes) — everything is normalised here.
+ * Competitive (NEET …) learn & notes endpoints (v4 `learn` module, exam id from the catalog). The backend sends
+ * counters as numbers or numeric strings — everything is normalised here.
  */
 
 type Envelope<T> = { success?: boolean; message?: string; data?: T };
@@ -281,41 +282,50 @@ export function bestAttempt(attempts: PastAttempt[]): PastAttempt | null {
 /* ---------------------------------- Calls ---------------------------------- */
 
 export const learnApi = {
-  async notesSubjects(classId: number): Promise<NotesSubject[]> {
-    const body = assertOk(await apiClient.get<Envelope<unknown>>('/api/neet/summary-notes/subjects', { params: { class_id: classId } }));
-    return toNotesSubjects(body.data);
+  async notesSubjects(exam: ExamRef, classId: number): Promise<NotesSubject[]> {
+    const body = assertOk(await apiClient.get<Envelope<{ subjects?: unknown }>>(`${learnApiBase(exam)}/classes/${classId}/notes/subjects`));
+    return toNotesSubjects(body.data?.subjects);
   },
 
-  async notesChapters(classId: number, subjectId: string): Promise<NotesChapters> {
+  async notesChapters(exam: ExamRef, classId: number, subjectId: string): Promise<NotesChapters> {
     const body = assertOk(
-      await apiClient.get<Envelope<unknown> & { summary?: Record<string, unknown> }>('/api/neet/summary-notes/chapters', {
-        params: { class_id: classId, subject_id: subjectId },
-      }),
+      await apiClient.get<Envelope<{ chapters?: unknown; summary?: Record<string, unknown> }>>(
+        `${learnApiBase(exam)}/classes/${classId}/notes/chapters`,
+        { params: { subject_id: subjectId } },
+      ),
     );
-    return toNotesChapters(body);
+    return toNotesChapters({ data: body.data?.chapters, summary: body.data?.summary ?? null });
   },
 
-  async course(courseId: string): Promise<CourseOverview> {
+  async course(exam: ExamRef, courseId: string): Promise<CourseOverview> {
     const body = assertOk(
-      await apiClient.get<Envelope<unknown> & { summary?: Record<string, { completed?: unknown }> }>(`/api/neet/module-list/${courseId}`),
+      await apiClient.get<Envelope<{ chapters?: unknown; summary?: Record<string, { completed?: unknown }> }>>(
+        `${learnApiBase(exam)}/courses/${courseId}/chapters`,
+      ),
     );
-    return toCourseOverview(body);
+    return toCourseOverview({ data: body.data?.chapters, summary: body.data?.summary ?? null });
   },
 
-  async chapter(moduleId: string): Promise<ChapterInfo | null> {
-    const body = assertOk(await apiClient.get<Envelope<unknown>>(`/api/neet/ChapterSidebar/${moduleId}`));
-    return toChapterInfo(body.data);
+  /** Null when the chapter doesn't exist (404). */
+  async chapter(exam: ExamRef, moduleId: string): Promise<ChapterInfo | null> {
+    try {
+      const body = assertOk(await apiClient.get<Envelope<{ chapter?: unknown }>>(`${learnApiBase(exam)}/chapters/${moduleId}`));
+      return toChapterInfo(body.data?.chapter ? [body.data.chapter] : []);
+    } catch (error) {
+      if (isApiError(error) && error.status === 404) return null;
+      throw error;
+    }
   },
 
-  async summaryVideo(moduleId: string): Promise<SummaryVideo | null> {
-    const body = assertOk(await apiClient.get<Envelope<unknown>>(`/api/neet/sumamry-video/${moduleId}`));
-    return toSummaryVideo(body.data);
+  async summaryVideo(exam: ExamRef, moduleId: string): Promise<SummaryVideo | null> {
+    const body = assertOk(await apiClient.get<Envelope<{ video?: unknown }>>(`${learnApiBase(exam)}/chapters/${moduleId}/summary-video`));
+    return toSummaryVideo(body.data?.video);
   },
 
   /** Null when the chapter has no notes yet (404). */
-  async studyNotes(moduleId: string): Promise<StudyNotes | null> {
+  async studyNotes(exam: ExamRef, moduleId: string): Promise<StudyNotes | null> {
     try {
-      const body = assertOk(await apiClient.get<Envelope<unknown>>(`/api/neet/get-summar-notes/${moduleId}`));
+      const body = assertOk(await apiClient.get<Envelope<unknown>>(`${learnApiBase(exam)}/chapters/${moduleId}/notes`));
       return toStudyNotes(body.data);
     } catch (error) {
       if (isApiError(error) && error.status === 404) return null;
@@ -330,9 +340,11 @@ export const learnApi = {
   },
 
   /** The chapter's practice (unit test) assessment id, or null when there isn't one (404). */
-  async practiceAssessment(moduleId: string): Promise<string | null> {
+  async practiceAssessment(exam: ExamRef, moduleId: string): Promise<string | null> {
     try {
-      const body = assertOk(await apiClient.get<Envelope<{ assessment_id?: unknown } | null>>(`/api/neet/unit-test-assessment/${moduleId}`));
+      const body = assertOk(
+        await apiClient.get<Envelope<{ assessment_id?: unknown } | null>>(`${learnApiBase(exam)}/chapters/${moduleId}/practice`),
+      );
       const id = body.data?.assessment_id;
       return id === undefined || id === null ? null : String(id);
     } catch (error) {
@@ -341,13 +353,15 @@ export const learnApi = {
     }
   },
 
-  async practiceAttempts(assessmentId: string): Promise<PastAttempt[]> {
-    const body = assertOk(await apiClient.get<{ submissions?: unknown }>(`/api/neet/quiz-exam/previous-attempts/${assessmentId}`));
-    return toAttempts(body.submissions);
+  async practiceAttempts(exam: ExamRef, assessmentId: string): Promise<PastAttempt[]> {
+    const body = assertOk(await apiClient.get<Envelope<{ attempts?: unknown }>>(`${learnApiBase(exam)}/practice/${assessmentId}/attempts`));
+    return toAttempts(body.data?.attempts);
   },
 
+  /** Chapter-PYQ attempts are shared with board exams (one table, keyed by chapter). */
   async chapterPyqAttempts(moduleId: string): Promise<PastAttempt[]> {
-    const body = assertOk(await apiClient.get<{ submissions?: unknown }>(`/api/neet/chapter-pyq-exam/previous-attempts/${moduleId}`));
-    return toAttempts(body.submissions);
+    const body = assertOk(await apiClient.get<Envelope<{ attempts?: unknown }>>(`${LEARN_API}/modules/${moduleId}/pyq-attempts`));
+    return toAttempts(body.data?.attempts);
   },
 };
+

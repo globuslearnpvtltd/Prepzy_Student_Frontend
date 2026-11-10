@@ -228,3 +228,50 @@ MOCKS['/api/v4/exams'] = {
     { exam_id: 2, exam_name: 'NEET-UG', exam_slice: 'neet-ug', category: 'competitive' },
   ],
 };
+
+// The new app reads the learn pages from the v4 backend (`learn` module). Same data as the old keys above
+// (the old app keeps using those); only the envelope differs where the old route didn't use one.
+const v4 = (data: unknown) => ({ success: true, message: 'ok', data });
+const dataOf = (path: string) => (MOCKS[path] as { data?: unknown }).data;
+const oldClasses = dataOf('/api/class-list');
+MOCKS['/api/v4/learn/board/1/classes'] = v4({ classes: oldClasses });
+MOCKS['/api/v4/learn/competitive/2/classes'] = v4({ classes: oldClasses });
+MOCKS['/api/v4/learn/classes/subscribed'] = MOCKS['/api/subscribed-class'];
+MOCKS['/api/v4/learn/board/1/textbooks'] = v4(MOCKS['/api/v2/get-textbooks']);
+for (const subject of [1, 2, 3, 4]) {
+  const old = dataOf(`/api/v1/student/getCourselist-dashboard/12/${subject}`) as { result: unknown[] };
+  MOCKS[`/api/v4/learn/classes/12/subjects/${subject}/courses`] = v4({ courses: old.result });
+}
+MOCKS['/api/v4/learn/free-courses'] = MOCKS['/api/v1/student/free-courses'];
+MOCKS['/api/v4/learn/courses/5/outline'] = MOCKS['/api/v1/learn/module-outline/5'];
+MOCKS['/api/v4/learn/courses/5/modules/2'] = MOCKS['/api/v1/learn/module-details/2/5'];
+MOCKS['/api/v4/learn/lectures/8'] = MOCKS['/api/v1/learn/lectures/8'];
+MOCKS['/api/v4/learn/lectures/8/transcript'] = MOCKS['/api/v1/learn/transcript/8'];
+MOCKS['/api/v4/learn/courses/7'] = MOCKS['/api/courses/7'];
+MOCKS['/api/v4/learn/courses/7/curriculum'] = v4(MOCKS['/api/course_outline_overview/7']);
+MOCKS['/api/v4/learn/modules/2/pyqs'] = MOCKS['/api/v1/learn/chapter-pyqs/2'];
+MOCKS['/api/v4/learn/modules/2/ncert-questions'] = MOCKS['/api/v1/learn/chapter-ncert-questions/2'];
+MOCKS['/api/v4/learn/modules/2/ncert-questions/count'] = MOCKS['/api/v1/learn/chapter-ncert-questions/2/count'];
+MOCKS['/api/v4/learn/modules/2/pyq-attempts'] = v4({
+  attempts: (MOCKS['/api/v1/exams/chapter-pyqs/previous-attempts/2'] as { submissions: { grade: string }[] }).submissions.map(
+    ({ grade, ...attempt }, index) => ({ ...attempt, percentage: Number(grade), is_latest: index === 0 }),
+  ),
+});
+// NEET learn & notes (competitive exam 2): same data as the /api/neet/* keys in mocks-neet-learn.ts.
+const neetLearn = '/api/v4/learn/competitive/2';
+const percentOf = (attempt: { percentage?: unknown }) => parseFloat(String(attempt.percentage));
+const asAttempts = (path: string) =>
+  v4({ attempts: ((MOCKS[path] as { submissions: { percentage?: unknown }[] }).submissions).map((a) => ({ ...a, percentage: percentOf(a) })) });
+MOCKS[`${neetLearn}/classes/20/notes/subjects`] = v4({ subjects: dataOf('/api/neet/summary-notes/subjects') });
+const neetNotesChapters = MOCKS['/api/neet/summary-notes/chapters'] as { summary: unknown; data: unknown };
+MOCKS[`${neetLearn}/classes/20/notes/chapters`] = v4({ summary: neetNotesChapters.summary, chapters: neetNotesChapters.data });
+const neetCourse = MOCKS['/api/neet/module-list/214'] as { total_modules: number; summary: unknown; data: unknown };
+MOCKS[`${neetLearn}/courses/214/chapters`] = v4({ total_modules: neetCourse.total_modules, summary: neetCourse.summary, chapters: neetCourse.data });
+for (const moduleId of [339, 340, 341, 342, 343]) {
+  MOCKS[`${neetLearn}/chapters/${moduleId}`] = v4({ chapter: (dataOf(`/api/neet/ChapterSidebar/${moduleId}`) as unknown[])[0] });
+}
+MOCKS[`${neetLearn}/chapters/341/summary-video`] = v4({ video: (dataOf('/api/neet/sumamry-video/341') as unknown[])[0] });
+MOCKS[`${neetLearn}/chapters/341/notes`] = MOCKS['/api/neet/get-summar-notes/341'];
+MOCKS[`${neetLearn}/chapters/341/practice`] = MOCKS['/api/neet/unit-test-assessment/341'];
+MOCKS[`${neetLearn}/practice/5231/attempts`] = asAttempts('/api/neet/quiz-exam/previous-attempts/5231');
+MOCKS['/api/v4/learn/modules/341/pyq-attempts'] = asAttempts('/api/neet/chapter-pyq-exam/previous-attempts/341');

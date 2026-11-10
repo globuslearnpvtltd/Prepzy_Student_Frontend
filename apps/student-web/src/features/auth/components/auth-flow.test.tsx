@@ -182,13 +182,15 @@ describe('SetupForm', () => {
     useOnboardingStore.getState().selectExam(1, 'CBSE');
     useOnboardingStore.getState().setPreselection({ classId: 12 });
     server.use(
-      http.get(`${API}/api/class-list`, () =>
+      http.get(`${API}/api/v4/learn/board/1/classes`, () =>
         HttpResponse.json({
           success: true,
-          data: [
-            { class_id: 11, title: 'CLASS 11', stream_name: 'PCM' },
-            { class_id: 12, title: 'CLASS 12', stream_name: '' },
-          ],
+          data: {
+            classes: [
+              { class_id: 11, title: 'CLASS 11', stream_name: 'PCM' },
+              { class_id: 12, title: 'CLASS 12', stream_name: '' },
+            ],
+          },
         }),
       ),
     );

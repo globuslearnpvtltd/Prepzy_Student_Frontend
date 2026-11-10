@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useExam } from '@/shared/hooks/use-exam';
 import { userMessage } from '@/shared/lib/errors';
 import { learnApi } from './api';
 
@@ -19,42 +20,56 @@ export const learnKeys = {
 };
 
 export function useNotesSubjects(classId: number | null) {
+  const exam = useExam();
   return useQuery({
     queryKey: learnKeys.notesSubjects(classId),
-    queryFn: () => learnApi.notesSubjects(classId!),
+    queryFn: () => learnApi.notesSubjects(exam, classId!),
     enabled: classId !== null,
   });
 }
 
 export function useNotesChapters(classId: number | null, subjectId: string | null) {
+  const exam = useExam();
   return useQuery({
     queryKey: learnKeys.notesChapters(classId, subjectId),
-    queryFn: () => learnApi.notesChapters(classId!, subjectId!),
+    queryFn: () => learnApi.notesChapters(exam, classId!, subjectId!),
     enabled: classId !== null && !!subjectId,
   });
 }
 
-export const useCourse = (courseId: string) =>
-  useQuery({ queryKey: learnKeys.course(courseId), queryFn: () => learnApi.course(courseId) });
+export function useCourse(courseId: string) {
+  const exam = useExam();
+  return useQuery({ queryKey: learnKeys.course(courseId), queryFn: () => learnApi.course(exam, courseId) });
+}
 
-export const useChapter = (moduleId: string | null | undefined) =>
-  useQuery({ queryKey: learnKeys.chapter(moduleId ?? ''), queryFn: () => learnApi.chapter(moduleId!), enabled: !!moduleId });
+export function useChapter(moduleId: string | null | undefined) {
+  const exam = useExam();
+  return useQuery({ queryKey: learnKeys.chapter(moduleId ?? ''), queryFn: () => learnApi.chapter(exam, moduleId!), enabled: !!moduleId });
+}
 
-export const useSummaryVideo = (moduleId: string) =>
-  useQuery({ queryKey: learnKeys.video(moduleId), queryFn: () => learnApi.summaryVideo(moduleId) });
+export function useSummaryVideo(moduleId: string) {
+  const exam = useExam();
+  return useQuery({ queryKey: learnKeys.video(moduleId), queryFn: () => learnApi.summaryVideo(exam, moduleId) });
+}
 
-export const useStudyNotes = (moduleId: string) =>
-  useQuery({ queryKey: learnKeys.notes(moduleId), queryFn: () => learnApi.studyNotes(moduleId) });
+export function useStudyNotes(moduleId: string) {
+  const exam = useExam();
+  return useQuery({ queryKey: learnKeys.notes(moduleId), queryFn: () => learnApi.studyNotes(exam, moduleId) });
+}
 
-export const usePracticeAssessment = (moduleId: string) =>
-  useQuery({ queryKey: learnKeys.practice(moduleId), queryFn: () => learnApi.practiceAssessment(moduleId) });
+export function usePracticeAssessment(moduleId: string) {
+  const exam = useExam();
+  return useQuery({ queryKey: learnKeys.practice(moduleId), queryFn: () => learnApi.practiceAssessment(exam, moduleId) });
+}
 
-export const usePracticeAttempts = (assessmentId: string | null | undefined) =>
-  useQuery({
+export function usePracticeAttempts(assessmentId: string | null | undefined) {
+  const exam = useExam();
+  return useQuery({
     queryKey: learnKeys.practiceAttempts(assessmentId ?? null),
-    queryFn: () => learnApi.practiceAttempts(assessmentId!),
+    queryFn: () => learnApi.practiceAttempts(exam, assessmentId!),
     enabled: !!assessmentId,
   });
+}
 
 export const useChapterPyqAttempts = (moduleId: string) =>
   useQuery({ queryKey: learnKeys.pyqAttempts(moduleId), queryFn: () => learnApi.chapterPyqAttempts(moduleId) });

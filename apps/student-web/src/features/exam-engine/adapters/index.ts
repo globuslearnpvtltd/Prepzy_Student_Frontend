@@ -1,4 +1,4 @@
-import type { ExamCategory, ExamConfig, TestTypeKey } from '@/shared/config/exams';
+import type { ExamCategory, ExamConfig, ExamDesign, TestTypeKey } from '@/shared/config/exams';
 import { createBoardAdapter } from './board';
 import { createDppAdapter, createPracticeAdapter, createSessionAdapter } from './competitive';
 import type { TestAdapter } from './types';
@@ -105,12 +105,12 @@ const ADAPTERS: Partial<Record<ExamCategory, Partial<Record<TestTypeKey, TestAda
   },
 };
 
-export function getTestAdapter(exam: ExamConfig, testType: TestTypeKey): TestAdapter | null {
+export function getTestAdapter(exam: Pick<ExamDesign, 'category'>, testType: TestTypeKey): TestAdapter | null {
   return ADAPTERS[exam.category]?.[testType] ?? null;
 }
 
 /** Test types the exam offers and the engine can run. */
-export function availableTestTypes(exam: ExamConfig): TestTypeKey[] {
+export function availableTestTypes(exam: ExamDesign): TestTypeKey[] {
   return exam.testTypes.filter((type) => getTestAdapter(exam, type) !== null);
 }
 

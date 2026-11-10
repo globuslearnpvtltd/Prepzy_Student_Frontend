@@ -1,3 +1,4 @@
+import { learnApiBase, type ExamRef } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk, unwrapData } from '@/shared/lib/unwrap';
 
@@ -150,9 +151,10 @@ export const profileApi = {
     assertOk(await apiClient.delete<Envelope<never>>(`/api/accounts/${accountId}`));
   },
 
-  async classes(): Promise<{ id: string; title: string }[]> {
-    const body = await apiClient.get<Envelope<{ class_id: number; title: string }[]>>('/api/class-list');
-    return unwrapData(body).map((c) => ({ id: String(c.class_id), title: c.title }));
+  /** Classes of the student's exam (the class select). */
+  async classes(exam: ExamRef): Promise<{ id: string; title: string }[]> {
+    const body = await apiClient.get<Envelope<{ classes: { class_id: number; title: string }[] }>>(`${learnApiBase(exam)}/classes`);
+    return unwrapData(body).classes.map((c) => ({ id: String(c.class_id), title: c.title }));
   },
 
   async parent(): Promise<Parent | null> {

@@ -1,4 +1,4 @@
-import { examList, findExam, type ExamConfig, type ExamSlug } from '@/shared/config/exams';
+import { findExam, type ExamConfig, type ExamSlug } from '@/shared/config/exams';
 
 /** Normalised student, independent of the backend's field names. */
 export interface Student {
@@ -44,9 +44,14 @@ export function planTier(plan: Pick<ActivePlan, 'durationMonths'>): 'Basic' | 'T
 }
 
 /** The plan's display name, following the previous app's naming (getPlanName). */
-export function planName(plan: ActivePlan, exam: Pick<ExamConfig, 'category'>): string {
-  const board = examList.find((e) => e.category === 'board' && plan.relatedExams.includes(e.examId));
-  const bundle = board ? ` + ${board.label}` : '';
+export function planName(
+  plan: ActivePlan,
+  exam: Pick<ExamConfig, 'category'>,
+  /** Exams from the backend catalog (GET /api/v4/exams): names the board exam bundled with a plan. */
+  catalog: readonly { examId: number; name: string; category: string }[] = [],
+): string {
+  const board = catalog.find((e) => e.category === 'board' && plan.relatedExams.includes(e.examId));
+  const bundle = board ? ` + ${board.name}` : '';
   if (exam.category !== 'competitive') {
     if (plan.durationMonths === 0) return 'Basic Plan';
     return plan.durationMonths === 1 ? 'Topper Monthly Plan' : 'Topper Academic Year Plan';

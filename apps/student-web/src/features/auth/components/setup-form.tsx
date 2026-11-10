@@ -3,9 +3,10 @@
 import { Alert, Button, OptionGroup, OptionTile, Skeleton } from '@prepzy/design-system';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { findExam, type ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
+import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { userMessage } from '@/shared/lib/errors';
 import { authApi } from '../api';
 import { getDeviceFingerprint, rememberExam } from '../device';
@@ -17,7 +18,12 @@ export function SetupForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { phone, examId, preselectedClassId, reset } = useOnboardingStore();
-  const exam = findExam(examId);
+  const catalog = useExamCatalog();
+  const exam = useMemo(() => {
+    const entry = catalog.data?.find((e) => e.examId === examId);
+    const design = entry ? findExam(entry.examSlice) : null;
+    return entry && design ? { ...design, examId: entry.examId } : null;
+  }, [catalog.data, examId]);
   const [choice, setChoice] = useState('');
   const [withBoard, setWithBoard] = useState(false);
   // Set once onboarding succeeds, so clearing the flow state doesn't trigger the restart below.
@@ -26,8 +32,8 @@ export function SetupForm() {
   useEffect(() => {
     if (completed.current) return;
     if (!phone) router.replace(routes.getStarted());
-    else if (!exam) router.replace(routes.examSelection());
-  }, [phone, exam, router]);
+    else if (catalog.isSuccess && !exam) router.replace(routes.examSelection());
+  }, [phone, exam, catalog.isSuccess, router]);
 
   const complete = useMutation({
     mutationFn: async (target: ExamConfig) => {
@@ -57,7 +63,7 @@ export function SetupForm() {
   return (
     <div className="flex flex-col gap-5">
       {exam.onboarding.kind === 'choose-class' ? (
-        <ClassChoice value={choice} onChange={setChoice} preselected={preselectedClassId} />
+        <ClassChoice exam={exam} value={choice} onChange={setChoice} preselected={preselectedClassId} />
       ) : (
         <>
           <TargetYearChoice value={choice} onChange={setChoice} examLabel={exam.label} />
@@ -99,15 +105,21 @@ function ChoiceSkeleton() {
 }
 
 function ClassChoice({
+  exam,
   value,
   onChange,
   preselected,
 }: {
+  exam: ExamConfig;
   value: string;
   onChange: (value: string) => void;
   preselected: number | null;
 }) {
-  const classes = useQuery({ queryKey: ['auth', 'class-options'], queryFn: authApi.classOptions, staleTime: Infinity });
+  const classes = useQuery({
+    queryKey: ['auth', 'class-options', exam.examId],
+    queryFn: () => authApi.classOptions(exam),
+    staleTime: Infinity,
+  });
 
   useEffect(() => {
     if (!value && preselected && classes.data?.some((c) => c.classId === preselected)) onChange(String(preselected));

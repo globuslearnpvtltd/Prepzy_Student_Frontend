@@ -77,7 +77,10 @@ describe('plans', () => {
     const neet = testExam('neet');
     const cbse = testExam('cbse');
     expect(planName(plan(), neet)).toBe('Topper NEET 2027 Plan');
-    expect(planName(plan({ relatedExams: [1] }), neet)).toBe('Topper NEET 2027 + CBSE Plan');
+    // The bundled board exam is named from the backend catalog (GET /api/v4/exams), not a hard-coded id.
+    const catalog = [{ examId: 41, name: 'CBSE', category: 'board' }];
+    expect(planName(plan({ relatedExams: [41] }), neet, catalog)).toBe('Topper NEET 2027 + CBSE Plan');
+    expect(planName(plan({ relatedExams: [41] }), neet)).toBe('Topper NEET 2027 Plan');
     expect(planName(plan({ durationMonths: 1 }), neet)).toBe('Topper NEET Monthly Plan');
     expect(planName(plan({ durationMonths: 0 }), neet)).toBe('Basic NEET Plan');
     expect(planName(plan({ durationMonths: 0 }), cbse)).toBe('Basic Plan');

@@ -2,9 +2,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
-import { EXAMS } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { createTestQueryClient } from '@/test/render';
+import { testExam } from '@/test/exams';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
 import { authApi } from './api';
@@ -163,7 +163,7 @@ describe('plan queries', () => {
       }),
     );
     const { wrapper } = setup();
-    const plans = renderHook(() => usePlans(EXAMS.neet), { wrapper });
+    const plans = renderHook(() => usePlans(testExam('neet')), { wrapper });
     await waitFor(() => expect(plans.result.current.isSuccess).toBe(true));
     expect(examId).toBe('2');
     expect(plans.result.current.data).toEqual([
@@ -173,7 +173,7 @@ describe('plan queries', () => {
     ]);
 
     usePlanSelection.setState({ planId: 6 });
-    const active = renderHook(() => useActivePlan(EXAMS.neet), { wrapper });
+    const active = renderHook(() => useActivePlan(testExam('neet')), { wrapper });
     await waitFor(() => expect(active.result.current.data?.planId).toBe(6));
   });
 
@@ -204,11 +204,11 @@ describe('plan queries', () => {
 describe('authApi', () => {
   it('maps class options with a missing stream', async () => {
     server.use(
-      http.get(`${API}/api/class-list`, () =>
-        HttpResponse.json({ success: true, data: [{ class_id: 11, title: 'CLASS 11', stream_name: null }] }),
+      http.get(`${API}/api/v4/learn/board/1/classes`, () =>
+        HttpResponse.json({ success: true, data: { classes: [{ class_id: 11, title: 'CLASS 11', stream_name: null }] } }),
       ),
     );
-    expect(await authApi.classOptions()).toEqual([{ classId: 11, title: 'CLASS 11', streamName: '' }]);
+    expect(await authApi.classOptions({ category: 'board', examId: 1 })).toEqual([{ classId: 11, title: 'CLASS 11', streamName: '' }]);
   });
 
   it('requests a login OTP and rejects unregistered numbers (404 STUDENT_NOT_FOUND)', async () => {

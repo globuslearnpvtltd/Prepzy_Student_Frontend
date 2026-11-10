@@ -47,8 +47,8 @@ describe('notes api', () => {
     expect(pdfDownloadUrl('https://cdn.test/a.pdf?v=1')).toBe('https://cdn.test/a.pdf?v=1&fl_attachment=true');
 
     server.use(
-      http.get(`${API}/api/notes/summary-video/40`, () =>
-        HttpResponse.json({ success: true, notes: { note_id: 40, module_name: 'Light', video_link: 'https://v.test/s.mp4', narrations: ['One', ''] } }),
+      http.get(`${API}/api/v4/notes/summary-video/40`, () =>
+        HttpResponse.json({ success: true, data: { note_id: 40, module_name: 'Light', video_link: 'https://v.test/s.mp4', narrations: ['One', ''] } }),
       ),
     );
     expect(await notesApi.summaryVideo('40')).toMatchObject({ videoUrl: 'https://v.test/s.mp4', narrations: ['One'] });
@@ -62,8 +62,8 @@ describe('Notes page', () => {
       http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () =>
         ok({ subjects: [{ subject_id: 1, subject_name: 'Science' }, { subject_id: 2, subject_name: 'Maths' }] }),
       ),
-      http.get(`${API}/api/v1/student/getCourselist-dashboard/12/1`, () => ok({ result: [{ course_id: 5, title: 'Science Part 1', module_count: 13 }] })),
-      http.get(`${API}/api/v1/student/getCourselist-dashboard/12/2`, () => ok({ result: [{ course_id: 6, title: 'Maths Book', module_count: 15 }] })),
+      http.get(`${API}/api/v4/learn/classes/12/subjects/1/courses`, () => ok({ courses: [{ course_id: 5, title: 'Science Part 1', module_count: 13 }] })),
+      http.get(`${API}/api/v4/learn/classes/12/subjects/2/courses`, () => ok({ courses: [{ course_id: 6, title: 'Maths Book', module_count: 15 }] })),
     );
     renderWithProviders(<NotesScreen aside={<p>Aside</p>} />, { exam: cbse });
     expect(screen.getByRole('heading', { name: 'Notes', level: 1 })).toBeInTheDocument();
@@ -91,7 +91,7 @@ describe('Notes view', () => {
   it('shows the linked chapter’s notes, topics, download and video', async () => {
     navigation.searchParams = new URLSearchParams('module_id=3');
     server.use(
-      http.get(`${API}/api/v1/notes/notes/5`, () =>
+      http.get(`${API}/api/v4/notes/courses/5`, () =>
         ok({ notes: [note(), note({ note_id: 41, module_id: 3, module_name: 'Electricity', module_order: 2, student_video_active: 0, notes_pdf: null })] }),
       ),
     );
@@ -116,17 +116,17 @@ describe('Notes view', () => {
   });
 
   it('says when notes aren’t ready, and handles failures', async () => {
-    server.use(http.get(`${API}/api/v1/notes/notes/5`, () => ok({ notes: [note({ student_note_active: 0 })] })));
+    server.use(http.get(`${API}/api/v4/notes/courses/5`, () => ok({ notes: [note({ student_note_active: 0 })] })));
     renderWithProviders(<NotesViewScreen courseId="5" />, { exam: cbse });
     expect(await screen.findByText('Notes Not Ready Yet...')).toBeInTheDocument();
 
-    server.use(http.get(`${API}/api/v1/notes/notes/9`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(http.get(`${API}/api/v4/notes/courses/9`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<NotesViewScreen courseId="9" />, { exam: cbse });
     expect(await screen.findByText('Failed To Fetch Notes')).toBeInTheDocument();
   });
 
   it('shows an empty chapter list', async () => {
-    server.use(http.get(`${API}/api/v1/notes/notes/5`, () => ok({ notes: [] })));
+    server.use(http.get(`${API}/api/v4/notes/courses/5`, () => ok({ notes: [] })));
     renderWithProviders(<NotesViewScreen courseId="5" />, { exam: cbse });
     expect(await screen.findByText('No Chapters To Show...')).toBeInTheDocument();
   });
@@ -135,8 +135,8 @@ describe('Notes view', () => {
 describe('Summary video', () => {
   it('plays the video with its transcript', async () => {
     server.use(
-      http.get(`${API}/api/notes/summary-video/40`, () =>
-        HttpResponse.json({ success: true, notes: { note_id: 40, module_name: 'Light', module_order: 1, course_name: 'Science', video_link: 'https://v.test/s.mp4', narrations: ['Welcome to light.'] } }),
+      http.get(`${API}/api/v4/notes/summary-video/40`, () =>
+        HttpResponse.json({ success: true, data: { note_id: 40, module_name: 'Light', module_order: 1, course_name: 'Science', video_link: 'https://v.test/s.mp4', narrations: ['Welcome to light.'] } }),
       ),
     );
     renderWithProviders(<SummaryVideoScreen noteId="40" />, { exam: cbse });
@@ -146,11 +146,11 @@ describe('Summary video', () => {
   });
 
   it('handles a missing video and failures', async () => {
-    server.use(http.get(`${API}/api/notes/summary-video/40`, () => HttpResponse.json({ success: true, notes: { module_name: 'Light' } })));
+    server.use(http.get(`${API}/api/v4/notes/summary-video/40`, () => HttpResponse.json({ success: true, data: { module_name: 'Light' } })));
     renderWithProviders(<SummaryVideoScreen noteId="40" />, { exam: cbse });
     expect(await screen.findByText('No video available')).toBeInTheDocument();
 
-    server.use(http.get(`${API}/api/notes/summary-video/41`, () => HttpResponse.json({ success: false, message: 'Notes not found' }, { status: 404 })));
+    server.use(http.get(`${API}/api/v4/notes/summary-video/41`, () => HttpResponse.json({ success: false, message: 'Notes not found' }, { status: 404 })));
     renderWithProviders(<SummaryVideoScreen noteId="41" />, { exam: cbse });
     await waitFor(() => expect(screen.getByText('Failed To Fetch Summary Video')).toBeInTheDocument());
   });

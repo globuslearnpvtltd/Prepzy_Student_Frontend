@@ -1,3 +1,4 @@
+import { learnApiBase, type ExamRef } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk, unwrapData } from '@/shared/lib/unwrap';
 import {
@@ -68,12 +69,12 @@ export const authApi = {
     }));
   },
 
-  async classOptions(): Promise<ClassOption[]> {
-    const body =
-      await apiClient.get<Envelope<{ class_id: number; title: string; stream_name?: string | null }[]>>(
-        '/api/class-list',
-      );
-    return unwrapData(body).map((c) => ({ classId: c.class_id, title: c.title, streamName: c.stream_name ?? '' }));
+  /** Classes of the exam being signed up for. */
+  async classOptions(exam: ExamRef): Promise<ClassOption[]> {
+    const body = await apiClient.get<
+      Envelope<{ classes: { class_id: number; title: string; stream_name?: string | null }[] }>
+    >(`${learnApiBase(exam)}/classes`);
+    return unwrapData(body).classes.map((c) => ({ classId: c.class_id, title: c.title, streamName: c.stream_name ?? '' }));
   },
 
   /** NEET preparation lengths in years (target year = current session year + length). */

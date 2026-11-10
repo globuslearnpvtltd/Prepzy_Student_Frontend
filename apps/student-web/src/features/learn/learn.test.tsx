@@ -27,7 +27,7 @@ const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
   ok({ plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 10', stream_name: '', duration_months: 12, expiry_date: '2099-03-31', status: 'active' }] }),
 );
 
-const outline = http.get(`${API}/api/v1/learn/module-outline/5`, () =>
+const outline = http.get(`${API}/api/v4/learn/courses/5/outline`, () =>
   ok({
     finalList: [
       { category: 'module', id: 2, title: 'light reflection', module_order: 1 },
@@ -69,10 +69,10 @@ describe('Learn page', () => {
       http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () =>
         ok({ subjects: [{ subject_id: 1, subject_name: 'SCIENCE', course_count: 2, subject_description: 'All about science' }, { subject_id: 4, subject_name: 'HINDI', course_count: 0 }] }),
       ),
-      http.get(`${API}/api/v1/student/getCourselist-dashboard/12/1`, () =>
-        ok({ result: [{ course_id: 5, title: 'Science Part 1', class: 'Class 10', unique_lecture: 12, assessment_count: 3 }] }),
+      http.get(`${API}/api/v4/learn/classes/12/subjects/1/courses`, () =>
+        ok({ courses: [{ course_id: 5, title: 'Science Part 1', class: 'Class 10', unique_lecture: 12, assessment_count: 3 }] }),
       ),
-      http.get(`${API}/api/v1/student/getCourselist-dashboard/12/4`, () => ok({ result: [] })),
+      http.get(`${API}/api/v4/learn/classes/12/subjects/4/courses`, () => ok({ courses: [] })),
     );
     renderWithProviders(<LearnScreen aside={<p>Aside</p>} />, { exam: cbse });
 
@@ -116,7 +116,7 @@ describe('Course entry', () => {
   });
 
   it('reports a course without chapters', async () => {
-    server.use(http.get(`${API}/api/v1/learn/module-outline/6`, () => ok({ finalList: [] })));
+    server.use(http.get(`${API}/api/v4/learn/courses/6/outline`, () => ok({ finalList: [] })));
     renderWithProviders(<CourseEntry courseId="6" />, { exam: cbse });
     expect(await screen.findByText('Failed to fetch module outline')).toBeInTheDocument();
   });
@@ -124,7 +124,7 @@ describe('Course entry', () => {
 
 describe('Chapter page', () => {
   const chapter = (finalList: unknown[], summaries: unknown[] = []) =>
-    http.get(`${API}/api/v1/learn/module-details/2/5`, () =>
+    http.get(`${API}/api/v4/learn/courses/5/modules/2`, () =>
       ok({ finalList, module_data: { title: 'light reflection', orders: 1 }, summary_videos: summaries }),
     );
 
@@ -142,8 +142,8 @@ describe('Chapter page', () => {
           { type: 'notes', id: 32, student_side_active: 1 },
         ],
       ),
-      http.get(`${API}/api/v1/learn/chapter-pyqs/2`, () => ok({ questions })),
-      http.get(`${API}/api/v1/learn/chapter-ncert-questions/2/count`, () => ok({ total: 1 })),
+      http.get(`${API}/api/v4/learn/modules/2/pyqs`, () => ok({ questions })),
+      http.get(`${API}/api/v4/learn/modules/2/ncert-questions/count`, () => ok({ total: 1 })),
     );
     renderWithProviders(<ModuleScreen courseId="5" moduleId="2" />, { exam: cbse });
 
@@ -172,8 +172,8 @@ describe('Chapter page', () => {
     server.use(
       outline,
       chapter([]),
-      http.get(`${API}/api/v1/learn/chapter-pyqs/2`, () => ok({ questions: [] })),
-      http.get(`${API}/api/v1/learn/chapter-ncert-questions/2/count`, () => ok({ total: 0 })),
+      http.get(`${API}/api/v4/learn/modules/2/pyqs`, () => ok({ questions: [] })),
+      http.get(`${API}/api/v4/learn/modules/2/ncert-questions/count`, () => ok({ total: 0 })),
     );
     renderWithProviders(<ModuleScreen courseId="5" moduleId="2" />, { exam: cbse });
     expect(await screen.findByText('No practice available yet.')).toBeInTheDocument();
@@ -184,9 +184,9 @@ describe('Chapter page', () => {
   it('shows an error when the chapter fails', async () => {
     server.use(
       outline,
-      http.get(`${API}/api/v1/learn/module-details/2/5`, () => HttpResponse.json({ message: 'nope' }, { status: 500 })),
-      http.get(`${API}/api/v1/learn/chapter-pyqs/2`, () => ok({ questions: [] })),
-      http.get(`${API}/api/v1/learn/chapter-ncert-questions/2/count`, () => ok({ total: 0 })),
+      http.get(`${API}/api/v4/learn/courses/5/modules/2`, () => HttpResponse.json({ message: 'nope' }, { status: 500 })),
+      http.get(`${API}/api/v4/learn/modules/2/pyqs`, () => ok({ questions: [] })),
+      http.get(`${API}/api/v4/learn/modules/2/ncert-questions/count`, () => ok({ total: 0 })),
     );
     renderWithProviders(<ModuleScreen courseId="5" moduleId="2" />, { exam: cbse });
     expect(await screen.findByText('Failed To Fetch Modules')).toBeInTheDocument();
@@ -202,10 +202,10 @@ describe('Chapter page', () => {
 
 describe('Lecture page', () => {
   const lecture = (videos: unknown) =>
-    http.get(`${API}/api/v1/learn/lectures/8`, () =>
+    http.get(`${API}/api/v4/learn/lectures/8`, () =>
       ok({ lecture: { lecture_id: 8, title: 'mirrors and images', description: 'About mirrors', course_id: 5, module_id: 2, videos } }),
     );
-  const transcript = http.get(`${API}/api/v1/learn/transcript/8`, () => ok({ transcript: 'First line<br />' }));
+  const transcript = http.get(`${API}/api/v4/learn/lectures/8/transcript`, () => ok({ transcript: 'First line<br />' }));
 
   it('plays the chosen language and moves through the course', async () => {
     let completed = false;
@@ -216,11 +216,11 @@ describe('Lecture page', () => {
         { language: 'english', link: 'https://cdn.test/en.mp4' },
         { language: 'hindi', link: 'https://youtu.be/abcdefghijk' },
       ]),
-      http.put(`${API}/api/v1/learn/progress-update/course/5/lecture/8/complete`, () => {
+      http.put(`${API}/api/v4/learn/courses/5/lectures/8/complete`, () => {
         completed = true;
         return ok({ activity: { category: 'assessment', id: 20, type: 'quiz', module: 2 } });
       }),
-      http.post(`${API}/api/v1/learn/previousActivity`, () => ok({ activity: { category: 'lecture', id: 7, module: 2 } })),
+      http.get(`${API}/api/v4/learn/courses/5/previous-activity`, () => ok({ activity: { category: 'lecture', id: 7, module: 2 } })),
     );
     renderWithProviders(<LectureScreen courseId="5" moduleId="2" lectureId="8" />, { exam: cbse });
 
@@ -248,12 +248,12 @@ describe('Lecture page', () => {
       outline,
       transcript,
       lecture([{ language: 'english', link: 'old-id' }]),
-      http.post(`${API}/api/lectures/8/refresh-videos`, () => {
+      http.post(`${API}/api/v4/learn/lectures/8/refresh-videos`, () => {
         refreshed += 1;
         return HttpResponse.json({ success: true, data: { videos: [{ language: 'english', link: 'https://cdn.test/new.mp4' }] } });
       }),
-      http.put(`${API}/api/v1/learn/progress-update/course/5/lecture/8/complete`, () => ok({ activity: null })),
-      http.post(`${API}/api/v1/learn/previousActivity`, () => HttpResponse.json({ success: false, data: { activity: null } })),
+      http.put(`${API}/api/v4/learn/courses/5/lectures/8/complete`, () => ok({ activity: null })),
+      http.get(`${API}/api/v4/learn/courses/5/previous-activity`, () => ok({ activity: null })),
     );
     renderWithProviders(<LectureScreen courseId="5" moduleId="2" lectureId="8" />, { exam: cbse });
     const video = await screen.findByLabelText('Mirrors And Images');
@@ -274,7 +274,7 @@ describe('Lecture page', () => {
       outline,
       transcript,
       lecture([]),
-      http.put(`${API}/api/v1/learn/progress-update/course/5/lecture/8/complete`, () => HttpResponse.json({ message: 'Server down' }, { status: 500 })),
+      http.put(`${API}/api/v4/learn/courses/5/lectures/8/complete`, () => HttpResponse.json({ message: 'Server down' }, { status: 500 })),
     );
     renderWithProviders(<LectureScreen courseId="5" moduleId="2" lectureId="8" />, { exam: cbse });
     expect(await screen.findByText(/finishing touches/)).toBeInTheDocument();
@@ -283,7 +283,7 @@ describe('Lecture page', () => {
   });
 
   it('reports a lecture that fails to load', async () => {
-    server.use(outline, transcript, http.get(`${API}/api/v1/learn/lectures/8`, () => HttpResponse.json({ message: 'x' }, { status: 404 })));
+    server.use(outline, transcript, http.get(`${API}/api/v4/learn/lectures/8`, () => HttpResponse.json({ message: 'x' }, { status: 404 })));
     renderWithProviders(<LectureScreen courseId="5" moduleId="2" lectureId="8" />, { exam: cbse });
     expect(await screen.findByText('Failed To Fetch Lecture Data')).toBeInTheDocument();
   });
@@ -304,14 +304,13 @@ describe('Chapter questions', () => {
     let calls = 0;
     server.use(
       outline,
-      http.get(`${API}/api/v1/learn/chapter-pyqs/2`, () => ok({ questions })),
-      http.get(`${API}/api/v1/exams/chapter-pyqs/previous-attempts/2`, () => {
+      http.get(`${API}/api/v4/learn/modules/2/pyqs`, () => ok({ questions })),
+      http.get(`${API}/api/v4/learn/modules/2/pyq-attempts`, () => {
         calls += 1;
-        return HttpResponse.json({
-          success: true,
-          submissions: [
-            { attempt_id: 91, attempt_number: 2, grade: '72.4', date: '2026-10-05T10:30:00Z' },
-            { attempt_id: 90, attempt_number: 1, grade: 'B', date: '2026-10-01T10:30:00Z' },
+        return ok({
+          attempts: [
+            { attempt_id: 91, attempt_number: 2, percentage: 72.4, date: '2026-10-05T10:30:00Z', is_latest: true },
+            { attempt_id: 90, attempt_number: 1, percentage: 55, date: '2026-10-01T10:30:00Z', is_latest: false },
           ],
         });
       }),
@@ -322,7 +321,7 @@ describe('Chapter questions', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Your attempts' }));
     const drawer = await screen.findByRole('dialog', { name: 'Your attempts' });
     expect(await within(drawer).findByText('72%')).toBeInTheDocument();
-    expect(within(drawer).getByText('B')).toBeInTheDocument();
+    expect(within(drawer).getByText('55%')).toBeInTheDocument();
     expect(within(drawer).getByText('Latest')).toBeInTheDocument();
     expect(within(drawer).getByText('5 Oct 2026')).toBeInTheDocument();
     expect(within(drawer).getAllByRole('link', { name: 'Review attempt' })[0]).toHaveAttribute('href', '/cbse/tests/chapter-pyq/result/91');
@@ -332,8 +331,8 @@ describe('Chapter questions', () => {
   it('explains an empty attempts list', async () => {
     server.use(
       outline,
-      http.get(`${API}/api/v1/learn/chapter-pyqs/2`, () => ok({ questions })),
-      http.get(`${API}/api/v1/exams/chapter-pyqs/previous-attempts/2`, () => HttpResponse.json({ success: true, submissions: [] })),
+      http.get(`${API}/api/v4/learn/modules/2/pyqs`, () => ok({ questions })),
+      http.get(`${API}/api/v4/learn/modules/2/pyq-attempts`, () => ok({ attempts: [] })),
     );
     renderWithProviders(<ChapterPyqsScreen courseId="5" moduleId="2" />, { exam: cbse });
     await screen.findByText(/CBSE 2020 to 2023/);
@@ -343,7 +342,7 @@ describe('Chapter questions', () => {
   });
 
   it('filters PYQs by type and year, and links to the test', async () => {
-    server.use(outline, http.get(`${API}/api/v1/learn/chapter-pyqs/2`, () => ok({ questions })));
+    server.use(outline, http.get(`${API}/api/v4/learn/modules/2/pyqs`, () => ok({ questions })));
     renderWithProviders(<ChapterPyqsScreen courseId="5" moduleId="2" />, { exam: cbse });
 
     expect(await screen.findByText(/CBSE 2020 to 2023/)).toBeInTheDocument();
@@ -367,19 +366,19 @@ describe('Chapter questions', () => {
   });
 
   it('shows PYQ empty and error states', async () => {
-    server.use(outline, http.get(`${API}/api/v1/learn/chapter-pyqs/2`, () => ok({ questions: [] })));
+    server.use(outline, http.get(`${API}/api/v4/learn/modules/2/pyqs`, () => ok({ questions: [] })));
     renderWithProviders(<ChapterPyqsScreen courseId="5" moduleId="2" />, { exam: cbse });
     expect(await screen.findByText('No PYQs available yet.')).toBeInTheDocument();
   });
 
   it('reports a PYQ failure', async () => {
-    server.use(outline, http.get(`${API}/api/v1/learn/chapter-pyqs/2`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(outline, http.get(`${API}/api/v4/learn/modules/2/pyqs`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<ChapterPyqsScreen courseId="5" moduleId="2" />, { exam: cbse });
     expect(await screen.findByText('Failed To Fetch PYQs')).toBeInTheDocument();
   });
 
   it('reveals NCERT solutions', async () => {
-    server.use(outline, http.get(`${API}/api/v1/learn/chapter-ncert-questions/2`, () => ok({ questions })));
+    server.use(outline, http.get(`${API}/api/v4/learn/modules/2/ncert-questions`, () => ok({ questions })));
     renderWithProviders(<NcertQuestionsScreen courseId="5" moduleId="2" />, { exam: cbse });
     const [first] = await screen.findAllByRole('article');
     expect(within(first!).getByText(/Q1 · MCQ · 1 mark/)).toBeInTheDocument();
@@ -406,10 +405,11 @@ describe('Chapter questions', () => {
 
 describe('Courses', () => {
   const catalogue = [
-    http.get(`${API}/api/class-list`, () => ok([{ class_id: 1, title: 'Class 10' }])),
-    http.get(`${API}/api/v2/get-textbooks`, ({ request }) => {
+    http.get(`${API}/api/v4/learn/board/${cbse.examId}/classes`, () => ok({ classes: [{ class_id: 1, title: 'Class 10' }] })),
+    http.get(`${API}/api/v4/learn/board/${cbse.examId}/textbooks`, ({ request }) => {
       const classId = new URL(request.url).searchParams.get('class_id');
-      return HttpResponse.json({
+      return ok({
+        class_id: classId ? Number(classId) : null,
         subject_courses: [
           { subject_id: 3, subject_name: 'Science', textbooks: [{ id: 7, class_id: 1, class_name: 'Class 10', textbook_name: 'Part 1', description: 'Light' }] },
           { subject_id: 4, subject_name: 'Maths', textbooks: classId ? [] : [{ id: 8, class_id: 1, textbook_name: 'Algebra', description: 'x' }] },
@@ -432,13 +432,13 @@ describe('Courses', () => {
 
   it('shows a course and enrolment state', async () => {
     server.use(
-      http.get(`${API}/api/courses/7`, () =>
+      http.get(`${API}/api/v4/learn/courses/7`, () =>
         ok({ course_id: 7, class: 1, title: 'Part 1', className: 'CLASS 10', subjectName: 'SCIENCE', outcomes: ['Waves'], lectureCount: 9, assessCounts: { quiz: 2 } }),
       ),
-      http.get(`${API}/api/course_outline_overview/7`, () =>
-        HttpResponse.json({ finalList: [{ category: 'module', id: 1, module_order: 1, title: 'light', lectures: [{ category: 'lecture', lecture_order: 1, title: 'intro' }] }] }),
+      http.get(`${API}/api/v4/learn/courses/7/curriculum`, () =>
+        ok({ finalList: [{ category: 'module', id: 1, module_order: 1, title: 'light', lectures: [{ category: 'lecture', lecture_order: 1, title: 'intro' }] }] }),
       ),
-      http.get(`${API}/api/subscribed-class`, () => ok({ classIds: [1] })),
+      http.get(`${API}/api/v4/learn/classes/subscribed`, () => ok({ classIds: [1] })),
     );
     renderWithProviders(<CourseDetailScreen courseId="7" />, { exam: cbse });
     expect(await screen.findByRole('heading', { name: 'Part 1' })).toBeInTheDocument();
@@ -450,14 +450,14 @@ describe('Courses', () => {
 
   it('offers enrolment when the class isn’t subscribed, and reports failures', async () => {
     server.use(
-      http.get(`${API}/api/courses/7`, () => ok({ course_id: 7, class: 2, title: 'Part 1' })),
-      http.get(`${API}/api/course_outline_overview/7`, () => HttpResponse.json({ finalList: [] })),
-      http.get(`${API}/api/subscribed-class`, () => HttpResponse.json({}, { status: 500 })),
+      http.get(`${API}/api/v4/learn/courses/7`, () => ok({ course_id: 7, class: 2, title: 'Part 1' })),
+      http.get(`${API}/api/v4/learn/courses/7/curriculum`, () => ok({ finalList: [] })),
+      http.get(`${API}/api/v4/learn/classes/subscribed`, () => HttpResponse.json({}, { status: 500 })),
     );
     renderWithProviders(<CourseDetailScreen courseId="7" />, { exam: cbse });
     expect(await screen.findByRole('link', { name: 'Enroll Now' })).toHaveAttribute('href', '/cbse/plans');
 
-    server.use(http.get(`${API}/api/courses/9`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(http.get(`${API}/api/v4/learn/courses/9`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<CourseDetailScreen courseId="9" />, { exam: cbse });
     expect(await screen.findByText('Failed to fetch course')).toBeInTheDocument();
   });

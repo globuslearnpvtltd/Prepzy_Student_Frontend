@@ -149,3 +149,11 @@ export const LEARN_MOCKS: Record<string, unknown> = {
     },
   },
 };
+
+// The new app reads notes from the v4 backend (same bodies; the summary video is under data).
+LEARN_MOCKS['/api/v4/notes/courses/5'] = LEARN_MOCKS['/api/v1/notes/notes/5'];
+LEARN_MOCKS['/api/v4/notes/summary-video/40'] = {
+  success: true,
+  message: 'Summary video fetched',
+  data: (LEARN_MOCKS['/api/notes/summary-video/40'] as { notes: unknown }).notes,
+};

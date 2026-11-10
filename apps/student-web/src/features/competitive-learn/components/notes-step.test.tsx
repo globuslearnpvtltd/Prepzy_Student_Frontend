@@ -8,10 +8,10 @@ import { testExam } from '@/test/exams';
 const neet = testExam('neet');
 const ok = (body: Record<string, unknown>) => HttpResponse.json({ success: true, ...body });
 
-const sidebar = http.get(`${API}/api/neet/ChapterSidebar/:id`, () =>
-  ok({ data: [{ module_id: 341, module_title: 'Laws of Motion', course_id: 214, course_title: 'Physics Class 11', total_notes: 1, completed_notes: 1 }] }),
+const sidebar = http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/:id`, () =>
+  ok({ data: { chapter: { module_id: 341, module_title: 'Laws of Motion', course_id: 214, course_title: 'Physics Class 11', total_notes: 1, completed_notes: 1 } } }),
 );
-const notes = (data: Record<string, unknown>) => http.get(`${API}/api/neet/get-summar-notes/341`, () => ok({ data }));
+const notes = (data: Record<string, unknown>) => http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/notes`, () => ok({ data }));
 
 const scrolled = vi.fn();
 
@@ -60,7 +60,7 @@ describe('NotesStep', () => {
 
   it('shows the generic chapter label when nothing names it', async () => {
     server.use(
-      http.get(`${API}/api/neet/ChapterSidebar/:id`, () => ok({ data: [] })),
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/:id`, () => HttpResponse.json({ success: false, code: 'CHAPTER_NOT_FOUND' }, { status: 404 })),
       notes({ notes_text: null }),
     );
     renderWithProviders(<NotesStep courseId="214" moduleId="341" step="study-notes" />, { exam: neet });

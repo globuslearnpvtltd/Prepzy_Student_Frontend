@@ -52,7 +52,7 @@ const sidebarRow = {
   completed_pyqs: 0,
   pyq_question_count: 14,
 };
-const sidebar = http.get(`${API}/api/neet/ChapterSidebar/:id`, () => ok({ data: [sidebarRow] }));
+const sidebar = http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/:id`, () => ok({ data: { chapter: sidebarRow } }));
 
 describe('competitive learn normalisers', () => {
   it('derives chapter progress from the four counters', () => {
@@ -152,11 +152,11 @@ describe('competitive learn normalisers', () => {
 
   it('treats a missing practice assessment or notes (404) as none', async () => {
     server.use(
-      http.get(`${API}/api/neet/unit-test-assessment/:id`, () => HttpResponse.json({ success: false }, { status: 404 })),
-      http.get(`${API}/api/neet/get-summar-notes/:id`, () => HttpResponse.json({ success: false }, { status: 404 })),
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/:id/practice`, () => HttpResponse.json({ success: false }, { status: 404 })),
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/:id/notes`, () => HttpResponse.json({ success: false }, { status: 404 })),
     );
-    await expect(learnApi.practiceAssessment('1')).resolves.toBeNull();
-    await expect(learnApi.studyNotes('1')).resolves.toBeNull();
+    await expect(learnApi.practiceAssessment(neet, '1')).resolves.toBeNull();
+    await expect(learnApi.studyNotes(neet, '1')).resolves.toBeNull();
   });
 
   it('knows the chapter steps and shell layout', () => {
@@ -180,24 +180,27 @@ describe('competitive learn normalisers', () => {
 });
 
 describe('NotesLibrary', () => {
-  const subjects = http.get(`${API}/api/neet/summary-notes/subjects`, ({ request }) => {
-    expect(new URL(request.url).searchParams.get('class_id')).toBe('20');
-    return ok({
-      data: [
-        { subject_id: 7, subject_name: 'NEET-PHYSICS', total_chapters: 2, completed_chapters: 1 },
-        { subject_id: 8, subject_name: 'NEET-BOTANY', total_chapters: 0, completed_chapters: 0 },
-      ],
-    });
-  });
-  const chapters = http.get(`${API}/api/neet/summary-notes/chapters`, ({ request }) => {
+  const subjects = http.get(`${API}/api/v4/learn/competitive/${neet.examId}/classes/20/notes/subjects`, () =>
+    ok({
+      data: {
+        subjects: [
+          { subject_id: 7, subject_name: 'NEET-PHYSICS', total_chapters: 2, completed_chapters: 1 },
+          { subject_id: 8, subject_name: 'NEET-BOTANY', total_chapters: 0, completed_chapters: 0 },
+        ],
+      },
+    }),
+  );
+  const chapters = http.get(`${API}/api/v4/learn/competitive/${neet.examId}/classes/20/notes/chapters`, ({ request }) => {
     const subject = new URL(request.url).searchParams.get('subject_id');
-    if (subject === '8') return ok({ data: [], summary: { total_chapters: 0, completed_chapters: 0 } });
+    if (subject === '8') return ok({ data: { chapters: [], summary: { total_chapters: 0, completed_chapters: 0 } } });
     return ok({
-      summary: { total_chapters: 2, completed_chapters: 1 },
-      data: [
-        { module_id: 341, course_id: 214, module_order: 1, module_title: 'Laws of Motion', notes_status: 'completed', lock_content: 0 },
-        { module_id: 342, course_id: 214, module_order: 2, module_title: 'Gravitation', notes_status: 'pending', lock_content: 1 },
-      ],
+      data: {
+        summary: { total_chapters: 2, completed_chapters: 1 },
+        chapters: [
+          { module_id: 341, course_id: 214, module_order: 1, module_title: 'Laws of Motion', notes_status: 'completed', lock_content: 0 },
+          { module_id: 342, course_id: 214, module_order: 2, module_title: 'Gravitation', notes_status: 'pending', lock_content: 1 },
+        ],
+      },
     });
   });
 
@@ -216,12 +219,12 @@ describe('NotesLibrary', () => {
   });
 
   it('shows an error when subjects fail and "No subjects found" when empty', async () => {
-    server.use(plan, http.get(`${API}/api/neet/summary-notes/subjects`, () => HttpResponse.json({ message: 'Down' }, { status: 500 })));
+    server.use(plan, http.get(`${API}/api/v4/learn/competitive/${neet.examId}/classes/20/notes/subjects`, () => HttpResponse.json({ message: 'Down' }, { status: 500 })));
     const { unmount } = renderWithProviders(<NotesLibrary />, { exam: neet });
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed to load subjects');
     unmount();
 
-    server.use(http.get(`${API}/api/neet/summary-notes/subjects`, () => ok({ data: [] })));
+    server.use(http.get(`${API}/api/v4/learn/competitive/${neet.examId}/classes/20/notes/subjects`, () => ok({ data: { subjects: [] } })));
     renderWithProviders(<NotesLibrary />, { exam: neet });
     expect(await screen.findByText('No subjects found')).toBeInTheDocument();
   });
@@ -231,10 +234,12 @@ describe('CourseScreen', () => {
   it('shows totals and chapter rows linking to their first step', async () => {
     server.use(
       sidebar,
-      http.get(`${API}/api/neet/module-list/214`, () =>
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/courses/214/chapters`, () =>
         ok({
-          summary: { videos: { completed: 1 }, notes: { completed: 0 }, tests: { completed: 0 }, pyqs: { completed: 0 } },
-          data: [{ module_id: 341, title: 'Laws of Motion', orders: 1, total_videos: 1, completed_videos: 1 }],
+          data: {
+            summary: { videos: { completed: 1 }, notes: { completed: 0 }, tests: { completed: 0 }, pyqs: { completed: 0 } },
+            chapters: [{ module_id: 341, title: 'Laws of Motion', orders: 1, total_videos: 1, completed_videos: 1 }],
+          },
         }),
       ),
     );
@@ -245,11 +250,11 @@ describe('CourseScreen', () => {
   });
 
   it('shows the empty and error states', async () => {
-    server.use(http.get(`${API}/api/neet/module-list/1`, () => ok({ data: [] })));
+    server.use(http.get(`${API}/api/v4/learn/competitive/${neet.examId}/courses/1/chapters`, () => ok({ data: { chapters: [] } })));
     const { unmount } = renderWithProviders(<CourseScreen courseId="1" />, { exam: neet });
     expect(await screen.findByText('No chapters yet')).toBeInTheDocument();
     unmount();
-    server.use(http.get(`${API}/api/neet/module-list/2`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(http.get(`${API}/api/v4/learn/competitive/${neet.examId}/courses/2/chapters`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<CourseScreen courseId="2" />, { exam: neet });
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
@@ -257,12 +262,12 @@ describe('CourseScreen', () => {
 
 describe('ChapterScreen', () => {
   const video = (link: unknown, status: string | null = null) =>
-    http.get(`${API}/api/neet/sumamry-video/341`, () => ok({ data: [{ module_id: 341, title: 'Physics', new_video_link: link, summary_video_status: status }] }));
+    http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/summary-video`, () => ok({ data: { video: { module_id: 341, title: 'Physics', new_video_link: link, summary_video_status: status } } }));
 
   it('links the sidebar steps and Prev / Next', async () => {
     server.use(sidebar, video({}));
     renderWithProviders(<ChapterScreen courseId="214" moduleId="341" step="study-notes" />, { exam: neet });
-    server.use(http.get(`${API}/api/neet/get-summar-notes/341`, () => ok({ data: { module_name: 'Laws of Motion', notes_text: null } })));
+    server.use(http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/notes`, () => ok({ data: { module_name: 'Laws of Motion', notes_text: null } })));
     const steps = await screen.findByRole('navigation', { name: 'Chapter steps' });
     expect(within(steps).getByRole('link', { name: /Study Notes/ })).toHaveAttribute('aria-current', 'page');
     expect(within(steps).getByRole('link', { name: /Previous Year Questions/ })).toHaveAttribute('href', '/neet/learn/214/341/chapter-pyq');
@@ -309,7 +314,7 @@ describe('ChapterScreen', () => {
     navigation.searchParams = new URLSearchParams('from=notes');
     server.use(
       sidebar,
-      http.get(`${API}/api/neet/get-summar-notes/341`, () =>
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/notes`, () =>
         ok({ data: { module_name: 'Laws of Motion', module_order: 3, notes_text: '<h2>Newton</h2>', notes_pdf: 'https://cdn/n.pdf', is_completed: false } }),
       ),
       http.post(`${API}/api/neet/summary-notes-completed`, () => {
@@ -328,11 +333,11 @@ describe('ChapterScreen', () => {
   });
 
   it('shows "Notes Coming Soon!" and a notes error', async () => {
-    server.use(sidebar, http.get(`${API}/api/neet/get-summar-notes/341`, () => HttpResponse.json({}, { status: 404 })));
+    server.use(sidebar, http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/notes`, () => HttpResponse.json({}, { status: 404 })));
     const { unmount } = renderWithProviders(<ChapterScreen courseId="214" moduleId="341" step="study-notes" />, { exam: neet });
     expect(await screen.findByText('Notes Coming Soon!')).toBeInTheDocument();
     unmount();
-    server.use(http.get(`${API}/api/neet/get-summar-notes/341`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/notes`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<ChapterScreen courseId="214" moduleId="341" step="study-notes" />, { exam: neet });
     expect(await screen.findByRole('alert')).toHaveTextContent('Failed To Fetch Notes');
   });
@@ -340,13 +345,15 @@ describe('ChapterScreen', () => {
   it('starts the practice assessment and reviews past attempts', async () => {
     server.use(
       sidebar,
-      http.get(`${API}/api/neet/unit-test-assessment/341`, () => ok({ data: { assessment_id: 5231 } })),
-      http.get(`${API}/api/neet/quiz-exam/previous-attempts/5231`, () =>
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/practice`, () => ok({ data: { assessment_id: 5231 } })),
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/practice/5231/attempts`, () =>
         ok({
-          submissions: [
-            { attempt_id: 9, attempt_number: 2, date: '2026-09-10T09:00:00Z', total_marks: 80, total_marks_obtained: 40, is_latest: true },
-            { attempt_id: 8, attempt_number: 1, date: '2026-09-01T09:00:00Z', total_marks: 80, total_marks_obtained: 60, is_latest: false },
-          ],
+          data: {
+            attempts: [
+              { attempt_id: 9, attempt_number: 2, date: '2026-09-10T09:00:00Z', total_marks: 80, total_marks_obtained: 40, is_latest: true },
+              { attempt_id: 8, attempt_number: 1, date: '2026-09-01T09:00:00Z', total_marks: 80, total_marks_obtained: 60, is_latest: false },
+            ],
+          },
         }),
       ),
     );
@@ -357,7 +364,7 @@ describe('ChapterScreen', () => {
   });
 
   it('explains when a chapter has no practice assessment', async () => {
-    server.use(sidebar, http.get(`${API}/api/neet/unit-test-assessment/341`, () => HttpResponse.json({}, { status: 404 })));
+    server.use(sidebar, http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/practice`, () => HttpResponse.json({}, { status: 404 })));
     renderWithProviders(<ChapterScreen courseId="214" moduleId="341" step="practice-questions" />, { exam: neet });
     expect(await screen.findByText('No assessment available for this chapter yet')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Start Assessment' })).not.toBeInTheDocument();
@@ -366,8 +373,8 @@ describe('ChapterScreen', () => {
   it('starts the chapter PYQ test with at most 10 questions', async () => {
     server.use(
       sidebar,
-      http.get(`${API}/api/neet/chapter-pyq-exam/previous-attempts/341`, () =>
-        ok({ submissions: [{ attempt_id: 77, attempt_number: 1, date: 'x', total_marks: 40, total_marks_obtained: 28, is_latest: true }] }),
+      http.get(`${API}/api/v4/learn/modules/341/pyq-attempts`, () =>
+        ok({ data: { attempts: [{ attempt_id: 77, attempt_number: 1, date: 'x', total_marks: 40, total_marks_obtained: 28, is_latest: true }] } }),
       ),
     );
     renderWithProviders(<ChapterScreen courseId="214" moduleId="341" step="chapter-pyq" />, { exam: neet });
@@ -377,7 +384,7 @@ describe('ChapterScreen', () => {
   });
 
   it('opens the chapter menu on mobile', async () => {
-    server.use(sidebar, http.get(`${API}/api/neet/chapter-pyq-exam/previous-attempts/341`, () => ok({ submissions: [] })));
+    server.use(sidebar, http.get(`${API}/api/v4/learn/modules/341/pyq-attempts`, () => ok({ data: { attempts: [] } })));
     renderWithProviders(<ChapterScreen courseId="214" moduleId="341" step="chapter-pyq" />, { exam: neet });
     await userEvent.click(screen.getByRole('button', { name: 'Chapter Menu' }));
     const dialog = screen.getByRole('dialog', { name: 'Chapter menu' });

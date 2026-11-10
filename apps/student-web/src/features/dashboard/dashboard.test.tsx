@@ -200,7 +200,7 @@ describe('board dashboard without a plan', () => {
   const freeHandlers = () => [
     http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: [] } })),
     account(),
-    http.get(`${API}/api/v1/student/free-courses`, () =>
+    http.get(`${API}/api/v4/learn/free-courses`, () =>
       HttpResponse.json({
         success: true,
         data: {

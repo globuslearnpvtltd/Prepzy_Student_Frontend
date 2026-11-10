@@ -1,4 +1,4 @@
-import { dashboardApiBase, type ExamRef } from '@/shared/config/exams';
+import { dashboardApiBase, LEARN_API, learnApiBase, type ExamRef } from '@/shared/config/exams';
 import type { TestTypeKey } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { apiClient } from '@/shared/lib/api-client';
@@ -360,28 +360,24 @@ export interface FreeCourse {
 export interface ChapterAttempt {
   attemptId: string;
   attemptNumber: number;
-  /** Score as shown: "72%" when the backend sends a number, otherwise its grade text. */
+  /** Score as shown: "72%". */
   score: string;
   date: string | null;
 }
 
 export const learnApi = {
   async chapterPyqAttempts(moduleId: string): Promise<ChapterAttempt[]> {
-    const body = assertOk(await apiClient.get<{ submissions?: Raw[] }>(`/api/v1/exams/chapter-pyqs/previous-attempts/${moduleId}`));
-    return (Array.isArray(body.submissions) ? body.submissions : []).map((s) => {
-      const grade = text(s.grade) ?? '';
-      const value = parseFloat(grade);
-      return {
-        attemptId: id(s.attempt_id),
-        attemptNumber: toNumber(s.attempt_number),
-        score: Number.isNaN(value) ? grade : `${Math.round(value)}%`,
-        date: text(s.date),
-      };
-    });
+    const body = assertOk(await apiClient.get<Envelope<{ attempts?: Raw[] }>>(`${LEARN_API}/modules/${moduleId}/pyq-attempts`));
+    return (body.data?.attempts ?? []).map((s) => ({
+      attemptId: id(s.attempt_id),
+      attemptNumber: toNumber(s.attempt_number),
+      score: `${Math.round(toNumber(s.percentage))}%`,
+      date: text(s.date),
+    }));
   },
 
   async freeCourses(): Promise<FreeCourse[]> {
-    const body = assertOk(await apiClient.get<Envelope<{ free_courses?: Raw[] }>>('/api/v1/student/free-courses'));
+    const body = assertOk(await apiClient.get<Envelope<{ free_courses?: Raw[] }>>(`${LEARN_API}/free-courses`));
     return (body.data?.free_courses ?? []).map((c) => {
       const image = text(c.image);
       return {
@@ -425,9 +421,9 @@ export const learnApi = {
 
   async subjectCourses(classId: number, subjectId: string): Promise<SubjectCourse[]> {
     const body = assertOk(
-      await apiClient.get<Envelope<{ result?: Raw[] }>>(`/api/v1/student/getCourselist-dashboard/${classId}/${subjectId}`),
+      await apiClient.get<Envelope<{ courses?: Raw[] }>>(`${LEARN_API}/classes/${classId}/subjects/${subjectId}/courses`),
     );
-    const rows = Array.isArray(body.data?.result) ? body.data.result : [];
+    const rows = Array.isArray(body.data?.courses) ? body.data.courses : [];
     return rows.map((c) => ({
       courseId: id(c.course_id),
       title: text(c.title) ?? '',
@@ -441,7 +437,7 @@ export const learnApi = {
 
   async outline(courseId: string): Promise<CourseOutline> {
     const body = assertOk(
-      await apiClient.get<Envelope<{ finalList?: unknown; courseDetail?: Raw }>>(`/api/v1/learn/module-outline/${courseId}`),
+      await apiClient.get<Envelope<{ finalList?: unknown; courseDetail?: Raw }>>(`${LEARN_API}/courses/${courseId}/outline`),
     );
     const list = toArray(body.data?.finalList);
     const course = body.data?.courseDetail;
@@ -466,7 +462,7 @@ export const learnApi = {
 
   async module(courseId: string, moduleId: string): Promise<ModuleDetail> {
     type Data = { finalList?: unknown; module_data?: Raw; summary_videos?: unknown };
-    const body = assertOk(await apiClient.get<Envelope<Data>>(`/api/v1/learn/module-details/${moduleId}/${courseId}`));
+    const body = assertOk(await apiClient.get<Envelope<Data>>(`${LEARN_API}/courses/${courseId}/modules/${moduleId}`));
     const data = body.data ?? {};
     const moduleData = asObject(data.module_data);
     return {
@@ -490,13 +486,13 @@ export const learnApi = {
   },
 
   async chapterPyqs(moduleId: string): Promise<ChapterQuestion[]> {
-    const body = assertOk(await apiClient.get<Envelope<{ questions?: unknown }>>(`/api/v1/learn/chapter-pyqs/${moduleId}`));
+    const body = assertOk(await apiClient.get<Envelope<{ questions?: unknown }>>(`${LEARN_API}/modules/${moduleId}/pyqs`));
     return toArray(body.data?.questions).map(toQuestion);
   },
 
   async ncertQuestions(moduleId: string): Promise<ChapterQuestion[]> {
     const body = assertOk(
-      await apiClient.get<Envelope<{ questions?: unknown }>>(`/api/v1/learn/chapter-ncert-questions/${moduleId}`),
+      await apiClient.get<Envelope<{ questions?: unknown }>>(`${LEARN_API}/modules/${moduleId}/ncert-questions`),
     );
     return toArray(body.data?.questions).map(toQuestion);
   },
@@ -504,7 +500,7 @@ export const learnApi = {
   /** The NCERT card is simply hidden when the count can't be read. */
   async ncertCount(moduleId: string): Promise<number> {
     try {
-      const body = await apiClient.get<Envelope<{ total?: unknown }>>(`/api/v1/learn/chapter-ncert-questions/${moduleId}/count`);
+      const body = await apiClient.get<Envelope<{ total?: unknown }>>(`${LEARN_API}/modules/${moduleId}/ncert-questions/count`);
       return toNumber(body?.data?.total);
     } catch {
       return 0;
@@ -512,7 +508,7 @@ export const learnApi = {
   },
 
   async lecture(lectureId: string): Promise<Lecture> {
-    const body = assertOk(await apiClient.get<Envelope<{ lecture?: Raw }>>(`/api/v1/learn/lectures/${lectureId}`));
+    const body = assertOk(await apiClient.get<Envelope<{ lecture?: Raw }>>(`${LEARN_API}/lectures/${lectureId}`));
     const lecture = asObject(body.data?.lecture);
     return {
       id: id(lecture.lecture_id) || lectureId,
@@ -528,7 +524,7 @@ export const learnApi = {
   /** Transcript HTML; empty when there's none (the tab then says so). */
   async transcript(lectureId: string): Promise<string> {
     try {
-      const body = await apiClient.get<Envelope<{ transcript?: unknown }>>(`/api/v1/learn/transcript/${lectureId}`);
+      const body = await apiClient.get<Envelope<{ transcript?: unknown }>>(`${LEARN_API}/lectures/${lectureId}/transcript`);
       return text(body?.data?.transcript) ?? '';
     } catch {
       return '';
@@ -538,48 +534,47 @@ export const learnApi = {
   /** Marks the lecture done; returns the next step, or null at the end of the course. */
   async completeLecture(courseId: string, lectureId: string): Promise<Activity | null> {
     const body = assertOk(
-      await apiClient.put<Envelope<{ activity?: unknown }>>(
-        `/api/v1/learn/progress-update/course/${courseId}/lecture/${lectureId}/complete`,
-      ),
+      await apiClient.put<Envelope<{ activity?: unknown }>>(`${LEARN_API}/courses/${courseId}/lectures/${lectureId}/complete`),
     );
     return toActivity(body.data?.activity);
   },
 
-  /** The step before this lecture, or null at the start (the backend answers `success: false` then). */
+  /** The step before this lecture, or null at the start of the course. */
   async previousActivity(courseId: string, lectureId: string): Promise<Activity | null> {
-    const body = await apiClient.post<Envelope<{ activity?: unknown }>>('/api/v1/learn/previousActivity', {
-      category: 'lecture',
-      id: lectureId,
-      course_id: courseId,
+    const body = await apiClient.get<Envelope<{ activity?: unknown }>>(`${LEARN_API}/courses/${courseId}/previous-activity`, {
+      params: { category: 'lecture', id: lectureId },
     });
     return toActivity(body?.data?.activity);
   },
 
-  /** Asks the backend for fresh signed video links (they expire); null when it has none. */
+  /** Asks the backend for fresh signed video links (they expire); null when it has none or can't refresh. */
   async refreshVideos(lectureId: string): Promise<LectureVideo[] | null> {
-    const body = await apiClient.post<Envelope<{ videos?: unknown }>>(`/api/lectures/${lectureId}/refresh-videos`);
-    if (!body?.success || !Array.isArray(body.data?.videos)) return null;
-    return toVideos(body.data.videos);
+    try {
+      const body = await apiClient.post<Envelope<{ videos?: unknown }>>(`${LEARN_API}/lectures/${lectureId}/refresh-videos`);
+      return Array.isArray(body?.data?.videos) ? toVideos(body.data.videos) : null;
+    } catch {
+      return null;
+    }
   },
 
   /* ----- course catalogue ----- */
 
-  async classes(): Promise<ClassOption[]> {
-    const body = assertOk(await apiClient.get<Envelope<Raw[]>>('/api/class-list'));
-    return (Array.isArray(body.data) ? body.data : []).map((c) => ({
+  async classes(exam: ExamRef): Promise<ClassOption[]> {
+    const body = assertOk(await apiClient.get<Envelope<{ classes?: Raw[] }>>(`${learnApiBase(exam)}/classes`));
+    return (body.data?.classes ?? []).map((c) => ({
       id: id(c.class_id),
       title: [text(c.title), text(c.stream_name)].filter(Boolean).join(' - '),
     }));
   },
 
   /** Textbooks per subject for a class ('' = every class). */
-  async textbooks(classId: string): Promise<TextbookSubject[]> {
+  async textbooks(exam: ExamRef, classId: string): Promise<TextbookSubject[]> {
     const body = assertOk(
-      await apiClient.get<{ subject_courses?: Raw[]; data?: { subject_courses?: Raw[] } }>('/api/v2/get-textbooks', {
+      await apiClient.get<Envelope<{ subject_courses?: Raw[] }>>(`${learnApiBase(exam)}/textbooks`, {
         params: { class_id: classId || undefined },
       }),
     );
-    const subjects = body.subject_courses ?? body.data?.subject_courses ?? [];
+    const subjects = body.data?.subject_courses ?? [];
     return subjects.map((s) => {
       const subjectName = text(s.subject_name) ?? '';
       return {
@@ -599,7 +594,7 @@ export const learnApi = {
   },
 
   async course(courseId: string): Promise<CourseDetail> {
-    const body = assertOk(await apiClient.get<Envelope<Raw>>(`/api/courses/${courseId}`));
+    const body = assertOk(await apiClient.get<Envelope<Raw>>(`${LEARN_API}/courses/${courseId}`));
     const c = asObject(body.data);
     const quizCount = Object.values(asObject(c.assessCounts)).reduce<number>((sum, n) => sum + toNumber(n), 0);
     return {
@@ -617,10 +612,8 @@ export const learnApi = {
   },
 
   async curriculum(courseId: string): Promise<CurriculumSection[]> {
-    const body = await apiClient.get<{ finalList?: unknown; data?: { finalList?: unknown } }>(
-      `/api/course_outline_overview/${courseId}`,
-    );
-    return toArray(body?.finalList ?? body?.data?.finalList).map((section, index) => {
+    const body = await apiClient.get<Envelope<{ finalList?: unknown }>>(`${LEARN_API}/courses/${courseId}/curriculum`);
+    return toArray(body?.data?.finalList).map((section, index) => {
       if (section.category !== 'module') {
         return {
           key: `exam-${index}`,
@@ -646,7 +639,7 @@ export const learnApi = {
   /** Class ids the student has a plan for (decides "Resume Course" vs "Enroll Now"). */
   async subscribedClasses(): Promise<string[]> {
     try {
-      const body = await apiClient.get<Envelope<{ classIds?: unknown[] }>>('/api/subscribed-class');
+      const body = await apiClient.get<Envelope<{ classIds?: unknown[] }>>(`${LEARN_API}/classes/subscribed`);
       return (body?.data?.classIds ?? []).map(id);
     } catch {
       return [];

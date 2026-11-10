@@ -33,8 +33,8 @@ const accountRow = {
 function handlers(parent: unknown = null) {
   return [
     http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: accountRow })),
-    http.get(`${API}/api/class-list`, () =>
-      HttpResponse.json({ success: true, data: [{ class_id: 12, title: 'CLASS 12' }, { class_id: 11, title: 'CLASS 11' }] }),
+    http.get(`${API}/api/v4/learn/board/${cbse.examId}/classes`, () =>
+      HttpResponse.json({ success: true, data: { classes: [{ class_id: 12, title: 'CLASS 12' }, { class_id: 11, title: 'CLASS 11' }] } }),
     ),
     http.get(`${API}/api/mentor/v1/auth/get-mentor-data`, () =>
       HttpResponse.json({ success: true, data: { mentor_data: parent } }),

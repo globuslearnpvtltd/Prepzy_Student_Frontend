@@ -103,6 +103,12 @@ describe('helpers', () => {
     expect(userMessage(new ApiError({ status: 422, code: 'X', message: 'Invalid Otp' }))).toBe('Invalid Otp');
   });
 
+  it('shows the "try again in a moment" message when the database is briefly unreachable', () => {
+    const error = new ApiError({ status: 503, code: 'DATABASE_UNAVAILABLE', message: "We couldn't reach our servers just now." });
+    expect(userMessage(error)).toBe("We couldn't reach our servers just now.");
+    expect(error.isRetryable).toBe(true);
+  });
+
   it('assertOk rejects 200 responses that carry a failure', () => {
     expect(() => assertOk({ success: false, message: 'Mobile Number Already Exists' })).toThrow(
       'Mobile Number Already Exists',

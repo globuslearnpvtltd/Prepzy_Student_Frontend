@@ -1,17 +1,13 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getExam } from '@/shared/config/exams';
-import { SECTIONS, sectionTitle } from '@/shared/config/navigation';
+import { placeholderSections, sectionTitle } from '@/shared/config/navigation';
 import { routes } from '@/shared/config/routes';
 import { SectionPlaceholder } from '@/shared/layout/section-placeholder';
 
-/**
- * Section pages that aren't ported yet (/cbse/learn, /neet/mock-tests …). A real page added at
- * /[exam]/(app)/<section>/page.tsx takes precedence over this one.
- */
 export function generateStaticParams({ params }: { params: { exam: string } }) {
   const exam = getExam(params.exam);
-  return exam ? Object.keys(SECTIONS[exam.category]).map((section) => ({ section })) : [];
+  return exam ? placeholderSections(exam.category).map((section) => ({ section })) : [];
 }
 
 export const dynamicParams = false;

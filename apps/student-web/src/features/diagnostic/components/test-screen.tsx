@@ -5,7 +5,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Bookmark, Check, ChevronRight, Clock, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { RichText } from '@/features/exam-engine/ui';
 import { useExam } from '@/shared/hooks/use-exam';
 import { BackButton, Breadcrumb, Notice, ScreenLoader } from '@/features/study-plan/ui';
@@ -211,10 +211,11 @@ function Evaluating({ onDone }: { onDone: () => void }) {
 /** The timed diagnostic test: one question at a time, palette, autosave, submit → result. */
 export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string }) {
   const exam = useExam();
+  const examRef = useMemo(() => ({ category: exam.category, examId: exam.examId }), [exam.category, exam.examId]);
   const router = useRouter();
   const session = useQuery({
     queryKey: ['diagnostic', 'questions', assessmentId],
-    queryFn: () => diagnosticApi.questions(assessmentId),
+    queryFn: () => diagnosticApi.questions(examRef, assessmentId),
     staleTime: Infinity,
     gcTime: 0,
     retry: false,
@@ -240,13 +241,13 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
   const saveSoon = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      if (!submitted.current && latest.current.length) void diagnosticApi.save(assessmentId, latest.current).catch(() => undefined);
+      if (!submitted.current && latest.current.length) void diagnosticApi.save(examRef, assessmentId, latest.current).catch(() => undefined);
     }, SAVE_DELAY);
-  }, [assessmentId]);
+  }, [examRef, assessmentId]);
 
   useEffect(() => {
     const flush = () => {
-      if (!submitted.current && latest.current.length) void diagnosticApi.save(assessmentId, latest.current, true);
+      if (!submitted.current && latest.current.length) void diagnosticApi.save(examRef, assessmentId, latest.current, true);
     };
     window.addEventListener('beforeunload', flush);
     return () => {
@@ -256,10 +257,10 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
         flush();
       }
     };
-  }, [assessmentId]);
+  }, [examRef, assessmentId]);
 
   const submit = useMutation({
-    mutationFn: () => diagnosticApi.submit(assessmentId, latest.current),
+    mutationFn: () => diagnosticApi.submit(examRef, assessmentId, latest.current),
     onError: () => {
       submitted.current = false;
       setEvaluating(false);

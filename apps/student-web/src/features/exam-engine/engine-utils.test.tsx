@@ -60,7 +60,7 @@ describe('reportProblem', () => {
   it('sends the report as multipart and surfaces HTTP 200 failures', async () => {
     let form: FormData | null = null;
     server.use(
-      http.post(`${API}/api/report-problem`, async ({ request }) => {
+      http.post(`${API}/api/v4/assessments/reports`, async ({ request }) => {
         form = await request.formData();
         return HttpResponse.json({ success: false, message: 'Already reported' });
       }),
@@ -76,7 +76,7 @@ describe('reportProblem', () => {
   });
 
   it('attaches a screenshot', async () => {
-    server.use(http.post(`${API}/api/report-problem`, () => HttpResponse.json({ success: true })));
+    server.use(http.post(`${API}/api/v4/assessments/reports`, () => HttpResponse.json({ success: true })));
     const image = new File(['a'], 'a.png', { type: 'image/png' });
     expect(await reportProblem({ questionId: '9', section: 'Question', description: 'x', image })).toEqual({ success: true });
   });
@@ -92,13 +92,13 @@ describe('uploadAnswerImage', () => {
 
   it('returns the uploaded image, or fails when the backend sends none', async () => {
     server.use(
-      http.post(`${API}/api/saveImage`, () =>
-        HttpResponse.json({ success: true, answer_image: { url: 'https://cdn.test/a.png', public_id: 'p1' } }),
+      http.post(`${API}/api/v4/assessments/answer-images`, () =>
+        HttpResponse.json({ success: true, message: 'Image uploaded', data: { url: 'https://cdn.test/a.png', public_id: 'p1' } }),
       ),
     );
     const file = new File(['a'], 'a.png', { type: 'image/png' });
     expect(await uploadAnswerImage(file)).toEqual({ url: 'https://cdn.test/a.png', publicId: 'p1' });
-    server.use(http.post(`${API}/api/saveImage`, () => HttpResponse.json({ success: true })));
+    server.use(http.post(`${API}/api/v4/assessments/answer-images`, () => HttpResponse.json({ success: true })));
     await expect(uploadAnswerImage(file)).rejects.toThrow('Upload failed');
   });
 });

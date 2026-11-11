@@ -105,7 +105,7 @@ function FullLengthExams() {
   const [kind, setKind] = useState<BoardPaperKind>('mock');
   const subjects = useQuery({
     queryKey: ['test-library', exam.slug, 'board-subjects', kind, context?.classId],
-    queryFn: () => libraryApi.boardSubjects(context!.classId, kind),
+    queryFn: () => libraryApi.boardSubjects(exam, context!.classId, kind),
     enabled: !!context,
   });
   const copy = KIND_COPY[kind];
@@ -200,7 +200,7 @@ export function BoardPaperSets({ kind, subjectId }: { kind: BoardPaperKind; subj
   const [subject, setSubject] = useState(subjectId);
   const query = useQuery({
     queryKey: ['test-library', exam.slug, 'board-papers', kind, subject, status, context?.classId],
-    queryFn: () => libraryApi.boardPapers(kind, subject, context!.classId, status || undefined),
+    queryFn: () => libraryApi.boardPapers(exam, kind, subject, context!.classId, status || undefined),
     enabled: !!context,
   });
   const select = 'border-neutral-150 bg-surface h-11 rounded-full border px-4 text-sm font-semibold';

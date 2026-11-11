@@ -99,16 +99,16 @@ export function BoardCustomTestBuilder({ open, onOpenChange }: { open: boolean; 
 
   const courses = useQuery({
     queryKey: ['test-library', exam.slug, 'board-custom-courses', context?.classId, debounced],
-    queryFn: () => boardCustomApi.courses(context!.classId, debounced),
+    queryFn: () => boardCustomApi.courses(exam, context!.classId, debounced),
     enabled: open && !!context,
   });
   const chapters = useQuery({
     queryKey: ['test-library', exam.slug, 'board-custom-chapters', course?.id],
-    queryFn: () => boardCustomApi.chapters(course!.id),
+    queryFn: () => boardCustomApi.chapters(exam, course!.id),
     enabled: open && !!course,
   });
   const generate = useMutation({
-    mutationFn: () => boardCustomApi.generate({ courseId: course!.id, chapter: chapter!, topicIds, difficulty }),
+    mutationFn: () => boardCustomApi.generate(exam, { chapter: chapter!, topicIds, difficulty }),
     onSuccess: (setId) => {
       if (setId) router.push(routes.testPlayer(exam.slug, 'custom', setId));
     },
@@ -441,7 +441,7 @@ export function BoardSavedTests({
   const [active, setActive] = useState<BoardCustomSet | null>(null);
   const sets = useQuery({
     queryKey: ['test-library', exam.slug, 'board-custom-sets', context?.classId],
-    queryFn: () => boardCustomApi.savedSets(context!.classId),
+    queryFn: () => boardCustomApi.savedSets(exam, context!.classId),
     enabled: open && !!context,
   });
   const button = 'flex w-full items-center justify-center rounded-[14px] border-[1.5px] border-brand px-6 py-3.5 text-xs leading-3 font-semibold';
@@ -514,7 +514,7 @@ function SubmissionsDrawer({ set, onClose }: { set: BoardCustomSet | null; onClo
   const exam = useExam();
   const submissions = useQuery({
     queryKey: ['test-library', exam.slug, 'board-custom-submissions', set?.setId],
-    queryFn: () => boardCustomApi.submissions(set!.setId),
+    queryFn: () => boardCustomApi.submissions(exam, set!.setId),
     enabled: !!set,
   });
   return (

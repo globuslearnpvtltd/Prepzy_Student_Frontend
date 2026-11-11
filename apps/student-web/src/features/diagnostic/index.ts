@@ -2,6 +2,7 @@
 export {
   attemptReducer,
   diagnosticApi,
+  diagnosticApiBase,
   formatClock,
   formatDuration,
   hasAnswer,

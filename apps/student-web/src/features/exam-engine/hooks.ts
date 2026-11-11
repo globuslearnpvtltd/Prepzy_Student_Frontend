@@ -57,7 +57,7 @@ export function useExamResult(testType: TestTypeKey, attemptId: string) {
   const adapter = useAdapter(testType);
   return useQuery({
     queryKey: examKeys.result(exam.slug, testType, attemptId),
-    queryFn: () => adapter!.result(attemptId),
+    queryFn: () => adapter!.result(attemptId, exam),
     enabled: !!adapter,
     staleTime: Infinity,
   });

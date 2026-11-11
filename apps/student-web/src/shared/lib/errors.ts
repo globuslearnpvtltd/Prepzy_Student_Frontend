@@ -37,7 +37,7 @@ export const isApiError = (error: unknown): error is ApiError => error instanceo
 
 /** A message that is safe to show to the user. */
 /** Server errors whose message is written for students (others may describe internals, so they get the fallback). */
-const USER_FACING_SERVER_ERRORS = new Set(['OTP_DELIVERY_FAILED']);
+const USER_FACING_SERVER_ERRORS = new Set(['OTP_DELIVERY_FAILED', 'DATABASE_UNAVAILABLE']);
 
 export function userMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
   if (isApiError(error)) {

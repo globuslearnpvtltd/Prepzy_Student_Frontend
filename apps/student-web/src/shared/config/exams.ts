@@ -107,5 +107,11 @@ export const dashboardApiBase = (exam: ExamRef): string => `/api/v4/dashboard/${
 /** v4 learn routes of an exam (classes, textbooks, competitive chapters …): same shape as dashboardApiBase. */
 export const learnApiBase = (exam: ExamRef): string => `/api/v4/learn/${exam.category}/${exam.examId}`;
 
+/**
+ * v4 test-library routes of an exam: `${assessmentsApiBase(exam)}/<testType>/sets` (subjects, attempts, best-score,
+ * months, live …). Same shape as dashboardApiBase.
+ */
+export const assessmentsApiBase = (exam: ExamRef): string => `/api/v4/assessments/${exam.category}/${exam.examId}`;
+
 /** v4 learn routes that don't depend on the exam (courses, chapters and lectures by id). */
 export const LEARN_API = '/api/v4/learn';

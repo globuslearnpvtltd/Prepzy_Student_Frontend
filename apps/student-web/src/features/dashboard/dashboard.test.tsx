@@ -178,7 +178,7 @@ describe('board dashboard (CBSE)', () => {
   });
 });
 
-function neetHandlers(dpp: unknown = { dpp: { dpp_id: 9, dpp_name: 'DPP #14' }, questionCount: 15, attempted_questions: 3, subjects: [{ subject_name: 'NEET-PHYSICS' }], attempt: null }) {
+function neetHandlers(dpp: unknown = { dpp: { dpp_id: 9, dpp_name: 'DPP #14' }, question_count: 15, attempted_questions: 3, subjects: [{ subject_name: 'NEET-PHYSICS' }], attempt: null }) {
   return [
     plan(20),
     account({ gender: 'female' }),
@@ -191,7 +191,7 @@ function neetHandlers(dpp: unknown = { dpp: { dpp_id: 9, dpp_name: 'DPP #14' }, 
         ],
       }),
     ),
-    http.get(`${API}/api/neet/get-live-dpp-neet`, () => HttpResponse.json({ success: true, data: dpp })),
+    http.get(`${API}/api/v4/assessments/competitive/2/dpp/live`, () => HttpResponse.json({ success: true, data: dpp })),
     http.get(`${API}/api/v4/dashboard/competitive/2/weekly-activity`, () => HttpResponse.json({ success: true, data: week })),
   ];
 }
@@ -273,7 +273,7 @@ describe('competitive dashboard (NEET)', () => {
 
   it('links to the result once today’s DPP is submitted', async () => {
     server.use(
-      ...neetHandlers({ dpp: { dpp_id: 9, dpp_name: 'DPP' }, questionCount: 15, attempted_questions: 15, attempt: { status: 'submitted', attempt_id: 77 } }),
+      ...neetHandlers({ dpp: { dpp_id: 9, dpp_name: 'DPP' }, question_count: 15, attempted_questions: 15, attempt: { status: 'submitted', attempt_id: 77 } }),
     );
     renderWithProviders(<Dashboard />, { exam: neet });
     expect(await screen.findByRole('link', { name: 'View Results' })).toHaveAttribute('href', '/neet/tests/dpp/result/77');

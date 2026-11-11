@@ -1,3 +1,4 @@
+import type { ExamRef } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk } from '@/shared/lib/unwrap';
@@ -366,25 +367,25 @@ export const isoToMask = (iso: string) => iso.split('-').reverse().join(' / ');
 
 export const studyPlanApi = {
   async plan(classId: number): Promise<{ plan: PlanHeader | null; days: PlanDay[] }> {
-    const body = assertOk(await apiClient.get<Envelope<{ plan?: unknown; days?: unknown }>>(`/api/v1/study-plan/${classId}`));
+    const body = assertOk(await apiClient.get<Envelope<{ plan?: unknown; days?: unknown }>>(`/api/v4/study-plan/classes/${classId}`));
     return { plan: toHeader(body.data?.plan), days: toDays(body.data?.days) };
   },
   async day(planId: number, date: string): Promise<PlanTask[]> {
-    const body = assertOk(await apiClient.get<Envelope<{ tasks?: unknown }>>(`/api/v1/study-plan/day/${planId}/${date}`));
+    const body = assertOk(await apiClient.get<Envelope<{ tasks?: unknown }>>(`/api/v4/study-plan/plans/${planId}/days/${date}`));
     return toTasks(body.data?.tasks);
   },
   async setTask(taskId: number, status: TaskStatus): Promise<void> {
-    assertOk(await apiClient.patch<Envelope<unknown>>(`/api/v1/study-plan/task/${taskId}`, { status }));
+    assertOk(await apiClient.patch<Envelope<unknown>>(`/api/v4/study-plan/tasks/${taskId}`, { status }));
   },
   async completeDay(dayId: number): Promise<void> {
-    assertOk(await apiClient.patch<Envelope<unknown>>(`/api/v1/study-plan/day/${dayId}/complete`));
+    assertOk(await apiClient.patch<Envelope<unknown>>(`/api/v4/study-plan/days/${dayId}/complete`));
   },
   async status(classId: number): Promise<PlanStatus> {
-    return toStatus(assertOk(await apiClient.get<Envelope<unknown>>(`/api/v1/study-plan/status/${classId}`)).data);
+    return toStatus(assertOk(await apiClient.get<Envelope<unknown>>(`/api/v4/study-plan/classes/${classId}/status`)).data);
   },
   async create(input: { classId: number; planType: PlanType; moduleIds: number[]; dailyMinutes: number; targetDate: string }): Promise<CreateResult> {
     const body = await apiClient.post<Envelope<{ feasible?: boolean; plan_id?: number; message?: string; min_per_day?: number }>>(
-      '/api/v1/study-plan/create',
+      '/api/v4/study-plan/plans',
       {
         class_id: input.classId,
         plan_type: input.planType,
@@ -398,14 +399,14 @@ export const studyPlanApi = {
     return { feasible: false, message: data?.message ?? body?.message ?? null, minPerDay: data?.min_per_day ?? null };
   },
   async journey(classId: number): Promise<Journey | null> {
-    return toJourney((await apiClient.get<Envelope<unknown>>(`/api/v1/study-plan/dashboard/${classId}`))?.data);
+    return toJourney((await apiClient.get<Envelope<unknown>>(`/api/v4/study-plan/classes/${classId}/dashboard`))?.data);
   },
-  /** Chapters (shared with the diagnostic setup). `exam_id` comes from the exam registry. */
-  async syllabus(classId: number, examId: number): Promise<{ subjects: SyllabusSubject[]; rules: DiagnosticRules }> {
+  /** Chapters (shared with the diagnostic setup); the exam is in the URL. */
+  async syllabus(classId: number, exam: ExamRef): Promise<{ subjects: SyllabusSubject[]; rules: DiagnosticRules }> {
     const body = assertOk(
-      await apiClient.get<Envelope<{ subject_chapter_list?: unknown; rules?: unknown }>>(`/api/v1/diagnostic/subject-chapter-list/${classId}`, {
-        params: { exam_id: examId },
-      }),
+      await apiClient.get<Envelope<{ subject_chapter_list?: unknown; rules?: unknown }>>(
+        `/api/v4/diagnostic/${exam.category}/${exam.examId}/classes/${classId}/chapters`,
+      ),
     );
     return { subjects: toSyllabus(body.data?.subject_chapter_list), rules: toRules(body.data?.rules) };
   },

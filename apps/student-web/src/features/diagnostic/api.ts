@@ -1,3 +1,4 @@
+import type { ExamRef } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/errors';
 import { assertOk } from '@/shared/lib/unwrap';
@@ -252,37 +253,41 @@ export const formatClock = (seconds: number) => {
   return `${String(Math.floor(safe / 60)).padStart(2, '0')}:${String(safe % 60).padStart(2, '0')}`;
 };
 
+/** v4 diagnostic routes of an exam (`attemptId` is the backend's diagnostic attempt id, called assessment_id in payloads). */
+export const diagnosticApiBase = (exam: ExamRef): string => `/api/v4/diagnostic/${exam.category}/${exam.examId}`;
+
 export const diagnosticApi = {
-  async status(classId: number): Promise<DiagnosticStatus> {
-    return toDiagnosticStatus(assertOk(await apiClient.get<Envelope<unknown>>(`/api/v1/diagnostic/status/${classId}`)).data);
+  async status(exam: ExamRef, classId: number): Promise<DiagnosticStatus> {
+    return toDiagnosticStatus(assertOk(await apiClient.get<Envelope<unknown>>(`${diagnosticApiBase(exam)}/classes/${classId}/status`)).data);
   },
-  async blueprint(classId: number, moduleIds: number[]): Promise<Blueprint> {
-    const body = await apiClient.post<Envelope<unknown>>('/api/v1/diagnostic/blueprint-preview', { class_id: classId, module_ids: moduleIds });
+  async blueprint(exam: ExamRef, classId: number, moduleIds: number[]): Promise<Blueprint> {
+    const body = await apiClient.post<Envelope<unknown>>(`${diagnosticApiBase(exam)}/classes/${classId}/blueprint`, { module_ids: moduleIds });
     return toBlueprint(assertOk(body).data);
   },
-  /** Starts the test; 429 means a cooldown is running (the page then shows the last result). */
-  async start(classId: number, moduleIds: number[]): Promise<number> {
-    const body = await apiClient.post<Envelope<{ assessment_id?: number }>>('/api/v1/diagnostic/start-test', { class_id: classId, module_ids: moduleIds });
+  /** Starts the test (or resumes the running one); 429 means a cooldown is running (the page then shows the last result). */
+  async start(exam: ExamRef, classId: number, moduleIds: number[]): Promise<number> {
+    const body = await apiClient.post<Envelope<{ assessment_id?: number }>>(`${diagnosticApiBase(exam)}/classes/${classId}/attempts`, { module_ids: moduleIds });
     const id = num(assertOk(body).data?.assessment_id);
     if (!id) throw new ApiError({ status: 500, code: 'EMPTY_RESPONSE', message: "We couldn't start your test. Please try again." });
     return id;
   },
-  async questions(assessmentId: string): Promise<{ questions: DiagnosticQuestion[]; timeLeft: number | null }> {
-    const body = assertOk(await apiClient.get<Envelope<{ questions?: unknown; time_left?: unknown }>>(`/api/v1/diagnostic/fetch-questions/${assessmentId}`));
+  async questions(exam: ExamRef, assessmentId: string): Promise<{ questions: DiagnosticQuestion[]; timeLeft: number | null }> {
+    const body = assertOk(await apiClient.get<Envelope<{ questions?: unknown; time_left?: unknown }>>(`${diagnosticApiBase(exam)}/attempts/${assessmentId}`));
     const timeLeft = body.data?.time_left;
     return { questions: toQuestions(body.data?.questions), timeLeft: timeLeft === undefined || timeLeft === null ? null : num(timeLeft) };
   },
-  async save(assessmentId: string, questions: DiagnosticQuestion[], keepalive = false): Promise<void> {
-    const path = `/api/v1/diagnostic/update-questions/${assessmentId}`;
+  async save(exam: ExamRef, assessmentId: string, questions: DiagnosticQuestion[], keepalive = false): Promise<void> {
+    const path = `${diagnosticApiBase(exam)}/attempts/${assessmentId}`;
     if (keepalive) apiClient.keepalive('PUT', path, { questions });
     else await apiClient.put(path, { questions });
   },
-  async submit(assessmentId: string, questions: DiagnosticQuestion[]): Promise<void> {
-    assertOk(await apiClient.post<Envelope<unknown>>('/api/v1/diagnostic/submit', { assessment_id: Number(assessmentId), questions }));
+  async submit(exam: ExamRef, assessmentId: string, questions: DiagnosticQuestion[]): Promise<void> {
+    assertOk(await apiClient.post<Envelope<unknown>>(`${diagnosticApiBase(exam)}/attempts/${assessmentId}/submit`, { questions }));
   },
-  async result(classId: number, assessmentId: string | null): Promise<DiagnosticResult> {
-    const body = await apiClient.get<Envelope<unknown>>(`/api/v1/diagnostic/diagnostic-results/${classId}`, {
-      params: assessmentId ? { assessment_id: assessmentId } : {},
+  /** The given attempt's report, or the class's latest (404 when there is none). */
+  async result(exam: ExamRef, classId: number, assessmentId: string | null): Promise<DiagnosticResult> {
+    const body = await apiClient.get<Envelope<unknown>>(`${diagnosticApiBase(exam)}/classes/${classId}/result`, {
+      params: assessmentId ? { attempt_id: assessmentId } : {},
     });
     const data = assertOk(body).data;
     if (!data) throw new ApiError({ status: 404, code: 'NOT_FOUND', message: 'Take the diagnostic test to see your personalised report.' });

@@ -35,11 +35,14 @@ export function useJourney(classId: number | null) {
   return useQuery({ queryKey: studyPlanKeys.journey(classId), queryFn: () => studyPlanApi.journey(classId!), enabled: !!classId });
 }
 
+/** Chapters of the class. The exam's category comes from the class context (callers pass that context's exam id). */
 export function useSyllabus(classId: number | null, examId: number) {
+  const { exam } = useClassContext();
+  const ref = exam && exam.examId === examId ? { category: exam.category, examId } : null;
   return useQuery({
     queryKey: studyPlanKeys.syllabus(classId, examId),
-    queryFn: () => studyPlanApi.syllabus(classId!, examId),
-    enabled: !!classId,
+    queryFn: () => studyPlanApi.syllabus(classId!, ref!),
+    enabled: !!classId && !!ref,
   });
 }
 

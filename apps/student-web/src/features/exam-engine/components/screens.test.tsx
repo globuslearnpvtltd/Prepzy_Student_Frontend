@@ -132,16 +132,17 @@ describe('TestSets', () => {
     const subjectsAsked: (string | null)[] = [];
     server.use(
       plans([cbsePlan]),
-      http.get(`${API}/api/v4/assessments/board/subjects`, () =>
+      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () =>
         HttpResponse.json({
-          success: true, data: {
-          mock_result: [
+          success: true,
+          data: [
             { subject_id: 3, subject_title: 'Physics', exam_count: 1 },
             { subject_id: 4, subject_title: 'Chemistry', exam_count: 0 },
-          ] } }),
+          ],
+        }),
       ),
-      http.get(`${API}/api/mock-exams/fetch-mock-sets`, ({ request }) => {
-        const subject = new URL(request.url).searchParams.get('subject');
+      http.get(`${API}/api/v4/assessments/board/1/mock/sets`, ({ request }) => {
+        const subject = new URL(request.url).searchParams.get('subject_id');
         subjectsAsked.push(subject);
         const papers = subject === '3' ? [{ set_id: 8, set_number: 2, year: 2024, status: 'completed' }] : [];
         return HttpResponse.json({ success: true, data: { papers } });
@@ -156,7 +157,7 @@ describe('TestSets', () => {
   });
 
   it('tells the student when their class has no subjects yet', async () => {
-    server.use(plans([cbsePlan]), http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: true })));
+    server.use(plans([cbsePlan]), http.get(`${API}/api/v4/assessments/board/1/pyq/subjects`, () => HttpResponse.json({ success: true })));
     renderWithProviders(<TestSets testType="pyq" />, { exam: cbse });
     expect(await screen.findByText('No papers are available for your class yet.')).toBeInTheDocument();
   });
@@ -164,17 +165,15 @@ describe('TestSets', () => {
   it('shows subject and paper loading errors', async () => {
     server.use(
       plans([cbsePlan]),
-      http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: false, message: 'Subjects down' })),
+      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () => HttpResponse.json({ success: false, message: 'Subjects down' })),
     );
     const { unmount } = renderWithProviders(<TestSets testType="mock" />, { exam: cbse });
     expect(await screen.findByText('Subjects down')).toBeInTheDocument();
     unmount();
 
     server.use(
-      http.get(`${API}/api/v4/assessments/board/subjects`, () =>
-        HttpResponse.json({ success: true, data: { mock_result: [{ subject_id: 3, subject_title: 'Physics' }] } }),
-      ),
-      http.get(`${API}/api/mock-exams/fetch-mock-sets`, () => HttpResponse.json({ success: false, message: 'Papers down' })),
+      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () => HttpResponse.json({ success: true, data: [{ subject_id: 3, subject_title: 'Physics' }] })),
+      http.get(`${API}/api/v4/assessments/board/1/mock/sets`, () => HttpResponse.json({ success: false, message: 'Papers down' })),
     );
     renderWithProviders(<TestSets testType="mock" />, { exam: cbse });
     expect(await screen.findByText('Papers down')).toBeInTheDocument();
@@ -183,8 +182,8 @@ describe('TestSets', () => {
   it("lists competitive papers directly (NEET's class comes from the exam when there is no plan)", async () => {
     server.use(
       plans([]),
-      http.get(`${API}/api/neet/get-live-dpp-neet`, () =>
-        HttpResponse.json({ success: true, data: { dpp: { dpp_id: 7, dpp_name: 'DPP 7' }, questionCount: 10, attempt: null } }),
+      http.get(`${API}/api/v4/assessments/competitive/2/dpp/live`, () =>
+        HttpResponse.json({ success: true, data: { dpp: { dpp_id: 7, dpp_name: 'DPP 7' }, question_count: 10, attempt: null } }),
       ),
     );
     renderWithProviders(<TestSets testType="dpp" />, { exam: neet });
@@ -216,7 +215,7 @@ const resultQuestion = (overrides: Partial<ResultQuestion> = {}): ResultQuestion
 describe('ResultView', () => {
   it('loads the result, then lets the student discuss a question with Vedica', async () => {
     server.use(
-      http.get(`${API}/api/neet/mock-exam/get-mock-result`, () =>
+      http.get(`${API}/api/v4/assessments/competitive/2/mock/attempts/:attemptId/result`, () =>
         HttpResponse.json({
           success: true,
           data: {
@@ -264,7 +263,7 @@ describe('ResultView', () => {
 
   it('explains a failed load with a way back (HTTP 200 + success:false)', async () => {
     server.use(
-      http.get(`${API}/api/v1/exams/mock-exam/fetch-mock-responses`, () =>
+      http.get(`${API}/api/v4/assessments/board/1/mock/attempts/1/result`, () =>
         HttpResponse.json({ success: false, message: 'Result not found' }),
       ),
     );

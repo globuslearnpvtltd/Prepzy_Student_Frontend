@@ -1,6 +1,6 @@
 'use client';
 
-import type { ExamRef } from '@/shared/config/exams';
+import { assessmentsApiBase, type ExamRef } from '@/shared/config/exams';
 import { useQuery } from '@tanstack/react-query';
 import type { ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
@@ -69,7 +69,7 @@ export function competitiveSuggestionHref(
 
 export const shellApi = {
   async hasStudyPlan(classId: number): Promise<boolean> {
-    const body = assertOk(await apiClient.get<Envelope<{ has_plan?: boolean }>>(`/api/v1/study-plan/status/${classId}`));
+    const body = assertOk(await apiClient.get<Envelope<{ has_plan?: boolean }>>(`/api/v4/study-plan/classes/${classId}/status`));
     return !!body.data?.has_plan;
   },
 
@@ -109,16 +109,14 @@ export const shellApi = {
   /** Today's daily practice paper, or null when there is none. */
   async liveDpp(exam: ExamConfig): Promise<LiveDpp | null> {
     type Raw = {
-      dpp?: { dpp_id: number | string; dpp_name?: string } | null;
-      questionCount?: unknown;
+      dpp?: { dpp_id: number | string; dpp_name?: string | null } | null;
+      question_count?: unknown;
       attempted_questions?: unknown;
       subjects?: { subject_name: string }[] | null;
       attempt?: { status?: string; attempt_id?: number | string } | null;
     };
     const body = assertOk(
-      await apiClient.get<Envelope<Raw>>('/api/neet/get-live-dpp-neet', {
-        params: { exam: exam.examSlice.toUpperCase() },
-      }),
+      await apiClient.get<Envelope<Raw | null>>(`${assessmentsApiBase(exam)}/dpp/live`),
     );
     const data = body.data;
     if (!data?.dpp) return null;
@@ -134,7 +132,7 @@ export const shellApi = {
       dppId: String(data.dpp.dpp_id),
       name,
       day: day ? Number(day) : null,
-      questionCount: num(data.questionCount),
+      questionCount: num(data.question_count),
       attempted: num(data.attempted_questions),
       subjects: (data.subjects ?? []).map((s) => subjectLabel(s.subject_name)),
       attempt,
@@ -144,11 +142,9 @@ export const shellApi = {
   /** Latest month's first paper, used when there's no live paper today. */
   async latestDppId(exam: ExamConfig): Promise<string | null> {
     const body = assertOk(
-      await apiClient.get<Envelope<{ months?: { first_dpp_id?: number | string }[] }>>('/api/neet/get-dpp-months', {
-        params: { exam: exam.examSlice.toUpperCase() },
-      }),
+      await apiClient.get<Envelope<{ first_dpp_id?: number | string }[]>>(`${assessmentsApiBase(exam)}/dpp/months`),
     );
-    const id = body.data?.months?.[0]?.first_dpp_id;
+    const id = body.data?.[0]?.first_dpp_id;
     return id ? String(id) : null;
   },
 

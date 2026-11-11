@@ -143,7 +143,7 @@ export function DiagnosticResultScreen() {
   const search = useSearchParams();
   const assessmentId = search.get('assessment_id');
   const { exam, classId, isPending } = useClassContext();
-  const result = useQuery({ queryKey: ['diagnostic', 'result', classId, assessmentId], queryFn: () => diagnosticApi.result(classId!, assessmentId), enabled: !!classId, retry: false });
+  const result = useQuery({ queryKey: ['diagnostic', 'result', classId, assessmentId], queryFn: () => diagnosticApi.result(exam!, classId!, assessmentId), enabled: !!exam && !!classId, retry: false });
   const status = usePlanStatus(classId);
   const [step, setStep] = useState<StepKey>('overview');
   const slug = exam?.slug ?? '';

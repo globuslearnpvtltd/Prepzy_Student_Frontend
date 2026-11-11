@@ -31,8 +31,12 @@ test('login with OTP opens the NEET dashboard', async ({ page, context }) => {
       data: [{ subject_name: 'NEET-Botany', completed_chapters: 3, total_chapters: 10, progress_percentage: 30 }],
     },
     'GET /api/neet/get-live-dpp-neet': { success: true, data: { dpp: null } },
+    'GET /api/v4/assessments/competitive/2/dpp/live': { success: true, data: null },
     'GET /api/v4/dashboard/competitive/2/weekly-activity': { success: true, data: { Mon: 1 } },
-    'GET /api/v4/dashboard/competitive/2/classes/20/subject-scores': { success: true, data: { overall_percent: 50, result_data: [] } },
+    'GET /api/v4/dashboard/competitive/2/classes/20/subject-scores': {
+      success: true,
+      data: { overall_percent: 50, result_data: [] },
+    },
   });
 
   await page.goto('/login');
@@ -51,8 +55,53 @@ test('login with OTP opens the NEET dashboard', async ({ page, context }) => {
 });
 
 test('take a NEET mock test from the list to the result', async ({ page, context }) => {
+  const mockQuestions = [
+    {
+      question_id: 1,
+      question_text: '<p>Powerhouse of the cell?</p>',
+      options: [
+        { option_id: 11, text: 'Ribosome' },
+        { option_id: 12, text: 'Mitochondria' },
+      ],
+    },
+    {
+      question_id: 2,
+      question_text: '<p>SI unit of force?</p>',
+      options: [
+        { option_id: 21, text: 'Newton' },
+        { option_id: 22, text: 'Pascal' },
+      ],
+    },
+  ];
+  const mockResult = {
+    summary: { name: 'NEET Full Mock 1', total_marks: 8, total_marks_obtained: 4 },
+    questions: [
+      {
+        question_id: 1,
+        question_text: 'Powerhouse of the cell?',
+        options: [
+          { option_id: 11, text: 'Ribosome' },
+          { option_id: 12, text: 'Mitochondria' },
+        ],
+        selected_option_id: 12,
+        correct_option_id: 12,
+        is_correct: 1,
+      },
+      {
+        question_id: 2,
+        question_text: 'SI unit of force?',
+        options: [
+          { option_id: 21, text: 'Newton' },
+          { option_id: 22, text: 'Pascal' },
+        ],
+        selected_option_id: null,
+        correct_option_id: 21,
+        is_correct: 0,
+      },
+    ],
+  };
   await signIn(context);
-  let submitted: { questions?: { selected_option: unknown; status: string }[] } = {};
+  let submitted: { answers?: { selected_option: unknown; status: string }[] } = {};
   await mockApi(page, {
     ...neetAccount,
     'GET /api/neet/mock-exam/fetch-mock-exams': {
@@ -70,29 +119,28 @@ test('take a NEET mock test from the list to the result', async ({ page, context
         ],
       },
     },
+    'GET /api/v4/assessments/competitive/2/mock/sets': {
+      success: true,
+      data: {
+        sets: [
+          {
+            set_id: 4,
+            name: 'NEET Full Mock 1',
+            duration: 180,
+            question_count: 2,
+            attempt_count: 0,
+            status: 'pending',
+            ongoing_session: null,
+          },
+        ],
+      },
+    },
     'POST /api/neet/mock-exam/start-mock-exam': {
       success: true,
       data: {
         set_id: 4,
         session_expiry_time: new Date(Date.now() + 3 * 3600_000).toISOString(),
-        questions: [
-          {
-            question_id: 1,
-            question_text: '<p>Powerhouse of the cell?</p>',
-            options: [
-              { option_id: 11, text: 'Ribosome' },
-              { option_id: 12, text: 'Mitochondria' },
-            ],
-          },
-          {
-            question_id: 2,
-            question_text: '<p>SI unit of force?</p>',
-            options: [
-              { option_id: 21, text: 'Newton' },
-              { option_id: 22, text: 'Pascal' },
-            ],
-          },
-        ],
+        questions: mockQuestions,
       },
     },
     'PUT /api/neet/mock-exam/update-mock-session-questions': { success: true },
@@ -100,35 +148,40 @@ test('take a NEET mock test from the list to the result', async ({ page, context
       submitted = body as typeof submitted;
       return { success: true, data: { attempt_id: 501 } };
     },
-    'GET /api/neet/mock-exam/get-mock-result': {
+    // v4 player (the new app's calls)
+    'POST /api/v4/assessments/competitive/2/mock/sets/4/attempts': {
       success: true,
       data: {
-        summary: { name: 'NEET Full Mock 1', total_marks: 8, total_marks_obtained: 4 },
-        questions: [
-          {
-            question_id: 1,
-            question_text: 'Powerhouse of the cell?',
-            options: [
-              { option_id: 11, text: 'Ribosome' },
-              { option_id: 12, text: 'Mitochondria' },
-            ],
-            selected_option_id: 12,
-            correct_option_id: 12,
-            is_correct: 1,
-          },
-          {
-            question_id: 2,
-            question_text: 'SI unit of force?',
-            options: [
-              { option_id: 21, text: 'Newton' },
-              { option_id: 22, text: 'Pascal' },
-            ],
-            selected_option_id: null,
-            correct_option_id: 21,
-            is_correct: 0,
-          },
-        ],
+        attempt_id: 61,
+        set_id: 4,
+        status: 'in_progress',
+        name: 'NEET-UG Full Mock 1',
+        time_left: 3 * 3600,
+        questions: mockQuestions,
       },
+    },
+    'PUT /api/v4/assessments/competitive/2/mock/attempts/61': { success: true, data: { attempt_id: 61 } },
+    'POST /api/v4/assessments/competitive/2/mock/attempts/61/submit': (body) => {
+      submitted = body as typeof submitted;
+      return {
+        success: true,
+        data: {
+          attempt_id: 501,
+          summary: {
+            total_questions: 2,
+            total_marks: 8,
+            total_marks_obtained: 4,
+            correct_answers: 1,
+            incorrect_answers: 0,
+            unattempted: 1,
+          },
+        },
+      };
+    },
+    'GET /api/v4/assessments/competitive/2/mock/attempts/501/result': { success: true, data: mockResult },
+    'GET /api/neet/mock-exam/get-mock-result': {
+      success: true,
+      data: mockResult,
     },
   });
 
@@ -149,8 +202,10 @@ test('take a NEET mock test from the list to the result', async ({ page, context
   const dialog = page.getByRole('dialog', { name: 'Submit your test?' });
   await expect(dialog).toContainText('1 of 2');
   await dialog.getByRole('button', { name: 'Submit', exact: true }).click();
+  // The submit answers with the score: the player shows it before the full result.
+  await page.getByRole('dialog', { name: 'Test Completed!' }).getByRole('button', { name: 'View result' }).click();
 
   await expect(page).toHaveURL(/\/neet\/tests\/mock\/result\/501$/);
   await expect(page.getByLabel('Score 4 out of 8')).toBeVisible();
-  expect(submitted.questions?.map((q) => q.selected_option)).toEqual([12, null]);
+  expect(submitted.answers?.map((q) => q.selected_option)).toEqual([12, null]);
 });

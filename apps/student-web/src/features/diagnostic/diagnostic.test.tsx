@@ -12,6 +12,8 @@ import { DiagnosticTestScreen } from './components/test-screen';
 import { testExam } from '@/test/exams';
 
 const cbse = testExam('cbse');
+/** The v4 diagnostic routes of the test exam. */
+const DIAGNOSTIC = `${API}/api/v4/diagnostic/${cbse.category}/${cbse.examId}`;
 
 const activePlan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' }] } }),
@@ -124,14 +126,14 @@ describe('DiagnosticSetupScreen', () => {
     let started: unknown = null;
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/diagnostic/status/12`, () => HttpResponse.json({ success: true, data: { state: 'available' } })),
-      http.get(`${API}/api/v1/diagnostic/subject-chapter-list/12`, () =>
+      http.get(`${DIAGNOSTIC}/classes/12/status`, () => HttpResponse.json({ success: true, data: { state: 'available' } })),
+      http.get(`${DIAGNOSTIC}/classes/12/chapters`, () =>
         HttpResponse.json({ success: true, data: { subject_chapter_list: syllabus, rules: { min_chapters_total: 2, max_chapters_per_subject: 2 } } }),
       ),
-      http.post(`${API}/api/v1/diagnostic/blueprint-preview`, () =>
+      http.post(`${DIAGNOSTIC}/classes/12/blueprint`, () =>
         HttpResponse.json({ success: true, data: { is_valid: true, subject_count: 1, chapter_count: 2, total_questions: 10, duration_seconds: 900 } }),
       ),
-      http.post(`${API}/api/v1/diagnostic/start-test`, async ({ request }) => {
+      http.post(`${DIAGNOSTIC}/classes/12/attempts`, async ({ request }) => {
         started = await request.json();
         return HttpResponse.json({ success: true, data: { assessment_id: 77 } });
       }),
@@ -149,21 +151,21 @@ describe('DiagnosticSetupScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Remove Current' }));
     await userEvent.click(screen.getByRole('button', { name: 'Start Test' }));
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/cbse/diagnostic-test/77'));
-    expect(started).toEqual({ class_id: 12, module_ids: [4] });
+    expect(started).toEqual({ module_ids: [4] });
   });
 
   it('resumes a running test', async () => {
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/diagnostic/status/12`, () => HttpResponse.json({ success: true, data: { state: 'in_progress', assessment_id: 5 } })),
-      http.get(`${API}/api/v1/diagnostic/subject-chapter-list/12`, () => HttpResponse.json({ success: true, data: { subject_chapter_list: syllabus } })),
+      http.get(`${DIAGNOSTIC}/classes/12/status`, () => HttpResponse.json({ success: true, data: { state: 'in_progress', assessment_id: 5 } })),
+      http.get(`${DIAGNOSTIC}/classes/12/chapters`, () => HttpResponse.json({ success: true, data: { subject_chapter_list: syllabus } })),
     );
     renderWithProviders(<DiagnosticSetupScreen />, { exam: cbse });
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/cbse/diagnostic-test/5'));
   });
 
   it('shows an error state', async () => {
-    server.use(activePlan, http.get(`${API}/api/v1/diagnostic/status/12`, () => HttpResponse.json({ message: 'Server down' }, { status: 400 })), http.get(`${API}/api/v1/diagnostic/subject-chapter-list/12`, () => HttpResponse.json({ success: true, data: {} })));
+    server.use(activePlan, http.get(`${DIAGNOSTIC}/classes/12/status`, () => HttpResponse.json({ success: false, message: 'Server down', code: 'BAD_REQUEST', data: null }, { status: 400 })), http.get(`${DIAGNOSTIC}/classes/12/chapters`, () => HttpResponse.json({ success: true, data: {} })));
     renderWithProviders(<DiagnosticSetupScreen />, { exam: cbse });
     expect(await screen.findByText('Something went wrong')).toBeInTheDocument();
   });
@@ -174,12 +176,12 @@ describe('DiagnosticTestScreen', () => {
     const saves: unknown[] = [];
     let submitted: { questions: { status: string }[] } | null = null;
     server.use(
-      http.get(`${API}/api/v1/diagnostic/fetch-questions/7`, () => HttpResponse.json({ success: true, data: { questions: rawQuestions, time_left: 600 } })),
-      http.put(`${API}/api/v1/diagnostic/update-questions/7`, async ({ request }) => {
+      http.get(`${DIAGNOSTIC}/attempts/7`, () => HttpResponse.json({ success: true, data: { questions: rawQuestions, time_left: 600 } })),
+      http.put(`${DIAGNOSTIC}/attempts/7`, async ({ request }) => {
         saves.push(await request.json());
         return HttpResponse.json({ success: true });
       }),
-      http.post(`${API}/api/v1/diagnostic/submit`, async ({ request }) => {
+      http.post(`${DIAGNOSTIC}/attempts/7/submit`, async ({ request }) => {
         submitted = (await request.json()) as typeof submitted;
         return HttpResponse.json({ success: true });
       }),
@@ -202,7 +204,7 @@ describe('DiagnosticTestScreen', () => {
   });
 
   it('goes to the report when the test is already over', async () => {
-    server.use(http.get(`${API}/api/v1/diagnostic/fetch-questions/8`, () => HttpResponse.json({ message: 'Already submitted' }, { status: 400 })));
+    server.use(http.get(`${DIAGNOSTIC}/attempts/8`, () => HttpResponse.json({ success: false, message: 'This diagnostic has already ended.', code: 'DIAGNOSTIC_ENDED', data: null }, { status: 400 })));
     renderWithProviders(<DiagnosticTestScreen assessmentId="8" />, { exam: cbse });
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/cbse/diagnostic-result'));
   });
@@ -210,8 +212,8 @@ describe('DiagnosticTestScreen', () => {
   it('auto-submits when time runs out', async () => {
     let submitted = false;
     server.use(
-      http.get(`${API}/api/v1/diagnostic/fetch-questions/9`, () => HttpResponse.json({ success: true, data: { questions: rawQuestions, time_left: 1 } })),
-      http.post(`${API}/api/v1/diagnostic/submit`, () => {
+      http.get(`${DIAGNOSTIC}/attempts/9`, () => HttpResponse.json({ success: true, data: { questions: rawQuestions, time_left: 1 } })),
+      http.post(`${DIAGNOSTIC}/attempts/9/submit`, () => {
         submitted = true;
         return HttpResponse.json({ success: true });
       }),
@@ -228,11 +230,11 @@ describe('DiagnosticResultScreen', () => {
     navigation.searchParams = new URLSearchParams('assessment_id=3');
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/diagnostic/diagnostic-results/12`, ({ request }) => {
-        expect(new URL(request.url).searchParams.get('assessment_id')).toBe('3');
+      http.get(`${DIAGNOSTIC}/classes/12/result`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get('attempt_id')).toBe('3');
         return HttpResponse.json({ success: true, data: resultRaw });
       }),
-      http.get(`${API}/api/v1/study-plan/status/12`, () => HttpResponse.json({ success: true, data: { can_create: true } })),
+      http.get(`${API}/api/v4/study-plan/classes/12/status`, () => HttpResponse.json({ success: true, data: { can_create: true } })),
     );
     renderWithProviders(<DiagnosticResultScreen />, { exam: cbse });
     expect(await screen.findByText('Here is what I found')).toBeInTheDocument();
@@ -248,8 +250,10 @@ describe('DiagnosticResultScreen', () => {
   it('shows the empty state', async () => {
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/diagnostic/diagnostic-results/12`, () => HttpResponse.json({ success: true, data: null })),
-      http.get(`${API}/api/v1/study-plan/status/12`, () => HttpResponse.json({ success: true, data: {} })),
+      http.get(`${DIAGNOSTIC}/classes/12/result`, () =>
+        HttpResponse.json({ success: false, message: 'No diagnostic attempt found for this class.', code: 'DIAGNOSTIC_NOT_FOUND', data: null }, { status: 404 }),
+      ),
+      http.get(`${API}/api/v4/study-plan/classes/12/status`, () => HttpResponse.json({ success: true, data: {} })),
     );
     renderWithProviders(<DiagnosticResultScreen />, { exam: cbse });
     expect(await screen.findByRole('link', { name: 'Take the diagnostic test' })).toHaveAttribute('href', '/cbse/diagnostic');

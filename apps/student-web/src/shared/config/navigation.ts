@@ -17,7 +17,7 @@ import { routes, type SectionKey } from './routes';
 /**
  * Why an item can be locked (the sidebar shows a padlock and the item can't be opened):
  * - plan: the student has no active plan for the exam
- * - study-plan: the student hasn't built a study plan yet (GET /api/v1/study-plan/status/{classId})
+ * - study-plan: the student hasn't built a study plan yet (GET /api/v4/study-plan/classes/{classId}/status)
  */
 export type NavLock = 'plan' | 'study-plan';
 
@@ -99,6 +99,32 @@ export const SECTIONS: Record<ExamCategory, Partial<Record<SectionKey, string>>>
   },
   reference: {},
 };
+
+/**
+ * Sections with their own page folder under app/(student)/[exam]/ (in any route group). They must not be pre-built here too: with both,
+ * Next can serve the [section] placeholder instead of the real page (seen on /neet/daily-practice and /cbse/learn).
+ * Keep in sync when porting a section ([section]/page.test.ts checks it against the folders).
+ */
+export const PORTED_SECTIONS = new Set([
+  'assessments',
+  'courses',
+  'custom-test',
+  'daily-practice',
+  'doubt-solver',
+  'learn',
+  'mock-tests',
+  'notes',
+  'plans',
+  'profile',
+  'pyq-library',
+  'refer-and-earn',
+  'study-plan',
+]);
+
+/** Placeholders for the sections that aren't ported yet (/cbse/syllabus, /neet/plans …). */
+export function placeholderSections(category: keyof typeof SECTIONS): string[] {
+  return Object.keys(SECTIONS[category]).filter((section) => !PORTED_SECTIONS.has(section));
+}
 
 export function sectionTitle(exam: Pick<ExamConfig, 'category'>, section: string): string | null {
   return (SECTIONS[exam.category] as Record<string, string | undefined>)[section] ?? null;

@@ -133,13 +133,13 @@ describe('StudyPlanScreen', () => {
     const patched: unknown[] = [];
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/study-plan/12`, () => HttpResponse.json(planBody())),
-      http.get(`${API}/api/v1/study-plan/day/5/${today}`, () => HttpResponse.json({ success: true, data: { tasks } })),
-      http.patch(`${API}/api/v1/study-plan/task/:id`, async ({ request, params }) => {
+      http.get(`${API}/api/v4/study-plan/classes/12`, () => HttpResponse.json(planBody())),
+      http.get(`${API}/api/v4/study-plan/plans/5/days/${today}`, () => HttpResponse.json({ success: true, data: { tasks } })),
+      http.patch(`${API}/api/v4/study-plan/tasks/:id`, async ({ request, params }) => {
         patched.push({ id: params.id, ...((await request.json()) as object) });
         return HttpResponse.json({ success: true });
       }),
-      http.patch(`${API}/api/v1/study-plan/day/1/complete`, () => {
+      http.patch(`${API}/api/v4/study-plan/days/1/complete`, () => {
         patched.push('day');
         return HttpResponse.json({ success: true });
       }),
@@ -164,13 +164,13 @@ describe('StudyPlanScreen', () => {
   });
 
   it('offers to build a plan when there is none', async () => {
-    server.use(activePlan, http.get(`${API}/api/v1/study-plan/12`, () => HttpResponse.json({ success: true, data: { plan: null, days: [] } })));
+    server.use(activePlan, http.get(`${API}/api/v4/study-plan/classes/12`, () => HttpResponse.json({ success: true, data: { plan: null, days: [] } })));
     renderWithProviders(<StudyPlanScreen />, { exam: cbse });
     expect(await screen.findByRole('link', { name: 'Build my study plan' })).toHaveAttribute('href', '/cbse/study-plan/chapters');
   });
 
   it('shows an error', async () => {
-    server.use(activePlan, http.get(`${API}/api/v1/study-plan/12`, () => HttpResponse.json({ message: 'x' }, { status: 500 })));
+    server.use(activePlan, http.get(`${API}/api/v4/study-plan/classes/12`, () => HttpResponse.json({ success: false, message: 'x', code: 'INTERNAL_SERVER_ERROR', data: null }, { status: 500 })));
     renderWithProviders(<StudyPlanScreen />, { exam: cbse });
     expect(await screen.findByText("Couldn't load your plan")).toBeInTheDocument();
   });
@@ -183,14 +183,14 @@ describe('creating a study plan', () => {
     let created: Record<string, unknown> | null = null;
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/diagnostic/subject-chapter-list/12`, ({ request }) => {
-        expect(new URL(request.url).searchParams.get('exam_id')).toBe('1');
+      http.get(`${API}/api/v4/diagnostic/${cbse.category}/${cbse.examId}/classes/12/chapters`, ({ request }) => {
+        expect(new URL(request.url).search).toBe('');
         return HttpResponse.json({ success: true, data: { subject_chapter_list: syllabusRaw } });
       }),
-      http.get(`${API}/api/v1/study-plan/status/12`, () =>
+      http.get(`${API}/api/v4/study-plan/classes/12/status`, () =>
         HttpResponse.json({ success: true, data: { state: 'ready', can_create: true, allowed_plan_types: ['learning_cum_practice', 'revision'] } }),
       ),
-      http.post(`${API}/api/v1/study-plan/create`, async ({ request }) => {
+      http.post(`${API}/api/v4/study-plan/plans`, async ({ request }) => {
         created = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ success: true, data: { feasible: true, plan_id: 9 } });
       }),
@@ -229,8 +229,8 @@ describe('creating a study plan', () => {
     useStudyPlanDraft.getState().setDraft(12, [4]);
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/study-plan/status/12`, () => HttpResponse.json({ success: true, data: { can_create: true, allowed_plan_types: ['revision'] } })),
-      http.post(`${API}/api/v1/study-plan/create`, () => HttpResponse.json({ success: true, data: { feasible: false, min_per_day: 150 } })),
+      http.get(`${API}/api/v4/study-plan/classes/12/status`, () => HttpResponse.json({ success: true, data: { can_create: true, allowed_plan_types: ['revision'] } })),
+      http.post(`${API}/api/v4/study-plan/plans`, () => HttpResponse.json({ success: true, data: { feasible: false, min_per_day: 150 } })),
     );
     renderWithProviders(<CreatePlanScreen />, { exam: cbse });
     expect(await screen.findByText(/only Revise is available/)).toBeInTheDocument();
@@ -248,11 +248,35 @@ describe('creating a study plan', () => {
     expect(screen.getByText('Question 2 of 3')).toBeInTheDocument();
   });
 
+  it('shows the error dialog when the server rejects the plan (v4 error body)', async () => {
+    useStudyPlanDraft.getState().setDraft(12, [4]);
+    server.use(
+      activePlan,
+      http.get(`${API}/api/v4/study-plan/classes/12/status`, () => HttpResponse.json({ success: true, data: { can_create: true, allowed_plan_types: ['revision'] } })),
+      http.post(`${API}/api/v4/study-plan/plans`, () =>
+        HttpResponse.json(
+          { success: false, message: 'You have already built a plan from this diagnostic.', code: 'DIAGNOSTIC_ALREADY_USED', data: null },
+          { status: 409 },
+        ),
+      ),
+    );
+    renderWithProviders(<CreatePlanScreen />, { exam: cbse });
+    await userEvent.click(await screen.findByRole('button', { name: 'Next' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    const date = new Date();
+    date.setDate(date.getDate() + 10);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    await userEvent.type(screen.getByLabelText(/Target/), `${pad(date.getDate())}${pad(date.getMonth() + 1)}${date.getFullYear()}`);
+    await userEvent.click(screen.getByRole('button', { name: 'Build my Plan' }));
+    expect(await screen.findByText("We couldn't build your Study plan")).toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
   it('blocks building without a fresh diagnostic', async () => {
     useStudyPlanDraft.getState().setDraft(12, [4]);
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/study-plan/status/12`, () => HttpResponse.json({ success: true, data: { state: 'diagnostic_used', can_create: false } })),
+      http.get(`${API}/api/v4/study-plan/classes/12/status`, () => HttpResponse.json({ success: true, data: { state: 'diagnostic_used', can_create: false } })),
     );
     renderWithProviders(<CreatePlanScreen />, { exam: cbse });
     expect(await screen.findByRole('link', { name: 'Take a new test' })).toHaveAttribute('href', '/cbse/diagnostic');
@@ -269,7 +293,7 @@ describe('JourneyCard', () => {
   it('shows the next step from the dashboard endpoint', async () => {
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/study-plan/dashboard/12`, () =>
+      http.get(`${API}/api/v4/study-plan/classes/12/dashboard`, () =>
         HttpResponse.json({ success: true, data: { state: 'weekly_progress', week: [{ date: today, label: 'Mon', task_count: 2, completed_count: 1, is_today: true }] } }),
       ),
     );
@@ -279,7 +303,7 @@ describe('JourneyCard', () => {
   });
 
   it('renders nothing without journey data', async () => {
-    server.use(activePlan, http.get(`${API}/api/v1/study-plan/dashboard/12`, () => HttpResponse.json({ success: true, data: null })));
+    server.use(activePlan, http.get(`${API}/api/v4/study-plan/classes/12/dashboard`, () => HttpResponse.json({ success: true, data: null })));
     const { container } = renderWithProviders(<JourneyCard />, { exam: cbse });
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });

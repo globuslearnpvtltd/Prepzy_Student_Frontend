@@ -130,7 +130,8 @@ export const MOCKS: Record<string, unknown> = {
       ['Zoology', 9, 19],
       ['Physics', 4, 20],
       ['Chemistry', 12, 20],
-    ].map(([s, c, t]) => ({
+    ].map(([s, c, t], i) => ({
+      subject_id: i + 1,
       subject_name: `NEET-${s}`,
       completed_chapters: c,
       total_chapters: t,
@@ -301,4 +302,108 @@ for (const doubts of ['/api/v4/chat/board/1/doubts', '/api/v4/chat/competitive/2
   const reply = MOCKS['/api/chat/step_solver_chat_interaction/v2'] as { chat_id: number; llm_responses: string; is_first_query: boolean; current_card_no: number };
   MOCKS[`${doubts}/chats/900/ask`] = v4({ ...reply, text: reply.llm_responses, image: null, reached_final_solution: false });
   MOCKS[`${doubts}/chats/900/concept-cards`] = v4(MOCKS['/api/chat/step_solver_concept_card/v1']);
+}
+// The new app's test library reads v4 assessment routes (/api/v4/assessments/:category/:examId/:testType/…);
+// same data as the old keys above, in the v4 shape.
+{
+  type Row = Record<string, unknown>;
+  const board = '/api/v4/assessments/board/1';
+  const neet = '/api/v4/assessments/competitive/2';
+  const activeExams = MOCKS['/api/active-exams'] as Record<'mock_result' | 'pyq_result', Row[]>;
+  MOCKS[`${board}/mock/subjects`] = v4(activeExams.mock_result);
+  MOCKS[`${board}/pyq/subjects`] = v4(activeExams.pyq_result);
+  const boardPapers = (path: string) => {
+    const old = dataOf(path) as { papers: Row[]; filterOptions: { subjectOptions: Row[] } };
+    const papers = old.papers.map((p): Row => ({
+      ...p,
+      subject_name: p.subject,
+      total_questions: p.totalQuestion,
+      latest_marks: p.latest_mark ?? null,
+      latest_attempt_id: p.attempt_id ?? null,
+      attempt_count: p.attempts ?? 0,
+      last_attempted_at: p.last_attempted_date ?? null,
+    }));
+    const count = (status: string) => papers.filter((p) => p.status === status).length;
+    return v4({
+      papers,
+      stats: { total: papers.length, completed: count('completed'), in_progress: count('in_progress'), pending: count('pending') },
+      subjects: old.filterOptions.subjectOptions.map((s) => ({ subject_id: s.subjectId, subject_title: s.subject })),
+    });
+  };
+  MOCKS[`${board}/mock/sets`] = boardPapers('/api/mock-exams/fetch-mock-sets');
+  MOCKS[`${board}/pyq/sets`] = boardPapers('/api/pyq-exams/fetch-pyq-sets');
+  const sets = (path: string, key: string) =>
+    v4({ sets: ((dataOf(path) as Record<string, Row[]>)[key] ?? []).map((s) => ({ ...s, set_number: s.setName ?? null, subject_name: s.subjectName ?? null })) });
+  MOCKS[`${neet}/mock/sets`] = sets('/api/neet/mock-exam/fetch-mock-exams', 'mockExams');
+  MOCKS[`${neet}/pyq/sets`] = sets('/api/neet/pyq-exam/fetch-pyq-exams', 'pyqExams');
+  for (const [type, old] of [
+    ['mock', '/api/neet/mock-exam/fetch-mock'],
+    ['pyq', '/api/neet/pyq-exam/fetch-pyq'],
+  ] as const) {
+    MOCKS[`${neet}/${type}/best-score`] = v4((dataOf(`${old}-best-score`) as { bestScore: unknown }).bestScore);
+    MOCKS[`${neet}/${type}/attempts`] = v4((dataOf(old.replace('fetch-', 'fetch-recent-') + '-attempts') as { attempts: unknown }).attempts);
+  }
+  MOCKS[`${neet}/custom/sets`] = v4({ sets: (MOCKS['/api/neet/custom-exam/saved-tests'] as { sets: unknown }).sets });
+  MOCKS[`${neet}/custom/attempts`] = v4((MOCKS['/api/neet/custom-exam/past-attempts'] as { attempts: unknown }).attempts);
+  MOCKS[`${board}/custom/sets`] = v4({ sets: (MOCKS['/api/custom-exams/get-custom-exam-set-list/12'] as { sets: unknown }).sets });
+  MOCKS[`${board}/custom/sets/71/attempts`] = v4({
+    set_id: 71,
+    attempts: (MOCKS['/api/custom-exams/custom-exam-submissions-list/71'] as { submissions: Row[] }).submissions.map(({ id, ...rest }) => ({
+      attempt_id: id,
+      ...rest,
+    })),
+  });
+  MOCKS[`${neet}/dpp/months`] = v4((dataOf('/api/neet/get-dpp-months') as { months: unknown }).months);
+  MOCKS[`${neet}/dpp/sets`] = v4(
+    (dataOf('/api/neet/get-dpp-list') as { list: Row[] }).list.map((d) => ({ ...d, attempted: !!d.attempted })),
+  );
+  const live = dataOf('/api/neet/get-live-dpp-neet') as Row;
+  MOCKS[`${neet}/dpp/live`] = v4({ ...live, question_count: live.questionCount });
+}
+// The new app's board exam player (all seven test types) reads v4 routes; same questions and graded answers as the
+// old mock-exam keys above. Mocks are per path: a start (POST …/sets/:id/attempts) for sets 8 / 10, results of
+// attempts 1 / 300.
+{
+  const oldQuestions = MOCKS['/api/v1/exams/mock-exam/fetch-mock-questions'] as { questions: unknown[]; time_left: number };
+  const oldResult = MOCKS['/api/v1/exams/mock-exam/fetch-mock-responses'] as {
+    marks: { total_marks: number; total_marks_obtained: number };
+    responses: unknown[];
+  };
+  for (const type of ['mock', 'pyq', 'chapter-pyq', 'custom', 'mid', 'final', 'quiz']) {
+    const base = `/api/v4/assessments/board/1/${type}`;
+    for (const setId of [8, 10]) {
+      MOCKS[`${base}/sets/${setId}/attempts`] = v4({ attempt_id: 61, set_id: setId, status: 'in_progress', time_left: oldQuestions.time_left, questions: oldQuestions.questions });
+    }
+    MOCKS[`${base}/attempts/61`] = v4({ attempt_id: 61, time_left: oldQuestions.time_left });
+    for (const attemptId of [1, 300]) {
+      MOCKS[`${base}/attempts/${attemptId}/result`] = v4({ attempt_id: attemptId, set_id: 8, ...oldResult.marks, responses: oldResult.responses });
+    }
+  }
+}
+// The new app's competitive exam player (mock, PYQ, chapter PYQ, custom, DPP, practice) reads v4 routes; same
+// questions and result as the old NEET mock keys above, in the v4 shape. (Mocks are per path: a GET of
+// …/mock/sets/:id/attempts — the "View attempts" list — gets this start body too.)
+{
+  const oldStart = dataOf('/api/neet/mock-exam/start-mock-exam') as { questions: unknown[] };
+  const oldResult = dataOf('/api/neet/mock-exam/get-mock-result');
+  for (const type of ['mock', 'pyq', 'chapter-pyq', 'custom', 'dpp', 'practice']) {
+    const base = `/api/v4/assessments/competitive/2/${type}`;
+    for (const setId of [4, 5, 6, 7, 9, 341, 5231]) {
+      MOCKS[`${base}/sets/${setId}/attempts`] = v4({ attempt_id: 61, set_id: setId, status: 'in_progress', time_left: 2 * 3600, questions: oldStart.questions });
+    }
+    MOCKS[`${base}/attempts/61`] = v4({ attempt_id: 61, time_left: 2 * 3600 });
+    MOCKS[`${base}/attempts/1/result`] = v4(oldResult);
+  }
+}
+// Custom test building, problem reports and answer photos on v4; same data as the old keys.
+{
+  const board = '/api/v4/assessments/board/1/custom';
+  const neet = '/api/v4/assessments/competitive/2/custom';
+  MOCKS[`${board}/courses`] = v4((MOCKS['/api/custom-exams/get-custom-exam-course-list/12'] as { courses: unknown }).courses);
+  MOCKS[`${board}/courses/11/modules`] = v4((MOCKS['/api/custom-exams/get-custom-exam-module-list/11'] as { modules: unknown }).modules);
+  const chapters = (MOCKS['/api/neet/custom-exam/chapters/1'] as { chapters: unknown }).chapters;
+  for (const subjectId of [1, 2, 3, 4]) MOCKS[`${neet}/chapters/${subjectId}`] = v4(chapters);
+  MOCKS[`${neet}/chapters/14/topics`] = v4((MOCKS['/api/neet/custom-exam/topics/14'] as { topics: unknown }).topics);
+  MOCKS['/api/v4/assessments/reports'] = { success: true, message: 'Problem reported', data: { report_id: 1, image: null } };
+  MOCKS['/api/v4/assessments/answer-images'] = v4({ url: 'https://res.cloudinary.com/demo/image/upload/sample.jpg', public_id: 'sample' });
 }

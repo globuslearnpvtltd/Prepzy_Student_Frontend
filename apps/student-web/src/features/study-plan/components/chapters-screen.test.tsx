@@ -14,7 +14,7 @@ const cbse = testExam('cbse');
 const activePlan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' }] } }),
 );
-const syllabusUrl = `${API}/api/v1/diagnostic/subject-chapter-list/12`;
+const syllabusUrl = `${API}/api/v4/diagnostic/${cbse.category}/${cbse.examId}/classes/12/chapters`;
 const syllabus = [
   {
     subject_id: 1,
@@ -88,7 +88,7 @@ describe('ChaptersScreen', () => {
 
 describe('JourneyCard states', () => {
   const journey = (data: Record<string, unknown>) =>
-    http.get(`${API}/api/v1/study-plan/dashboard/12`, () => HttpResponse.json({ success: true, data }));
+    http.get(`${API}/api/v4/study-plan/classes/12/dashboard`, () => HttpResponse.json({ success: true, data }));
 
   it('offers a diagnostic retake when the plan is complete', async () => {
     server.use(activePlan, journey({ state: 'plan_complete', can_retake_diagnostic: true }));
@@ -120,7 +120,7 @@ describe('JourneyCard states', () => {
     let served = false;
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/study-plan/dashboard/12`, () => {
+      http.get(`${API}/api/v4/study-plan/classes/12/dashboard`, () => {
         served = true;
         return HttpResponse.json({ success: true, data: { state: 'mystery' } });
       }),

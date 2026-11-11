@@ -36,9 +36,9 @@ function StatusPanel({ session, attempt, question, secondsLeft, counts, onSelect
     list.push({ question, index });
     groups.set(question.typeLabel, list);
   });
-  const currentType = question.typeLabel;
-  const [section, setSection] = useState<string | null>(null);
-  const shown = section && groups.has(section) ? section : currentType;
+  // Always the current question's type: Skip / Save & Next / Previous move the highlight across types, and a
+  // tab click jumps to that type's first question (so the two never disagree).
+  const shown = question.typeLabel;
 
   return (
     <div className="flex flex-col">
@@ -74,10 +74,7 @@ function StatusPanel({ session, attempt, question, secondsLeft, counts, onSelect
             type="button"
             role="tab"
             aria-selected={shown === label}
-            onClick={() => {
-              setSection(label);
-              onSelect(groups.get(label)![0]!.index);
-            }}
+            onClick={() => onSelect(groups.get(label)![0]!.index)}
             className={cx(
               'rounded-[36px] border-[1.5px] px-1 py-2.5 text-[12px] font-bold',
               shown === label ? 'bg-info-700 border-info-700 text-on-brand' : 'border-info-50 text-neutral-900',
@@ -88,7 +85,7 @@ function StatusPanel({ session, attempt, question, secondsLeft, counts, onSelect
         ))}
       </div>
       <nav aria-label="Questions" className="flex max-h-[260px] flex-col gap-2.5 overflow-y-auto">
-        {(groups.get(shown) ?? []).map(({ question, index }, i) => {
+        {(groups.get(shown) ?? []).map(({ question, index }) => {
           const saved = isAnswered(attempt.snapshot.answers[question.id]);
           return (
             <button
@@ -103,7 +100,8 @@ function StatusPanel({ session, attempt, question, secondsLeft, counts, onSelect
               )}
             >
               <Tick on={saved} />
-              Question {i + 1}
+              {/* The paper-wide number, the same one the question card shows. */}
+              Question {index + 1}
             </button>
           );
         })}

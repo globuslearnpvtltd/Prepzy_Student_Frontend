@@ -21,12 +21,13 @@ describe('BoardAssessments: full length exams', () => {
   it('links each subject to its mock or past-year papers', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/v4/assessments/board/subjects`, () =>
-        HttpResponse.json({
-          success: true, data: {
-          mock_result: [{ subject_id: 3, subject_title: 'PHYSICS', exam_count: 4 }],
-          pyq_result: [{ subject_id: 5, subject_title: 'CHEMISTRY', exam_count: 2 }] } }),
+      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () =>
+        HttpResponse.json({ success: true, data: [{ subject_id: 3, subject_title: 'PHYSICS', exam_count: 4 }] }),
       ),
+      http.get(`${API}/api/v4/assessments/board/1/pyq/subjects`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get('class_id')).toBe('12');
+        return HttpResponse.json({ success: true, data: [{ subject_id: 5, subject_title: 'CHEMISTRY', exam_count: 2 }] });
+      }),
     );
     renderWithProviders(<BoardAssessments />, { exam: cbse });
     const physics = await screen.findByRole('link', { name: /physics/ });
@@ -40,12 +41,12 @@ describe('BoardAssessments: full length exams', () => {
   });
 
   it('says "Coming Soon" without subjects and shows load errors', async () => {
-    server.use(plan, http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: true, data: { mock_result: [] } })));
+    server.use(plan, http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () => HttpResponse.json({ success: true, data: [] })));
     const { unmount } = renderWithProviders(<BoardAssessments />, { exam: cbse });
     expect(await screen.findByText('Coming Soon...')).toBeInTheDocument();
     unmount();
 
-    server.use(http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: false, message: 'No subjects' })));
+    server.use(http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () => HttpResponse.json({ success: false, message: 'No subjects' })));
     renderWithProviders(<BoardAssessments />, { exam: cbse });
     expect(await screen.findByText('No subjects')).toBeInTheDocument();
   });
@@ -53,8 +54,8 @@ describe('BoardAssessments: full length exams', () => {
   it('opens the custom test builder from a study-plan link and cleans the URL', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/v4/assessments/board/subjects`, () => HttpResponse.json({ success: true })),
-      http.get(`${API}/api/custom-exams/get-custom-exam-course-list/12`, () => HttpResponse.json({ success: true, courses: [] })),
+      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () => HttpResponse.json({ success: true })),
+      http.get(`${API}/api/v4/assessments/board/1/custom/courses`, () => HttpResponse.json({ success: true, data: [] })),
     );
     window.history.replaceState(null, '', '/cbse/assessments?open=custom-test&x=1');
     renderWithProviders(<BoardAssessments />, { exam: cbse });
@@ -68,22 +69,20 @@ describe('BoardPaperSets', () => {
     const asked: string[] = [];
     server.use(
       plan,
-      http.get(`${API}/api/mock-exams/fetch-mock-sets`, ({ request }) => {
+      http.get(`${API}/api/v4/assessments/board/1/mock/sets`, ({ request }) => {
         const params = new URL(request.url).searchParams;
-        asked.push(`${params.get('subject')}:${params.get('status') ?? ''}`);
+        asked.push(`${params.get('subject_id')}:${params.get('status') ?? ''}`);
         return HttpResponse.json({
           success: true,
           data: {
             papers: [
-              { set_id: 8, set_number: 2, subject: 'Physics', status: 'in_progress', current_progress: 40, duration: '2 hrs', totalQuestion: 30, total_marks: 70 },
-              { set_id: 9, set_number: 3, subject: 'Physics', status: 'completed', total_marks: 0, latest_mark: 0, last_attempted_date: '2026-10-01', attempts: 1 },
+              { set_id: 8, set_number: 2, subject_name: 'Physics', status: 'in_progress', current_progress: 40, duration: '2 hrs', total_questions: 30, total_marks: 70 },
+              { set_id: 9, set_number: 3, subject_name: 'Physics', status: 'completed', total_marks: 0, latest_marks: 0, last_attempted_at: '2026-10-01', attempt_count: 1 },
             ],
-            filterOptions: {
-              subjectOptions: [
-                { subjectId: 3, subject: 'Physics' },
-                { subjectId: 4, subject: 'Chemistry' },
-              ],
-            },
+            subjects: [
+              { subject_id: 3, subject_title: 'Physics' },
+              { subject_id: 4, subject_title: 'Chemistry' },
+            ],
           },
         });
       }),

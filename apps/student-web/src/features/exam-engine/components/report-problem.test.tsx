@@ -10,7 +10,7 @@ describe('report a problem', () => {
   it('sends the section and description as multipart form data', async () => {
     let sent: string | null = null;
     server.use(
-      http.post(`${API}/api/report-problem`, async ({ request }) => {
+      http.post(`${API}/api/v4/assessments/reports`, async ({ request }) => {
         sent = await request.text();
         return HttpResponse.json({ success: true, message: 'Problem Reported Successfully' });
       }),

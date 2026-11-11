@@ -8,13 +8,15 @@ import { DiagnosticSetupScreen } from './setup-screen';
 import { testExam } from '@/test/exams';
 
 const cbse = testExam('cbse');
+/** The v4 diagnostic routes of the test exam. */
+const DIAGNOSTIC = `${API}/api/v4/diagnostic/${cbse.category}/${cbse.examId}`;
 
 const activePlan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' }] } }),
 );
-const status = (data: Record<string, unknown>) => http.get(`${API}/api/v1/diagnostic/status/12`, () => HttpResponse.json({ success: true, data }));
+const status = (data: Record<string, unknown>) => http.get(`${DIAGNOSTIC}/classes/12/status`, () => HttpResponse.json({ success: true, data }));
 const chapters = (list: unknown[], rules = { min_chapters_total: 2, max_chapters_per_subject: 2 }) =>
-  http.get(`${API}/api/v1/diagnostic/subject-chapter-list/12`, () => HttpResponse.json({ success: true, data: { subject_chapter_list: list, rules } }));
+  http.get(`${DIAGNOSTIC}/classes/12/chapters`, () => HttpResponse.json({ success: true, data: { subject_chapter_list: list, rules } }));
 
 const syllabus = [
   {
@@ -27,7 +29,7 @@ const syllabus = [
   },
   { subject_id: 2, subject_name: 'Chemistry', courses: [{ course_id: 8, course_name: 'Chemistry Part 1', modules: [{ module_id: 6, module_name: 'ATOMS', topic_count: 4, is_selectable: true }] }] },
 ];
-const blueprint = http.post(`${API}/api/v1/diagnostic/blueprint-preview`, async ({ request }) => {
+const blueprint = http.post(`${DIAGNOSTIC}/classes/12/blueprint`, async ({ request }) => {
   const { module_ids: ids } = (await request.json()) as { module_ids: number[] };
   return ids.length >= 2
     ? HttpResponse.json({ success: true, data: { is_valid: true, subject_count: 2, chapter_count: ids.length, total_questions: 1, duration_seconds: 60 } })
@@ -135,14 +137,14 @@ describe('DiagnosticSetupScreen', () => {
       activePlan,
       status({ state: 'available' }),
       chapters(syllabus, { min_chapters_total: 1, max_chapters_per_subject: 2 }),
-      http.post(`${API}/api/v1/diagnostic/blueprint-preview`, () =>
+      http.post(`${DIAGNOSTIC}/classes/12/blueprint`, () =>
         HttpResponse.json({ success: true, data: { is_valid: true, subject_count: 1, chapter_count: 1, total_questions: 5, duration_seconds: 300 } }),
       ),
-      http.post(`${API}/api/v1/diagnostic/start-test`, () => {
+      http.post(`${DIAGNOSTIC}/classes/12/attempts`, () => {
         calls += 1;
         return calls === 1
           ? HttpResponse.json({ success: true, data: {} })
-          : HttpResponse.json({ message: 'Try again tomorrow' }, { status: 429 });
+          : HttpResponse.json({ success: false, message: 'You can take the diagnostic again in 3 day(s).', code: 'DIAGNOSTIC_COOLDOWN', data: null, details: { days_until_next: 3 } }, { status: 429 });
       }),
     );
     renderWithProviders(<DiagnosticSetupScreen />, { exam: cbse });

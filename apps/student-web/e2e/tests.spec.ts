@@ -27,6 +27,27 @@ test('board: a CBSE mock test from the list through submit to the result', async
       submitted = body;
       return { success: true, data: { attempt_id: 300 } };
     },
+    'POST /api/v4/assessments/board/1/mock/sets/10/attempts': {
+      success: true,
+      data: {
+        attempt_id: 61,
+        set_id: 10,
+        status: 'in_progress',
+        time_left: 3600,
+        questions: [
+          mcq(1, 'Which of the following is the SI unit of electric charge?', ['Ampere', 'Coulomb']),
+          mcq(2, 'The force between two charges is given by which law?', ["Ohm's law", "Coulomb's law"]),
+        ],
+      },
+    },
+    'PUT /api/v4/assessments/board/1/mock/attempts/61': { success: true, data: { attempt_id: 61, time_left: 3500 } },
+    'POST /api/v4/assessments/board/1/mock/attempts/61/submit': (body) => {
+      submitted = body;
+      return {
+        success: true,
+        data: { attempt_id: 300, summary: { total_questions: 2, total_marks: 4, total_marks_obtained: 3 } },
+      };
+    },
   });
 
   await page.goto('/cbse/tests');
@@ -45,11 +66,17 @@ test('board: a CBSE mock test from the list through submit to the result', async
   const dialog = page.getByRole('dialog', { name: 'Submit your test?' });
   await expect(dialog).toContainText('1 of 2');
   await dialog.getByRole('button', { name: 'Submit', exact: true }).click();
+  // The submit answers with the score: the player shows it before the full result.
+  const done = page.getByRole('dialog', { name: 'Test Completed!' });
+  await expect(done).toContainText('3 / 4');
+  await done.getByRole('button', { name: 'View result' }).click();
 
   await expect(page).toHaveURL(/\/cbse\/tests\/mock\/result\/300$/);
   await expect(page.getByRole('heading', { name: 'Your Score' })).toBeVisible();
   await expect(page.getByText('3/4')).toBeVisible();
-  expect(submitted).toBeTruthy();
+  expect(submitted).toMatchObject({
+    answers: [{ question_id: 1, status: 'saved', selected_answer: { text: '12' } }, { question_id: 2 }],
+  });
 });
 
 test('competitive: create a custom test from subject, chapter and topics', async ({ page, context }) => {
@@ -60,11 +87,18 @@ test('competitive: create a custom test from subject, chapter and topics', async
       generated = body;
       return { success: true, set_id: 77 };
     },
-    'POST /api/neet/custom-exam/start-custom-exam': {
+    'POST /api/v4/assessments/competitive/2/custom/sets': (body) => {
+      generated = body;
+      return { success: true, message: 'Custom test created', data: { set_id: 77, set_number: 1, total: 1, total_marks: 4, difficulty_level: 'hard' } };
+    },
+    'POST /api/v4/assessments/competitive/2/custom/sets/77/attempts': {
       success: true,
       data: {
+        attempt_id: 61,
+        set_id: 77,
+        status: 'in_progress',
         name: 'Cell: The Unit of Life',
-        session_expiry_time: new Date(Date.now() + 3600_000).toISOString(),
+        time_left: 3600,
         questions: [
           {
             question_id: 1,
@@ -93,7 +127,7 @@ test('competitive: create a custom test from subject, chapter and topics', async
   await expect(page).toHaveURL(/\/neet\/tests\/custom\/77$/);
   await expect(page.getByText('Who proposed the cell theory?')).toBeVisible();
   await expect(page.getByRole('timer')).toBeVisible();
-  expect(generated).toEqual({ module_id: 14, lecture_ids: [1], difficulty_level: 'hard' });
+  expect(generated).toEqual({ module_id: 14, topic_ids: [1], difficulty_level: 'hard' });
 });
 
 const dppQuestions = [
@@ -107,23 +141,50 @@ const dppQuestions = [
   },
 ];
 
-test('competitive: daily practice — today\'s paper from the dashboard to the result, and the paper list', async ({
+test("competitive: daily practice — today's paper from the dashboard to the result, and the paper list", async ({
   page,
   context,
 }) => {
   await signIn(context, 'neet');
-  let submitted: { dpp_id?: unknown; questions?: { selected_option: unknown }[] } = {};
+  let submitted: { answers?: { selected_option: unknown }[] } = {};
   await mockStudentApi(page, 'competitive', {
     'GET /api/neet/start-dpp-attempt': (_body, url) => {
       expect(url.searchParams.get('dpp_id')).toBe('9');
       return { success: true, attempt_id: 610, time_left: 1800, questions: dppQuestions };
     },
     'PUT /api/neet/update-dpp-session-questions': { success: true },
-    'POST /api/neet/submit-dpp-attempt': (body) => {
+    'POST /api/neet/submit-dpp-attempt': { success: true },
+    // v4 player (the new app's calls)
+    'POST /api/v4/assessments/competitive/2/dpp/sets/9/attempts': {
+      success: true,
+      data: { attempt_id: 610, set_id: 9, status: 'in_progress', time_left: 1800, questions: dppQuestions },
+    },
+    'PUT /api/v4/assessments/competitive/2/dpp/attempts/610': { success: true, data: { attempt_id: 610 } },
+    'POST /api/v4/assessments/competitive/2/dpp/attempts/610/submit': (body) => {
       submitted = body as typeof submitted;
-      return { success: true };
+      return {
+        success: true,
+        data: {
+          attempt_id: 610,
+          summary: {
+            total_questions: 1,
+            total_marks: 4,
+            total_marks_obtained: 4,
+            correct_answers: 1,
+            incorrect_answers: 0,
+            unattempted: 0,
+          },
+        },
+      };
     },
     'GET /api/neet/get-dpp-result': {
+      success: true,
+      data: {
+        summary: { name: 'Daily practice · 14 Nov', total_marks: 4, total_marks_obtained: 4 },
+        questions: [{ ...dppQuestions[0], selected_option_id: 12, correct_option_id: 12, is_correct: 1 }],
+      },
+    },
+    'GET /api/v4/assessments/competitive/2/dpp/attempts/610/result': {
       success: true,
       data: {
         summary: { name: 'Daily practice · 14 Nov', total_marks: 4, total_marks_obtained: 4 },
@@ -137,11 +198,14 @@ test('competitive: daily practice — today\'s paper from the dashboard to the r
   await expect(page).toHaveURL(/\/neet\/tests\/dpp\/9$/);
   await page.getByRole('radio', { name: /Mitochondria/ }).click();
   await page.getByRole('button', { name: /Submit test/i }).click();
-  await page.getByRole('dialog', { name: 'Submit your test?' }).getByRole('button', { name: 'Submit', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Submit your test?' })
+    .getByRole('button', { name: 'Submit', exact: true })
+    .click();
+  await page.getByRole('dialog', { name: 'Test Completed!' }).getByRole('button', { name: 'View result' }).click();
   await expect(page).toHaveURL(/\/neet\/tests\/dpp\/result\/610$/);
   await expect(page.getByLabel('Score 4 out of 4')).toBeVisible();
-  expect(submitted.dpp_id).toBe('9');
-  expect(submitted.questions?.[0]?.selected_option).toBe(12);
+  expect(submitted.answers?.[0]?.selected_option).toBe(12);
 
   await page.goto('/neet/daily-practice');
   await expect(page.getByRole('heading', { name: 'Daily Practice', level: 1 })).toBeVisible();
@@ -149,5 +213,7 @@ test('competitive: daily practice — today\'s paper from the dashboard to the r
   await expect(today).toContainText('15 questions');
   await expect(today.getByRole('link', { name: 'Start Now' })).toHaveAttribute('href', '/neet/tests/dpp/9');
   const papers = page.getByRole('region', { name: 'All practice papers' });
-  await expect(papers.getByRole('listitem').filter({ hasText: '12 Nov' }).getByRole('link', { name: 'Result' })).toBeVisible();
+  await expect(
+    papers.getByRole('listitem').filter({ hasText: '12 Nov' }).getByRole('link', { name: 'Result' }),
+  ).toBeVisible();
 });

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { modulesOf, toSentenceCase, useClassContext, useSyllabus, type DiagnosticRules, type SyllabusSubject } from '@/features/study-plan';
 import { BackButton, Breadcrumb, Notice, ProgressRing, ScreenLoader, stickyFooter } from '@/features/study-plan/ui';
+import type { ExamRef } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { isApiError, userMessage } from '@/shared/lib/errors';
 import { diagnosticApi, formatDuration } from '../api';
@@ -269,6 +270,7 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 function BlueprintReview({
   subjects,
   selected,
+  exam,
   classId,
   onRemove,
   onAdd,
@@ -278,6 +280,7 @@ function BlueprintReview({
 }: {
   subjects: SyllabusSubject[];
   selected: number[];
+  exam: ExamRef;
   classId: number;
   onRemove: (id: number) => void;
   onAdd: (subjectId: number) => void;
@@ -287,7 +290,7 @@ function BlueprintReview({
 }) {
   const blueprint = useQuery({
     queryKey: ['diagnostic', 'blueprint', classId, selected],
-    queryFn: () => diagnosticApi.blueprint(classId, selected),
+    queryFn: () => diagnosticApi.blueprint(exam, classId, selected),
     placeholderData: (previous) => previous,
   });
   const grouped = subjects
@@ -393,7 +396,7 @@ function BlueprintReview({
 export function DiagnosticSetupScreen() {
   const router = useRouter();
   const { exam, classId, isPending } = useClassContext();
-  const status = useQuery({ queryKey: ['diagnostic', 'status', classId], queryFn: () => diagnosticApi.status(classId!), enabled: !!classId });
+  const status = useQuery({ queryKey: ['diagnostic', 'status', classId], queryFn: () => diagnosticApi.status(exam!, classId!), enabled: !!exam && !!classId });
   const syllabus = useSyllabus(classId, exam?.examId ?? 0);
   const [step, setStep] = useState<1 | 2>(1);
   const [selected, setSelected] = useState<number[]>([]);
@@ -415,7 +418,7 @@ export function DiagnosticSetupScreen() {
   const subjectOf = useMemo(() => new Map(subjects.flatMap((s) => modulesOf(s).map((m) => [m.id, s.id] as const))), [subjects]);
 
   const start = useMutation({
-    mutationFn: () => diagnosticApi.start(classId!, selected),
+    mutationFn: () => diagnosticApi.start(exam!, classId!, selected),
     onSuccess: (id) => router.replace(routes.diagnosticTest(slug, id)),
     onError: (error) => {
       if (isApiError(error) && error.status === 429) router.replace(routes.diagnosticResult(slug));
@@ -455,6 +458,7 @@ export function DiagnosticSetupScreen() {
         <BlueprintReview
           subjects={subjects}
           selected={selected}
+          exam={exam!}
           classId={classId!}
           onRemove={(id) => setSelected((prev) => prev.filter((m) => m !== id))}
           onAdd={(subjectId) => {

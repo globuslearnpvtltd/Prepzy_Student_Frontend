@@ -191,10 +191,11 @@ function SetCard({ set, kind }: { set: LibrarySet; kind: LibraryKind }) {
 }
 
 function AttemptsDialog({ set, kind }: { set: LibrarySet; kind: LibraryKind }) {
+  const exam = useExam();
   const [open, setOpen] = useState(false);
   const attempts = useQuery({
-    queryKey: ['test-library', kind, 'attempts', set.setId],
-    queryFn: () => libraryApi.setAttempts(kind, set.setId),
+    queryKey: ['test-library', exam.slug, kind, 'attempts', set.setId],
+    queryFn: () => libraryApi.setAttempts(exam, kind, set.setId),
     enabled: open,
   });
   return (

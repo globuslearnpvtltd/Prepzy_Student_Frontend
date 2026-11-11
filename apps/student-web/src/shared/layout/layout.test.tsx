@@ -44,7 +44,7 @@ const boardPlan = (extra: RawPlan = {}): RawPlan => ({
 const plans = (...rows: RawPlan[]) =>
   http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: rows } }));
 const studyPlan = (hasPlan: boolean) =>
-  http.get(`${API}/api/v1/study-plan/status/:classId`, () => HttpResponse.json({ success: true, data: { has_plan: hasPlan } }));
+  http.get(`${API}/api/v4/study-plan/classes/:classId/status`, () => HttpResponse.json({ success: true, data: { has_plan: hasPlan } }));
 
 function renderShell(slug: 'cbse' | 'neet') {
   return renderWithProviders(
@@ -290,8 +290,8 @@ describe('competitive shell', () => {
       purchased(['neet-ug', 'NEET-UG']),
       account,
       neetPlan,
-      http.get(`${API}/api/neet/get-live-dpp-neet`, () =>
-        HttpResponse.json({ success: true, data: { dpp: { dpp_id: 31, dpp_name: 'DPP #3' }, questionCount: 10, attempt: null } }),
+      http.get(`${API}/api/v4/assessments/competitive/2/dpp/live`, () =>
+        HttpResponse.json({ success: true, data: { dpp: { dpp_id: 31, dpp_name: 'DPP #3' }, question_count: 10, attempt: null } }),
       ),
     );
     const { container } = renderShell('neet');
@@ -328,10 +328,10 @@ describe('daily practice resolution', () => {
 
   it("falls back to the latest month's first paper, then to the Daily Practice page", async () => {
     server.use(
-      http.get(`${API}/api/neet/get-dpp-months`, () => HttpResponse.json({ success: true, data: { months: [{ first_dpp_id: 12 }] } })),
+      http.get(`${API}/api/v4/assessments/competitive/2/dpp/months`, () => HttpResponse.json({ success: true, data: [{ first_dpp_id: 12 }] })),
     );
     expect(await resolveDailyPractice(neet, live(null))).toBe('/neet/tests/dpp/12');
-    server.use(http.get(`${API}/api/neet/get-dpp-months`, () => HttpResponse.json({ success: true, data: { months: [] } })));
+    server.use(http.get(`${API}/api/v4/assessments/competitive/2/dpp/months`, () => HttpResponse.json({ success: true, data: [] })));
     expect(await resolveDailyPractice(neet, live(null))).toBe('/neet/daily-practice');
     expect(await resolveDailyPractice(neet, () => Promise.reject(new Error('offline')))).toBe('/neet/daily-practice');
   });
@@ -353,12 +353,12 @@ describe('shell API', () => {
           data: { suggestions: [{ result_name: 'Cell cycle', module_name: 'Cell Division', subject_name: 'NEET-BOTANY' }] },
         }),
       ),
-      http.get(`${API}/api/neet/get-live-dpp-neet`, () =>
+      http.get(`${API}/api/v4/assessments/competitive/2/dpp/live`, () =>
         HttpResponse.json({
           success: true,
           data: {
             dpp: { dpp_id: 9, dpp_name: 'Daily #21' },
-            questionCount: '15',
+            question_count: '15',
             attempted_questions: 4,
             subjects: [{ subject_name: 'NEET-ZOOLOGY' }],
             attempt: { status: 'in_progress', attempt_id: 3 },

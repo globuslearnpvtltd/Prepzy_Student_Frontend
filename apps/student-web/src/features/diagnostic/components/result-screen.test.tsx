@@ -8,6 +8,8 @@ import { DiagnosticResultScreen, overview } from './result-screen';
 import { testExam } from '@/test/exams';
 
 const cbse = testExam('cbse');
+/** The v4 diagnostic routes of the test exam. */
+const DIAGNOSTIC = `${API}/api/v4/diagnostic/${cbse.category}/${cbse.examId}`;
 
 const activePlan = http.get(`${API}/api/v4/student/plans/active`, () =>
   HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' }] } }),
@@ -67,7 +69,7 @@ describe('DiagnosticResultScreen', () => {
   it('shows the AI report, links to the built plan and explains unknown levels with defaults', async () => {
     server.use(
       activePlan,
-      http.get(`${API}/api/v1/diagnostic/diagnostic-results/12`, () =>
+      http.get(`${DIAGNOSTIC}/classes/12/result`, () =>
         HttpResponse.json({
           success: true,
           data: {
@@ -84,7 +86,7 @@ describe('DiagnosticResultScreen', () => {
           },
         }),
       ),
-      http.get(`${API}/api/v1/study-plan/status/12`, () => HttpResponse.json({ success: true, data: { can_create: false, has_plan: true } })),
+      http.get(`${API}/api/v4/study-plan/classes/12/status`, () => HttpResponse.json({ success: true, data: { can_create: false, has_plan: true } })),
     );
     renderWithProviders(<DiagnosticResultScreen />, { exam: cbse });
     expect(await screen.findByText('Based on 30 questions across 3 subjects')).toBeInTheDocument();

@@ -2,10 +2,10 @@ import { http, HttpResponse } from 'msw';
 import { API, server } from '@/test/server';
 import { emptySnapshot, withAnswer, withMarkToggled, withVisit } from '../attempt';
 import { AlreadySubmittedError, type TestContext } from '../model';
-import { boardSnapshot, toBoardPayload, toBoardQuestion, toBoardResultQuestion, type RawBoardQuestion } from './board';
+import { boardSnapshot, toBoardAnswers, toBoardQuestion, toBoardResultQuestion, type RawBoardQuestion } from './board';
 import {
   competitiveSnapshot,
-  toCompetitivePayload,
+  toCompetitiveAnswers,
   toCompetitiveResultQuestion,
   type RawCompetitiveQuestion,
 } from './competitive';
@@ -50,7 +50,7 @@ describe('board adapter mapping', () => {
     expect(toBoardQuestion({ question_id: 9, question_type: 'odd_type' }).typeLabel).toBe('Odd type');
   });
 
-  it('writes every answer back in the backend shape (not just the current question)', () => {
+  it('sends every answer by question id (not just the current question, never the questions)', () => {
     let snap = withAnswer(emptySnapshot(), '1', { kind: 'option', optionId: '11' });
     snap = withAnswer(snap, '2', {
       kind: 'written',
@@ -58,22 +58,20 @@ describe('board adapter mapping', () => {
       images: [{ url: 'https://img/a.png', publicId: 'a' }],
     });
     snap = withAnswer(snap, '3', { kind: 'parts', parts: { '31': { text: 'Part A', images: [] } } });
-    const [mcq, written, multipart] = toBoardPayload([boardMcq, boardWritten, boardCase], snap);
+    const [mcq, written, multipart] = toBoardAnswers([boardMcq, boardWritten, boardCase], snap);
 
-    expect(mcq).toMatchObject({
-      status: 'saved',
-      selected_answer: { text: 11, images: [{ url: 'https://img/4.png', public_id: '' }] },
-    });
+    expect(mcq).toEqual({ question_id: 1, status: 'saved', selected_answer: { text: '11', images: [] } });
     expect(written?.selected_answer).toEqual({
       text: '<p>Because &lt;light&gt;</p><p><img src="https://img/a.png" alt="Answer image"></p>',
       images: [{ url: 'https://img/a.png', public_id: 'a' }],
     });
-    expect(multipart?.sub_questions?.[0]?.selected_answer).toMatchObject({ text: '<p>Part A</p>' });
-    expect(multipart?.sub_questions?.[1]?.selected_answer).toEqual({ text: null, images: [] });
+    expect(multipart?.sub_answers?.[0]).toMatchObject({ id: 31, selected_answer: { text: '<p>Part A</p>' } });
+    expect(multipart?.sub_answers?.[1]?.selected_answer).toEqual({ text: null, images: [] });
+    expect(JSON.stringify([mcq, written, multipart])).not.toMatch(/question_text|options/);
   });
 
   it('marks visited-but-blank questions as skipped and untouched ones as unanswered', () => {
-    const payload = toBoardPayload([boardMcq, boardWritten], withVisit(emptySnapshot(), '1'));
+    const payload = toBoardAnswers([boardMcq, boardWritten], withVisit(emptySnapshot(), '1'));
     expect(payload.map((q) => q.status)).toEqual(['skipped', 'unanswered']);
   });
 
@@ -142,7 +140,7 @@ describe('competitive adapter mapping', () => {
   it('serialises NEET statuses and selected options', () => {
     let snap = withAnswer(emptySnapshot(), '1', { kind: 'option', optionId: '6' });
     snap = withMarkToggled(snap, '2');
-    const payload = toCompetitivePayload(raws, snap);
+    const payload = toCompetitiveAnswers(raws, snap);
     expect(payload.map((q) => [q.selected_option, q.status])).toEqual([
       [6, 'answered'],
       [null, 'marked_for_review'],
@@ -181,46 +179,40 @@ describe('competitive adapter mapping', () => {
 });
 
 describe('adapters against the API', () => {
-  it('NEET mock: starts with an absolute deadline and submits the full paper', async () => {
+  it('NEET mock: starts with the time left and submits only the choices', async () => {
     let submitted: Record<string, unknown> = {};
+    const v4 = `${API}/api/v4/assessments/competitive/${neet.exam.examId}/mock`;
     server.use(
-      http.post(`${API}/api/neet/mock-exam/start-mock-exam`, () =>
+      http.post(`${v4}/sets/4/attempts`, () =>
         HttpResponse.json({
           success: true,
           data: {
+            attempt_id: 61,
             set_id: 4,
-            session_expiry_time: '2030-01-01T10:00:00.000Z',
-            questions: [
-              { question_id: 1, question_text: 'Q', options: [{ option_id: 5, text: 'A' }], status: 'not_visited' },
-            ],
+            status: 'in_progress',
+            time_left: 3600,
+            questions: [{ question_id: 1, question_text: 'Q', options: [{ option_id: 5, text: 'A' }], status: 'not_visited' }],
           },
         }),
       ),
-      http.post(`${API}/api/neet/mock-exam/submit-mock-exam`, async ({ request }) => {
+      http.post(`${v4}/attempts/61/submit`, async ({ request }) => {
         submitted = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ success: true, data: { attempt_id: 99 } });
+        return HttpResponse.json({ success: true, data: { attempt_id: 99, summary: {} } });
       }),
     );
     const adapter = getTestAdapter(neet.exam, 'mock')!;
+    const before = Date.now();
     const session = await adapter.start(neet, '4');
-    expect(session.deadline).toBe(Date.parse('2030-01-01T10:00:00.000Z'));
-    const result = await adapter.submit(
-      session,
-      withAnswer(session.initial, '1', { kind: 'option', optionId: '5' }),
-      neet,
-    );
+    expect(session.deadline).toBeGreaterThanOrEqual(before + 3_600_000);
+    const result = await adapter.submit(session, withAnswer(session.initial, '1', { kind: 'option', optionId: '5' }), neet);
     expect(result.attemptId).toBe('99');
-    expect(submitted).toMatchObject({
-      set_id: '4',
-      class_id: 20,
-      questions: [{ selected_option: 5, status: 'answered' }],
-    });
+    expect(submitted).toEqual({ class_id: 20, answers: [{ question_id: 1, selected_option: 5, status: 'answered' }] });
   });
 
   it('DPP: an already-submitted paper raises AlreadySubmittedError with its attempt id', async () => {
     server.use(
-      http.get(`${API}/api/neet/start-dpp-attempt`, () =>
-        HttpResponse.json({ already_attempted: true, attempt_id: 55 }),
+      http.post(`${API}/api/v4/assessments/competitive/${neet.exam.examId}/dpp/sets/7/attempts`, () =>
+        HttpResponse.json({ success: true, data: { attempt_id: 55, set_id: 7, status: 'submitted' } }),
       ),
     );
     const error = await getTestAdapter(neet.exam, 'dpp')!
@@ -232,32 +224,31 @@ describe('adapters against the API', () => {
 
   it('board mock: lists subjects and papers for the class', async () => {
     server.use(
-      http.get(`${API}/api/v4/assessments/board/subjects`, ({ request }) => {
+      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, ({ request }) => {
         expect(new URL(request.url).searchParams.get('class_id')).toBe('12');
-        return HttpResponse.json({
-          success: true, data: {
-          mock_result: [{ subject_id: 3, subject_title: 'Physics', exam_count: 2 }],
-          pyq_result: [] } });
+        return HttpResponse.json({ success: true, data: [{ subject_id: 3, subject_title: 'Physics', exam_count: 2 }] });
       }),
-      http.get(`${API}/api/mock-exams/fetch-mock-sets`, () =>
-        HttpResponse.json({
+      http.get(`${API}/api/v4/assessments/board/1/mock/sets`, ({ request }) => {
+        const query = new URL(request.url).searchParams;
+        expect([query.get('subject_id'), query.get('class_id')]).toEqual(['3', '12']);
+        return HttpResponse.json({
           success: true,
           data: {
             papers: [
               {
                 set_id: 8,
                 set_number: 2,
-                subject: 'Physics',
-                totalQuestion: 30,
+                subject_name: 'Physics',
+                total_questions: 30,
                 status: 'completed',
                 total_marks: 80,
-                latest_mark: 61,
-                attempt_id: 300,
+                latest_marks: 61,
+                latest_attempt_id: 300,
               },
             ],
           },
-        }),
-      ),
+        });
+      }),
     );
     const adapter = getTestAdapter(cbse.exam, 'mock')!;
     expect(await adapter.listSubjects!(cbse)).toEqual([{ id: '3', title: 'Physics', count: 2 }]);

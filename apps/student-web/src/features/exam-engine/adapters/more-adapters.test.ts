@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { API, server } from '@/test/server';
 import { withAnswer } from '../attempt';
-import { AlreadySubmittedError, type TestContext } from '../model';
+import type { TestContext } from '../model';
 import { getTestAdapter, listableTestTypes } from './index';
 import { testExam } from '@/test/exams';
 
@@ -29,196 +29,131 @@ const submitStats = {
   partially_correct: 0,
 };
 
-/** Board test types opened from Learn: same payloads as mock papers, their own endpoints. */
-const BOARD_TYPES = [
-  {
-    type: 'chapter-pyq',
-    fetch: '/api/v1/exams/chapter-pyqs/fetch-chapter-pyqs-questions',
-    save: '/api/v1/exams/chapter-pyqs/update-chapter-pyqs-session-questions',
-    submit: '/api/v1/exams/chapter-pyqs/submit-exam',
-    result: '/api/v1/exams/chapter-pyqs/fetch-chapter-pyqs-responses',
-  },
-  {
-    type: 'custom',
-    fetch: '/api/v1/exams/custom-exam/fetch-custom-exam',
-    save: '/api/custom-exams/update-custom-exam-session-questions',
-    submit: '/api/v1/exams/custom-exam/submit-exam',
-    result: '/api/v1/exams/custom-exam/fetch-custom-exam-responses',
-  },
-  {
-    type: 'mid',
-    fetch: '/api/v1/exams/mid-exam/fetch-mid-questions',
-    save: '/api/mid-exams/update-mid-session-questions',
-    submit: '/api/v1/exams/mid-exam/submit-exam',
-    result: '/api/v1/exams/mid-exam/fetch-mid-responses',
-  },
-  {
-    type: 'final',
-    fetch: '/api/v1/exams/final-exam/fetch-final-questions',
-    save: '/api/final-exams/update-final-session-questions',
-    submit: '/api/v1/exams/final-exam/submit-exam',
-    result: '/api/v1/exams/final-exam/fetch-final-responses',
-  },
-  {
-    type: 'quiz',
-    fetch: '/api/v1/exams/quiz/fetch-quiz-questions',
-    save: '/api/quiz-exams/update-quiz-session-questions',
-    submit: '/api/v1/exams/quiz/submit-exam',
-    result: '/api/quiz-exams/fetch-quiz-responses',
-  },
-] as const;
+/** Every board test type runs on the v4 exam player: same payloads, its own test type in the URL. */
+const BOARD_TYPES = ['mock', 'pyq', 'chapter-pyq', 'custom', 'mid', 'final', 'quiz'] as const;
 
-describe.each(BOARD_TYPES)('board $type adapter', ({ type, fetch, save, submit, result }) => {
-  it('fetches, saves, submits with stats and maps the graded result', async () => {
+describe.each(BOARD_TYPES)('board %s adapter', (type) => {
+  const base = `${API}/api/v4/assessments/board/${cbse.exam.examId}/${type}`;
+
+  it('starts, saves only the answers, submits with stats and maps the graded result', async () => {
     const bodies: Record<string, unknown> = {};
     server.use(
-      http.get(`${API}${fetch}`, ({ request }) => {
-        const params = new URL(request.url).searchParams;
-        expect(params.get('set_id')).toBe('31');
-        expect(params.get('class_id')).toBe('12');
-        return HttpResponse.json({ success: true, questions: [boardQuestion], time_left: 600 });
+      http.post(`${base}/sets/31/attempts`, async ({ request }) => {
+        bodies.start = await request.json();
+        return HttpResponse.json({ success: true, data: { attempt_id: 61, set_id: 31, time_left: 600, questions: [boardQuestion] } });
       }),
-      http.put(`${API}${save}`, async ({ request }) => {
+      http.put(`${base}/attempts/61`, async ({ request }) => {
         bodies.save = await request.json();
-        return HttpResponse.json({ success: true });
+        return HttpResponse.json({ success: true, data: { attempt_id: 61, time_left: 590 } });
       }),
-      http.post(`${API}${submit}`, async ({ request }) => {
+      http.post(`${base}/attempts/61/submit`, async ({ request }) => {
         bodies.submit = await request.json();
-        return HttpResponse.json({ success: true, data: { ...submitStats, attempt_id: 700 } });
+        return HttpResponse.json({ success: true, data: { attempt_id: 700, summary: submitStats } });
       }),
-      http.get(`${API}${result}`, () =>
+      http.get(`${base}/attempts/700/result`, () =>
         HttpResponse.json({
           success: true,
-          marks: { total_marks: 1, total_marks_obtained: 1 },
-          responses: [
-            {
-              id: 1,
-              question_type: 'mcq',
-              question_text: '2 + 2?',
-              total_marks: 1,
-              marks_obtained: 1,
-              options: [{ option_id: 11, option_text: '4', isSelected: true, isCorrectAnswer: true }],
-            },
-          ],
+          data: {
+            attempt_id: 700,
+            set_id: 31,
+            total_marks: 1,
+            total_marks_obtained: 1,
+            responses: [
+              {
+                id: 1,
+                question_type: 'mcq',
+                question_text: '2 + 2?',
+                total_marks: 1,
+                marks_obtained: 1,
+                options: [{ option_id: 11, option_text: '4', isSelected: true, isCorrectAnswer: true }],
+              },
+            ],
+          },
         }),
       ),
     );
     const adapter = getTestAdapter(cbse.exam, type)!;
-    expect(adapter.listSets).toBeUndefined();
 
     const before = Date.now();
     const session = await adapter.start(cbse, '31');
+    expect(bodies.start).toEqual({ class_id: 12 });
     expect(session.deadline).toBeGreaterThanOrEqual(before + 600_000);
     const snapshot = withAnswer(session.initial, '1', { kind: 'option', optionId: '11' });
 
     await adapter.save(session, snapshot, cbse);
-    expect(bodies.save).toMatchObject({ set_id: '31', questions: [{ status: 'saved', selected_answer: { text: 11 } }] });
+    expect(bodies.save).toEqual({ answers: [{ question_id: 1, status: 'saved', selected_answer: { text: '11', images: [] } }] });
 
     const outcome = await adapter.submit(session, snapshot, cbse);
     expect(outcome).toEqual({
       attemptId: '700',
       summary: { totalQuestions: 1, totalMarks: 4, obtained: 4, correct: 1, incorrect: 0, partial: 0 },
     });
-    expect(bodies.submit).toMatchObject({ set_id: '31', class_id: 12 });
+    expect(bodies.submit).toMatchObject({ class_id: 12, answers: [{ question_id: 1, status: 'saved' }] });
 
-    const graded = await adapter.result('700');
-    expect(graded).toMatchObject({ totalMarks: 1, obtained: 1, counts: { correct: 1 } });
+    const graded = await adapter.result('700', cbse.exam);
+    expect(graded).toMatchObject({ totalMarks: 1, obtained: 1, counts: { correct: 1 }, assessmentId: '31' });
   });
 });
 
-describe('competitive session adapters', () => {
-  it('chapter PYQ is keyed by module id', async () => {
+/** Every competitive test type runs on the v4 player; chapter PYQs by module id, practice by assessment id. */
+const COMPETITIVE_TYPES = [
+  ['mock', '4'],
+  ['pyq', '5'],
+  ['chapter-pyq', '14'],
+  ['custom', '1'],
+  ['dpp', '7'],
+  ['practice', '40'],
+] as const;
+
+describe.each(COMPETITIVE_TYPES)('competitive %s adapter', (type, setId) => {
+  const base = `${API}/api/v4/assessments/competitive/${neet.exam.examId}/${type}`;
+
+  it('starts, saves only the choices, submits with stats and maps the result', async () => {
     const bodies: unknown[] = [];
     server.use(
-      http.post(`${API}/api/neet/chapter-pyq-exam/start-chapter-pyq-exam`, async ({ request }) => {
+      http.post(`${base}/sets/${setId}/attempts`, async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json({
           success: true,
-          data: { module_id: 14, session_expiry_time: '2030-01-01T00:00:00.000Z', questions: [neetQuestion] },
+          data: { attempt_id: 61, set_id: Number(setId), status: 'in_progress', name: 'Cell biology · Set 1', time_left: 120, questions: [neetQuestion] },
         });
       }),
-      http.put(`${API}/api/neet/chapter-pyq-exam/update-chapter-pyq-session-questions`, async ({ request }) => {
+      http.put(`${base}/attempts/61`, async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ success: true });
+        return HttpResponse.json({ success: true, data: { attempt_id: 61, time_left: 100 } });
       }),
-      http.post(`${API}/api/neet/chapter-pyq-exam/submit-chapter-pyq-exam`, async ({ request }) => {
+      http.post(`${base}/attempts/61/submit`, async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ success: true, data: { ...submitStats, attempt_id: 81 } });
+        return HttpResponse.json({ success: true, data: { attempt_id: 81, summary: submitStats } });
       }),
-      http.get(`${API}/api/neet/chapter-pyq-exam/get-chapter-pyq-result`, () =>
+      http.get(`${base}/attempts/81/result`, () =>
         HttpResponse.json({
           success: true,
           data: {
-            summary: { total_marks: 4, total_marks_obtained: 4 },
+            summary: { total_marks: 4, total_marks_obtained: 4, set_id: Number(setId) },
             questions: [{ ...neetQuestion, selected_option_id: 5, correct_option_id: 5, is_correct: true }],
           },
         }),
       ),
     );
-    const adapter = getTestAdapter(neet.exam, 'chapter-pyq')!;
-    const session = await adapter.start(neet, '14');
-    expect(session.deadline).toBe(Date.parse('2030-01-01T00:00:00.000Z'));
+    const adapter = getTestAdapter(neet.exam, type)!;
+    const before = Date.now();
+    const session = await adapter.start(neet, setId);
+    expect(session.title).toBe('Cell biology · Set 1');
+    expect(session.deadline).toBeGreaterThanOrEqual(before + 120_000);
     const snap = withAnswer(session.initial, '1', { kind: 'option', optionId: '5' });
     await adapter.save(session, snap, neet);
     const outcome = await adapter.submit(session, snap, neet);
     expect(outcome.attemptId).toBe('81');
     expect(outcome.summary?.correct).toBe(1);
-    expect(bodies).toEqual([
-      { module_id: '14', class_id: 20 },
-      { module_id: '14', questions: [expect.objectContaining({ selected_option: 5, status: 'answered' })] },
-      expect.objectContaining({ module_id: '14', class_id: 20 }),
-    ]);
-    expect((await adapter.result('81')).counts.correct).toBe(1);
+    const answers = [{ question_id: 1, status: 'answered', selected_option: 5 }];
+    expect(bodies).toEqual([{ class_id: 20 }, { answers }, { class_id: 20, answers }]);
+    const result = await adapter.result('81', neet.exam);
+    expect(result).toMatchObject({ counts: { correct: 1 }, assessmentId: setId });
   });
+});
 
-  it('custom test: uses remaining seconds and opens the result when time ran out', async () => {
-    server.use(
-      http.post(`${API}/api/neet/custom-exam/start-custom-exam`, async ({ request }) => {
-        const { set_id } = (await request.json()) as { set_id: string };
-        if (set_id === '2')
-          return HttpResponse.json({ success: true, data: { set_id: 2, expired_submitted: true, attempt_id: 64 } });
-        return HttpResponse.json({
-          success: true,
-          data: { set_id: 1, name: 'Cell biology · Set 1', remaining_seconds: 120, questions: [neetQuestion] },
-        });
-      }),
-    );
-    const adapter = getTestAdapter(neet.exam, 'custom')!;
-    const before = Date.now();
-    const session = await adapter.start(neet, '1');
-    expect(session.title).toBe('Cell biology · Set 1');
-    expect(session.deadline).toBeGreaterThanOrEqual(before + 120_000);
-    const error = await adapter.start(neet, '2').catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(AlreadySubmittedError);
-    expect((error as AlreadySubmittedError).attemptId).toBe('64');
-  });
-
-  it('practice questions are keyed by assessment id with a top-level attempt id', async () => {
-    let submitted: unknown;
-    server.use(
-      http.get(`${API}/api/neet/quiz-exam/fetch-quiz-questions`, ({ request }) => {
-        expect(new URL(request.url).searchParams.get('assessment_id')).toBe('40');
-        return HttpResponse.json({ success: true, questions: [neetQuestion], time_left: 300 });
-      }),
-      http.put(`${API}/api/neet/quiz-exam/update-quiz-session-questions`, () => HttpResponse.json({ success: true })),
-      http.post(`${API}/api/neet/quiz-exam/submit-exam`, async ({ request }) => {
-        submitted = await request.json();
-        return HttpResponse.json({ success: true, attempt_id: 12, data: submitStats });
-      }),
-      http.get(`${API}/api/neet/quiz-exam/fetch-quiz-responses`, () =>
-        HttpResponse.json({ success: true, data: { summary: { total_marks: 4, total_marks_obtained: 0 }, questions: [] } }),
-      ),
-    );
-    const adapter = getTestAdapter(neet.exam, 'practice')!;
-    const session = await adapter.start(neet, '40');
-    expect(session.questions).toHaveLength(1);
-    await adapter.save(session, session.initial, neet);
-    const outcome = await adapter.submit(session, session.initial, neet);
-    expect(outcome.attemptId).toBe('12');
-    expect(submitted).toMatchObject({ assessment_id: '40', questions: [{ status: 'not_visited' }] });
-    expect((await adapter.result('12')).totalMarks).toBe(4);
-  });
-
+describe('competitive adapters', () => {
   it('only paper types with a list appear in the tests hub', () => {
     expect(listableTestTypes(cbse.exam)).toEqual(['mock', 'pyq']);
     expect(listableTestTypes(neet.exam)).toEqual(['mock', 'pyq', 'dpp']);

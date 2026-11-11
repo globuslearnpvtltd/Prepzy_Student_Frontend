@@ -24,8 +24,8 @@ const STEPS = [
 export function CustomTests() {
   const exam = useExam();
   const [tab, setTab] = useState<'saved' | 'past'>('saved');
-  const saved = useQuery({ queryKey: ['test-library', exam.slug, 'custom-saved'], queryFn: libraryApi.savedCustomTests });
-  const past = useQuery({ queryKey: ['test-library', exam.slug, 'custom-past'], queryFn: libraryApi.pastCustomAttempts });
+  const saved = useQuery({ queryKey: ['test-library', exam.slug, 'custom-saved'], queryFn: () => libraryApi.savedCustomTests(exam) });
+  const past = useQuery({ queryKey: ['test-library', exam.slug, 'custom-past'], queryFn: () => libraryApi.pastCustomAttempts(exam) });
   // Saved = built but never finished (the previous app showed attempted ones under Past exams).
   const savedList = (saved.data ?? []).filter((s) => s.attemptCount === 0 || s.inProgress);
   const create = routes.customTestCreate(exam.slug);
@@ -181,17 +181,17 @@ export function CustomTestCreate() {
 
   const subjects = useQuery({ queryKey: ['test-library', exam.slug, 'custom-subjects'], queryFn: () => libraryApi.customSubjects(exam) });
   const chapters = useQuery({
-    queryKey: ['test-library', 'custom-chapters', subject?.courseIds.join(',')],
-    queryFn: () => libraryApi.customChapters(subject!.courseIds),
+    queryKey: ['test-library', exam.slug, 'custom-chapters', subject?.id],
+    queryFn: () => libraryApi.customChapters(exam, subject!.id),
     enabled: !!subject && step >= 1,
   });
   const topicList = useQuery({
-    queryKey: ['test-library', 'custom-topics', chapterId],
-    queryFn: () => libraryApi.customTopics(chapterId!),
+    queryKey: ['test-library', exam.slug, 'custom-topics', chapterId],
+    queryFn: () => libraryApi.customTopics(exam, chapterId!),
     enabled: !!chapterId && step >= 2,
   });
   const generate = useMutation({
-    mutationFn: () => libraryApi.generateCustomTest({ moduleId: chapterId!, lectureIds: topics, difficulty }),
+    mutationFn: () => libraryApi.generateCustomTest(exam, { moduleId: chapterId!, lectureIds: topics, difficulty }),
     onSuccess: ({ setId }) => {
       if (setId) router.push(routes.testPlayer(exam.slug, 'custom', setId));
     },

@@ -18,12 +18,14 @@ function mockNeetPaper(onSubmit: (body: unknown) => void) {
         data: { plans: [{ plan_id: 1, class_id: 20, class_name: 'NEET', duration_months: 12, status: 'active' }] },
       }),
     ),
-    http.post(`${API}/api/neet/mock-exam/start-mock-exam`, () =>
+    http.post(`${API}/api/v4/assessments/competitive/2/mock/sets/4/attempts`, () =>
       HttpResponse.json({
         success: true,
         data: {
+          attempt_id: 61,
           set_id: 4,
-          session_expiry_time: new Date(Date.now() + 3_600_000).toISOString(),
+          status: 'in_progress',
+          time_left: 3600,
           questions: [
             {
               question_id: 1,
@@ -45,8 +47,8 @@ function mockNeetPaper(onSubmit: (body: unknown) => void) {
         },
       }),
     ),
-    http.put(`${API}/api/neet/mock-exam/update-mock-session-questions`, () => HttpResponse.json({ success: true })),
-    http.post(`${API}/api/neet/mock-exam/submit-mock-exam`, async ({ request }) => {
+    http.put(`${API}/api/v4/assessments/competitive/2/mock/attempts/61`, () => HttpResponse.json({ success: true, data: { attempt_id: 61 } })),
+    http.post(`${API}/api/v4/assessments/competitive/2/mock/attempts/61/submit`, async ({ request }) => {
       onSubmit(await request.json());
       return HttpResponse.json({ success: true, data: { attempt_id: 77 } });
     }),
@@ -83,11 +85,10 @@ describe('ExamPlayer', () => {
 
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/neet/tests/mock/result/77'));
     expect(onSubmit).toHaveBeenCalledWith({
-      set_id: '4',
       class_id: 20,
-      questions: [
-        expect.objectContaining({ question_id: 1, selected_option: 12, status: 'answered' }),
-        expect.objectContaining({ question_id: 2, selected_option: null, status: 'marked_for_review' }),
+      answers: [
+        { question_id: 1, selected_option: 12, status: 'answered' },
+        { question_id: 2, selected_option: null, status: 'marked_for_review' },
       ],
     });
   });
@@ -100,7 +101,7 @@ describe('ExamPlayer', () => {
           data: { plans: [{ plan_id: 1, class_id: 20, class_name: 'NEET', duration_months: 0, status: 'active' }] },
         }),
       ),
-      http.post(`${API}/api/neet/mock-exam/start-mock-exam`, () =>
+      http.post(`${API}/api/v4/assessments/competitive/2/mock/sets/4/attempts`, () =>
         HttpResponse.json(
           { success: false, error: { code: 'FEATURE_LIMIT_REACHED', message: 'You have used all 2 free mock tests.' } },
           { status: 429 },
@@ -121,8 +122,8 @@ describe('ExamPlayer', () => {
           data: { plans: [{ plan_id: 1, class_id: 20, class_name: 'NEET', duration_months: 12, status: 'active' }] },
         }),
       ),
-      http.get(`${API}/api/neet/start-dpp-attempt`, () =>
-        HttpResponse.json({ already_attempted: true, attempt_id: 55 }),
+      http.post(`${API}/api/v4/assessments/competitive/2/dpp/sets/7/attempts`, () =>
+        HttpResponse.json({ success: true, data: { attempt_id: 55, set_id: 7, status: 'submitted' } }),
       ),
     );
     renderWithProviders(<ExamPlayer testType="dpp" setId="7" />, { exam: neet });

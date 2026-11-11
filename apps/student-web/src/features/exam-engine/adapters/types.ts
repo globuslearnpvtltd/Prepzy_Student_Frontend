@@ -1,3 +1,4 @@
+import type { ExamRef } from '@/shared/config/exams';
 import type { AttemptSnapshot, SubmitOutcome, SubmitSummary, ExamResult, ExamSession, SubjectGroup, TestContext, TestSetSummary } from '../model';
 
 /** What the engine needs from a backend. One implementation per backend family. */
@@ -13,7 +14,8 @@ export interface TestAdapter {
   ): Promise<void>;
   /** Submits and returns the attempt id for the result page (and the score when the backend sends it). */
   submit(session: ExamSession, snapshot: AttemptSnapshot, context: TestContext): Promise<SubmitOutcome>;
-  result(attemptId: string): Promise<ExamResult>;
+  /** The exam is the result page's (board results are read through its v4 routes). */
+  result(attemptId: string, exam: ExamRef): Promise<ExamResult>;
   /** Absent when sets are only reachable from another page (Learn opens chapter tests by id). */
   listSets?(context: TestContext, subjectId?: string): Promise<TestSetSummary[]>;
   /** Present when sets are grouped by subject (board papers). */

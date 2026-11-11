@@ -16,15 +16,16 @@ const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
 const topics = Array.from({ length: 7 }, (_, i) => ({ topic_id: i + 1, topic_name: `Topic ${i + 1}` }));
 const builderApi = (generate: Record<string, unknown>, onBody?: (body: unknown) => void) => [
   plan,
-  http.get(`${API}/api/custom-exams/get-custom-exam-course-list/12`, () =>
-    HttpResponse.json({ success: true, courses: [{ course_id: 11, course_name: 'Physics Part 1', subject_name: 'Physics' }] }),
+  http.get(`${API}/api/v4/assessments/board/1/custom/courses`, ({ request }) => {
+    expect(new URL(request.url).searchParams.get('class_id')).toBe('12');
+    return HttpResponse.json({ success: true, data: [{ course_id: 11, course_name: 'Physics Part 1', subject_name: 'Physics' }] });
+  }),
+  http.get(`${API}/api/v4/assessments/board/1/custom/courses/11/modules`, () =>
+    HttpResponse.json({ success: true, data: [{ module_id: 101, module_name: 'ELECTRIC CHARGES', topics }] }),
   ),
-  http.get(`${API}/api/custom-exams/get-custom-exam-module-list/11`, () =>
-    HttpResponse.json({ success: true, modules: [{ module_id: 101, module_name: 'ELECTRIC CHARGES', topics }] }),
-  ),
-  http.post(`${API}/api/custom-exams/generate-custom-exam`, async ({ request }) => {
+  http.post(`${API}/api/v4/assessments/board/1/custom/sets`, async ({ request }) => {
     onBody?.(await request.json());
-    return HttpResponse.json({ success: true, ...generate });
+    return HttpResponse.json({ success: true, data: generate });
   }),
 ];
 
@@ -52,17 +53,7 @@ describe('board custom test builder', () => {
     expect(screen.getByPlaceholderText('Search courses...')).toBeInTheDocument();
     await buildTest(user);
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/cbse/tests/custom/77'));
-    expect(body).toEqual({
-      course_id: 11,
-      difficulty_level: 'hard',
-      topic_ids: [
-        {
-          module_id: 101,
-          module_name: 'ELECTRIC CHARGES',
-          topics: [1, 2, 3, 4, 5].map((id) => ({ topic_id: id, topic_name: `Topic ${id}` })),
-        },
-      ],
-    });
+    expect(body).toEqual({ module_id: 101, topic_ids: [1, 2, 3, 4, 5], difficulty_level: 'hard' });
     expect(within(screen.getByRole('complementary', { name: 'Selection Summary' })).getByText('5')).toBeInTheDocument();
   });
 
@@ -76,7 +67,7 @@ describe('board custom test builder', () => {
   });
 
   it('opens from the Assessments page buttons', async () => {
-    server.use(...builderApi({}), http.get(`${API}/api/custom-exams/get-custom-exam-set-list/12`, () => HttpResponse.json({ success: true, sets: [] })));
+    server.use(...builderApi({}), http.get(`${API}/api/v4/assessments/board/1/custom/sets`, () => HttpResponse.json({ success: true, data: { sets: [] } })));
     const user = userEvent.setup();
     renderWithProviders(<BoardAssessments />, { exam: cbse });
     await user.click(screen.getByRole('button', { name: 'Customize Test' }));
@@ -93,14 +84,23 @@ describe('board saved custom tests', () => {
   it('lists saved sets, links to the player and shows submissions with score cards', async () => {
     server.use(
       plan,
-      http.get(`${API}/api/custom-exams/get-custom-exam-set-list/12`, () =>
+      http.get(`${API}/api/v4/assessments/board/1/custom/sets`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get('class_id')).toBe('12');
+        return HttpResponse.json({
+          success: true,
+          data: {
+            sets: [{ set_id: 71, course_name: 'Physics Part 1', subject_name: 'Physics', difficulty_level: 'easy', total_marks: 40, total_questions: 20, created_at: '2026-10-02T10:00:00Z' }],
+          },
+        });
+      }),
+      http.get(`${API}/api/v4/assessments/board/1/custom/sets/71/attempts`, () =>
         HttpResponse.json({
           success: true,
-          sets: [{ set_id: 71, course_name: 'Physics Part 1', subject_name: 'Physics', difficulty_level: 'easy', total_marks: 40, total_questions: 20, created_at: '2026-10-02T10:00:00Z' }],
+          data: {
+            set_id: 71,
+            attempts: [{ attempt_id: 501, attempt_number: 1, attempt_date: '2026-10-03T10:00:00Z', total_questions: 20, total_marks: 40, total_marks_obtained: 28 }],
+          },
         }),
-      ),
-      http.get(`${API}/api/custom-exams/custom-exam-submissions-list/71`, () =>
-        HttpResponse.json({ success: true, submissions: [{ id: 501, attempt_number: 1, attempt_date: '2026-10-03T10:00:00Z', total_questions: 20, total_marks: 40, total_marks_obtained: 28 }] }),
       ),
     );
     const user = userEvent.setup();

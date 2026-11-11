@@ -16,12 +16,12 @@ export async function uploadAnswerImage(file: File): Promise<UploadedImage> {
   const form = new FormData();
   form.append('answerImages', file);
   const body = assertOk(
-    await apiClient.post<{ success?: boolean; answer_image?: { url: string; public_id: string } }>(
-      '/api/saveImage',
+    await apiClient.post<{ success?: boolean; data?: { url: string; public_id: string } | null }>(
+      '/api/v4/assessments/answer-images',
       form,
     ),
   );
-  if (!body.answer_image)
+  if (!body.data?.url)
     throw new ApiError({ status: 500, code: 'UPLOAD_FAILED', message: 'Upload failed. Please try again.' });
-  return { url: body.answer_image.url, publicId: body.answer_image.public_id };
+  return { url: body.data.url, publicId: body.data.public_id };
 }

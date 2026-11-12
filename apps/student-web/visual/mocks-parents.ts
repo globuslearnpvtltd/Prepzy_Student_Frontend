@@ -98,3 +98,22 @@ export const PARENT_MOCKS: Record<string, unknown> = {
     },
   },
 };
+
+/** The same data under the v4 paths the new app calls (the keys above still serve the old app). */
+const OLD_PARENTS = '/api/mentor/v1/parents';
+const V4_PARENTS = '/api/v4/parents';
+const STUDENT_REPORTS: Array<[v4: string, old: string]> = [
+  ['learning-hours', 'get-student-learning-hours-info'],
+  ['videos', 'get-student-video-completion-info'],
+  ['doubts', 'get-student-doubts-section-info'],
+  ['assessments', 'get-student-assessment-section-info'],
+];
+Object.assign(PARENT_MOCKS, {
+  [`${V4_PARENTS}/auth/me`]: PARENT_MOCKS['/api/mentor/v1/auth/get-parent-info'],
+  [`${V4_PARENTS}/students`]: PARENT_MOCKS[`${OLD_PARENTS}/get-student-list`],
+  ...Object.fromEntries(
+    [1, 2].flatMap((id) =>
+      STUDENT_REPORTS.map(([v4, old]) => [`${V4_PARENTS}/students/${id}/${v4}`, PARENT_MOCKS[`${OLD_PARENTS}/${old}`]]),
+    ),
+  ),
+});

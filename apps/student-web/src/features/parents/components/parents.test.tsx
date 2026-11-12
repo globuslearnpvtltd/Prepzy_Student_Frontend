@@ -9,8 +9,9 @@ import { ParentDashboard } from './dashboard';
 import { ParentLoginScreen } from './login-screen';
 import { ParentHeader } from './parent-header';
 
-const GENERATE = `${API}/api/mentor/v1/auth/generate-login-otp`;
-const VERIFY = `${API}/api/mentor/v1/auth/verify-login-otp`;
+const PARENTS = `${API}/api/v4/parents`;
+const GENERATE = `${PARENTS}/auth/otp`;
+const VERIFY = `${PARENTS}/auth/verify`;
 
 beforeEach(() => localStorage.clear());
 
@@ -30,7 +31,7 @@ describe('ParentLoginScreen', () => {
       }),
       http.post(VERIFY, async ({ request }) => {
         bodies.push(await request.json());
-        return HttpResponse.json({ success: true, account_id: 5 });
+        return HttpResponse.json({ success: true, message: 'Logged in successfully', data: { parent_data: { account_id: 5 } } });
       }),
     );
     renderWithProviders(<ParentLoginScreen />);
@@ -46,10 +47,9 @@ describe('ParentLoginScreen', () => {
     await typeOtp('123456');
     await userEvent.click(screen.getByRole('button', { name: 'Verify & sign in' }));
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/parents/dashboard'));
-    // The backend looks the contact up from `phone`, for email logins too.
     expect(bodies).toEqual([
-      { phone: '', email: 'sunita@example.com' },
-      { phone: 'sunita@example.com', otp: '123456' },
+      { method: 'email', contact: 'sunita@example.com' },
+      { contact: 'sunita@example.com', otp: '123456' },
     ]);
   });
 
@@ -67,7 +67,7 @@ describe('ParentLoginScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send code on WhatsApp' }));
 
     expect(await screen.findByRole('heading', { name: 'Check your WhatsApp' })).toBeInTheDocument();
-    expect(body).toEqual({ phone: '+919876543210', email: '' });
+    expect(body).toEqual({ method: 'whatsapp', contact: '+919876543210' });
     expect(screen.getByText('+919876543210')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: '← Back' }));
@@ -89,7 +89,7 @@ describe('ParentLoginScreen', () => {
     await userEvent.selectOptions(screen.getByLabelText('Country code'), 'AE');
     await userEvent.type(screen.getByLabelText('WhatsApp number'), '501234567');
     await userEvent.click(screen.getByRole('button', { name: 'Send code on WhatsApp' }));
-    await waitFor(() => expect(body).toEqual({ phone: '+971501234567', email: '' }));
+    await waitFor(() => expect(body).toEqual({ method: 'whatsapp', contact: '+971501234567' }));
   });
 
   it('asks for credentials before calling the backend', async () => {
@@ -106,10 +106,13 @@ describe('ParentLoginScreen', () => {
     expect(called).not.toHaveBeenCalled();
   });
 
-  it('shows the backend error for an unregistered contact (HTTP 200 + success:false)', async () => {
+  it('shows the backend error for an unregistered contact (404 ACCOUNT_NOT_FOUND)', async () => {
     server.use(
       http.post(GENERATE, () =>
-        HttpResponse.json({ success: false, error: 'This phone number or email is not registered.' }),
+        HttpResponse.json(
+          { success: false, message: 'This phone number or email is not registered.', code: 'ACCOUNT_NOT_FOUND', data: null },
+          { status: 404 },
+        ),
       ),
     );
     renderWithProviders(<ParentLoginScreen />);
@@ -119,10 +122,12 @@ describe('ParentLoginScreen', () => {
     expect(screen.queryByRole('heading', { name: 'Check your email' })).not.toBeInTheDocument();
   });
 
-  it('shows "Invalid Otp" from an HTTP-200 error body and clears the code', async () => {
+  it('shows the INVALID_OTP message and clears the code', async () => {
     server.use(
       http.post(GENERATE, () => HttpResponse.json({ success: true })),
-      http.post(VERIFY, () => HttpResponse.json({ success: false, error: 'Invalid Otp' })),
+      http.post(VERIFY, () =>
+        HttpResponse.json({ success: false, message: 'Invalid Otp', code: 'INVALID_OTP', data: null }, { status: 400 }),
+      ),
     );
     renderWithProviders(<ParentLoginScreen />);
     await userEvent.type(screen.getByLabelText('Email'), 'sunita@example.com');
@@ -216,11 +221,11 @@ const children = {
 function dashboardHandlers(seen: string[] = []) {
   const record = (request: Request) => {
     const url = new URL(request.url);
-    seen.push(`${url.pathname.split('/').pop()}?${url.searchParams.toString()}`);
+    seen.push(`${url.pathname.split('/students/').pop()}?${url.searchParams.toString()}`);
   };
   return [
-    http.get(`${API}/api/mentor/v1/parents/get-student-list`, () => HttpResponse.json(children)),
-    http.get(`${API}/api/mentor/v1/parents/get-student-learning-hours-info`, ({ request }) => {
+    http.get(`${PARENTS}/students`, () => HttpResponse.json(children)),
+    http.get(`${PARENTS}/students/:studentId/learning-hours`, ({ request }) => {
       record(request);
       return HttpResponse.json({
         success: true,
@@ -234,7 +239,7 @@ function dashboardHandlers(seen: string[] = []) {
         },
       });
     }),
-    http.get(`${API}/api/mentor/v1/parents/get-student-video-completion-info`, ({ request }) => {
+    http.get(`${PARENTS}/students/:studentId/videos`, ({ request }) => {
       record(request);
       return HttpResponse.json({
         success: true,
@@ -247,7 +252,7 @@ function dashboardHandlers(seen: string[] = []) {
         },
       });
     }),
-    http.get(`${API}/api/mentor/v1/parents/get-student-doubts-section-info`, () =>
+    http.get(`${PARENTS}/students/:studentId/doubts`, () =>
       HttpResponse.json({
         success: true,
         data: {
@@ -259,7 +264,7 @@ function dashboardHandlers(seen: string[] = []) {
         },
       }),
     ),
-    http.get(`${API}/api/mentor/v1/parents/get-student-assessment-section-info`, () =>
+    http.get(`${PARENTS}/students/:studentId/assessments`, () =>
       HttpResponse.json({ success: true, data: { assessments: { total: 12, categories: [{ label: 'Quiz', count: 6, percentage: 72 }] } } }),
     ),
   ];
@@ -286,10 +291,10 @@ describe('ParentDashboard', () => {
     expect(screen.getByText('ATLAS')).toBeInTheDocument();
     expect(await screen.findByText('Quiz (6)')).toBeInTheDocument();
     expect(screen.getByText('72%')).toBeInTheDocument();
-    expect(seen).toContain('get-student-learning-hours-info?student_id=1&class_id=12');
+    expect(seen).toContain('1/learning-hours?class_id=12');
 
     await userEvent.click(screen.getByRole('button', { name: 'CLASS 11 PCB' }));
-    await waitFor(() => expect(seen).toContain('get-student-video-completion-info?student_id=1&class_id=11'));
+    await waitFor(() => expect(seen).toContain('1/videos?class_id=11'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Asha Kumar' }));
     expect(await screen.findByText(/hasn.t joined a class yet/)).toBeInTheDocument();
@@ -298,7 +303,7 @@ describe('ParentDashboard', () => {
 
   it('explains when no student is linked', async () => {
     server.use(
-      http.get(`${API}/api/mentor/v1/parents/get-student-list`, () =>
+      http.get(`${PARENTS}/students`, () =>
         HttpResponse.json({ success: true, data: { student_data: [] } }),
       ),
     );
@@ -309,7 +314,7 @@ describe('ParentDashboard', () => {
   it('shows an error with a retry', async () => {
     let calls = 0;
     server.use(
-      http.get(`${API}/api/mentor/v1/parents/get-student-list`, () => {
+      http.get(`${PARENTS}/students`, () => {
         calls++;
         return calls === 1 ? HttpResponse.json({ message: 'Bad request' }, { status: 400 }) : HttpResponse.json(children);
       }),
@@ -324,7 +329,7 @@ describe('ParentDashboard', () => {
 
   it('marks a section that fails to load', async () => {
     server.use(
-      http.get(`${API}/api/mentor/v1/parents/get-student-assessment-section-info`, () =>
+      http.get(`${PARENTS}/students/:studentId/assessments`, () =>
         HttpResponse.json({ message: 'nope' }, { status: 400 }),
       ),
       ...dashboardHandlers(),
@@ -339,13 +344,13 @@ describe('ParentHeader', () => {
   it('shows the parent in the menu and logs out to the portal login, clearing cached data', async () => {
     let loggedOut = false;
     server.use(
-      http.get(`${API}/api/mentor/v1/auth/get-parent-info`, () =>
+      http.get(`${PARENTS}/auth/me`, () =>
         HttpResponse.json({
           success: true,
           data: { parent_data: { account_id: 5, first_name: 'Sunita', last_name: 'Kumar', email: 'sunita@example.com', phone: '+919876500000' } },
         }),
       ),
-      http.post(`${API}/api/mentor/v1/auth/parent-logout`, () => {
+      http.post(`${PARENTS}/auth/logout`, () => {
         loggedOut = true;
         return HttpResponse.json({ success: true });
       }),
@@ -365,8 +370,8 @@ describe('ParentHeader', () => {
 
   it('opens and closes the mobile drawer and still logs out when the API fails', async () => {
     server.use(
-      http.get(`${API}/api/mentor/v1/auth/get-parent-info`, () => HttpResponse.json({ success: true, data: { parent_data: null } })),
-      http.post(`${API}/api/mentor/v1/auth/parent-logout`, () => HttpResponse.json({}, { status: 500 })),
+      http.get(`${PARENTS}/auth/me`, () => HttpResponse.json({ success: true, data: { parent_data: null } })),
+      http.post(`${PARENTS}/auth/logout`, () => HttpResponse.json({}, { status: 500 })),
     );
     renderWithProviders(<ParentHeader />);
     await userEvent.click(screen.getByRole('button', { name: 'Open menu' }));

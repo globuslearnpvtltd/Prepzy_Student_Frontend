@@ -11,6 +11,9 @@ import { assertOk } from '@/shared/lib/unwrap';
 
 type Envelope<T> = { success?: boolean; message?: string; data?: T };
 
+/** The backend rejects longer search queries. */
+export const SEARCH_MAX_QUERY_LENGTH = 100;
+
 const num = (value: unknown) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -73,37 +76,35 @@ export const shellApi = {
     return !!body.data?.has_plan;
   },
 
+  /**
+   * Top-bar suggestions: GET /api/v4/search/:category/:examId/suggestions. The backend decides what is searched per
+   * category (board: topics of the class; competitive: notes topics, chapters and courses of the exam).
+   */
   async searchSuggestions(exam: ExamConfig, query: string, classId: number | null): Promise<SearchSuggestion[]> {
-    type Board = { topic_name: string; subject_name: string };
-    type Competitive = {
+    type Row = {
       result_name: string;
       result_type?: string;
       module_name?: string | null;
-      subject_name: string;
+      subject_name?: string | null;
       course_id?: number | string | null;
       module_id?: number | string | null;
       anchor_id?: string | null;
     };
     const body = assertOk(
-      exam.category === 'competitive'
-        ? await apiClient.get<Envelope<{ suggestions?: Competitive[] }>>('/api/v1/student/neet-search-suggestions', {
-            params: { q: query },
-          })
-        : await apiClient.get<Envelope<{ suggestions?: Board[] }>>('/api/v1/student/search-suggestions', {
-            params: { q: query, classId: classId ?? undefined },
-          }),
+      await apiClient.get<Envelope<{ suggestions?: Row[] }>>(
+        `/api/v4/search/${exam.category}/${exam.examId}/suggestions`,
+        { params: { q: query.slice(0, SEARCH_MAX_QUERY_LENGTH), class_id: classId ?? undefined } },
+      ),
     );
-    const rows = (body.data?.suggestions ?? []) as (Board | Competitive)[];
-    return rows.map((row, index) => {
-      const title = 'result_name' in row ? row.result_name : row.topic_name;
-      return {
-        key: `${index}-${title}`,
-        title,
-        context: 'module_name' in row && row.module_name ? `in ${row.module_name.toLowerCase()}` : null,
-        subject: subjectLabel(row.subject_name ?? ''),
-        href: 'result_name' in row ? competitiveSuggestionHref(exam.slug, row) : null,
-      };
-    });
+    // Board results open nothing (as before); competitive ones link to the course, notes topic or chapter.
+    const linked = exam.category === 'competitive';
+    return (body.data?.suggestions ?? []).map((row, index) => ({
+      key: `${index}-${row.result_name}`,
+      title: row.result_name,
+      context: row.module_name ? `in ${row.module_name.toLowerCase()}` : null,
+      subject: subjectLabel(row.subject_name ?? ''),
+      href: linked ? competitiveSuggestionHref(exam.slug, row) : null,
+    }));
   },
 
   /** Today's daily practice paper, or null when there is none. */

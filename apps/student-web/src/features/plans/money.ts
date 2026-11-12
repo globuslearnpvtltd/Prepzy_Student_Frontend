@@ -12,6 +12,9 @@ export const formatInr = (value: number) => whole.format(value);
 /** "₹1,768.82" — invoices keep paise. */
 export const formatInrExact = (value: number) => exact.format(value);
 
+/** Server amounts (quote, order): "₹1,499" when whole, "₹588.82" otherwise. Never rounds away paise. */
+export const formatAmount = (value: number) => (Number.isInteger(value) ? formatInr(value) : formatInrExact(value));
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 
 /** "4 Sept 2026" — the purchase page's date style. */

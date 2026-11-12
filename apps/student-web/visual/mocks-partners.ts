@@ -17,8 +17,8 @@ const profile = {
 };
 
 export const PARTNER_MOCKS: Record<string, unknown> = {
-  '/api/partner/v1/kyc/me': { success: true, data: profile },
-  '/api/partner/v1/kyc/partner-types': {
+  '/api/v4/partners/profile': { success: true, data: profile },
+  '/api/v4/partners/partner-types': {
     success: true,
     data: [
       { id: 1, name: 'Parent' },
@@ -28,7 +28,7 @@ export const PARTNER_MOCKS: Record<string, unknown> = {
       { id: 5, name: 'Student' },
     ],
   },
-  '/api/partner/v1/kyc/bank-details': {
+  '/api/v4/partners/bank-details': {
     success: true,
     data: {
       kycStatus: 'verified',
@@ -41,7 +41,7 @@ export const PARTNER_MOCKS: Record<string, unknown> = {
       },
     },
   },
-  '/api/partner/v1/dashboard/me': {
+  '/api/v4/partners/summary': {
     success: true,
     data: {
       code: 'ANITA50',
@@ -53,7 +53,7 @@ export const PARTNER_MOCKS: Record<string, unknown> = {
       friendCount: 3,
     },
   },
-  '/api/partner/v1/dashboard/friends': {
+  '/api/v4/partners/friends': {
     success: true,
     data: [
       { id: 1, status: 'paid', attributed_at: '2026-09-04T10:00:00.000Z', paid_at: '2026-09-10T10:00:00.000Z', friend_name: 'Riya Verma', friend_phone: '+91 98XXXXXX10', exam_name: 'CBSE', signup_credit_amount: '50.00', conversion_credit_amount: '450.00' },
@@ -61,7 +61,7 @@ export const PARTNER_MOCKS: Record<string, unknown> = {
       { id: 3, status: 'blocked', attributed_at: '2026-10-01T10:00:00.000Z', paid_at: null, friend_name: '', friend_phone: null, exam_name: null, signup_credit_amount: null, conversion_credit_amount: null },
     ],
   },
-  '/api/partner/v1/dashboard/statement': {
+  '/api/v4/partners/statement': {
     success: true,
     data: [
       { id: 11, entry_type: 'payout_reserve', amount: '-400.00', balance_after: '1250.00', reason: null, created_at: '2026-10-05T10:00:00.000Z' },
@@ -69,7 +69,7 @@ export const PARTNER_MOCKS: Record<string, unknown> = {
       { id: 9, entry_type: 'grant_signup', amount: '50.00', balance_after: '1200.00', reason: 'Signup: Kabir Singh', created_at: '2026-09-18T10:00:00.000Z' },
     ],
   },
-  '/api/partner/v1/payouts': {
+  '/api/v4/partners/payouts': {
     success: true,
     data: {
       kycStatus: 'verified',

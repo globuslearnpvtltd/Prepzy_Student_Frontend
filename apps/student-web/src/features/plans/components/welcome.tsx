@@ -12,7 +12,9 @@ import { routes } from '@/shared/config/routes';
 import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { PageSpinner, StatusScreen } from '@/shared/layout/status-screens';
 import { userMessage } from '@/shared/lib/errors';
-import { isPlanCategory, plansApi } from '../api';
+import { plansApi } from '../api';
+import { bundledTitles, bundleOptionTitles, composePlanName, groupKeyOf, type CatalogExam } from '../catalog';
+import { planKeys } from '../hooks';
 import { formatInr, formatShortDate } from '../money';
 import { Confetti } from './confetti';
 import { useModalBehaviour } from './modal';
@@ -100,7 +102,7 @@ function CodeInput({
 
 function LimitsDialog({ exam, onClose }: { exam: ExamConfig; onClose: () => void }) {
   useModalBehaviour(onClose);
-  const limits = useQuery({ queryKey: ['plans', 'signup-limits', exam.examId], queryFn: () => plansApi.signupLimits(exam.examId) });
+  const limits = useQuery({ queryKey: planKeys.limits(exam), queryFn: () => plansApi.featureLimits(exam) });
   const cell = (value: number | null) => (value == null ? 'Unlimited' : String(value));
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -150,23 +152,71 @@ function LimitsDialog({ exam, onClose }: { exam: ExamConfig; onClose: () => void
   );
 }
 
-function PricingDialog({ exam, classId, planId, onClose }: { exam: ExamConfig; classId: number; planId: number; onClose: () => void }) {
+/**
+ * Prices of the student's plan after the free month, from the class's catalog (GET /catalog?class_id=), named by the
+ * server's `display_name` (composed the same way when an older backend omits it). The plan is the one the catalog
+ * marks active (the free Topper month), else the active plan's id, else the class's first plan. Basic (duration 0)
+ * comes first.
+ */
+export function signupPrices(catalog: CatalogExam, activePlanId: number | null) {
+  const plans = catalog.variants.flatMap((variant) => variant.plans.map((plan) => ({ plan, variant })));
+  const planId =
+    plans.find(({ plan }) => plan.is_active_plan === true || plan.is_active_plan === 1)?.plan.plan_id ??
+    plans.find(({ plan }) => plan.plan_id === activePlanId)?.plan.plan_id ??
+    plans[0]?.plan.plan_id;
+  const rows = plans
+    .filter(({ plan }) => plan.plan_id === planId)
+    .sort((a, b) => a.plan.duration_months - b.plan.duration_months)
+    .map(({ plan, variant }) => {
+      const bundles = plan.is_combo ? (plan.bundled?.length ? bundledTitles(plan.bundled) : bundleOptionTitles(variant)) : [];
+      return {
+        name:
+          plan.display_name ||
+          composePlanName({
+            durationMonths: plan.duration_months,
+            exam: catalog.title,
+            groupKey: variant.group_key ?? (variant.target_year != null ? 'target_year' : groupKeyOf(catalog)),
+            targetYear: variant.target_year,
+            bundles,
+          }),
+        bundled: plan.is_combo,
+        year: variant.target_year,
+        durationMonths: plan.duration_months,
+        price: plan.price,
+        costPrice: plan.cost_price || null,
+      };
+    });
+  // Every plan keeps Basic after the free month; name it by the same rule when the catalog has no free row.
+  if (rows.length && !rows.some((row) => row.durationMonths === 0)) {
+    const variant = plans.find(({ plan }) => plan.plan_id === planId)?.variant;
+    rows.unshift({
+      name: composePlanName({ durationMonths: 0, exam: catalog.title, groupKey: variant?.group_key ?? groupKeyOf(catalog) }),
+      bundled: false,
+      year: variant?.target_year ?? null,
+      durationMonths: 0,
+      price: 0,
+      costPrice: null,
+    });
+  }
+  return rows;
+}
+
+function PricingDialog({ exam, classId, planId, onClose }: { exam: ExamConfig; classId: number; planId: number | null; onClose: () => void }) {
   useModalBehaviour(onClose);
-  const prices = useQuery({ queryKey: ['plans', 'signup-prices', classId, planId], queryFn: () => plansApi.signupPrices(classId, planId) });
-  const list = prices.data ?? [];
+  const prices = useQuery({
+    queryKey: planKeys.catalog(exam, classId),
+    queryFn: () => plansApi.catalog(exam, classId),
+    select: (catalog) => signupPrices(catalog, planId),
+  });
+  const all = prices.data ?? [];
+  const basic = all.find((p) => p.durationMonths === 0);
+  const list = all.filter((p) => p.durationMonths !== 0);
   const monthly = list.find((p) => p.durationMonths === 1);
-  const academic = list.find((p) => p.durationMonths !== 1 && p.durationMonths !== 0) ?? list.find((p) => p.durationMonths !== 1);
-  const title = list[0]?.title ?? '';
-  const competitive = exam.category === 'competitive';
-  const bundle = list[0]?.bundled ? ' + CBSE' : '';
-  const year = list[0]?.year;
-  const names = competitive
-    ? { basic: `Basic NEET${bundle}`, monthly: `Topper NEET${bundle} Monthly`, yearly: `Topper NEET${year != null ? ` ${year}` : ''}${bundle}` }
-    : { basic: `${title} Basic`, monthly: `${title} Topper Monthly`, yearly: `${title} Topper Academic Year` };
+  const academic = list.find((p) => p.durationMonths !== 1);
   const row = (name: string, price: number, cost: number | null, highlight = false) => (
-    <div className={cx('flex items-center justify-between rounded-lg px-4 py-3.5', highlight ? 'border-brand-800 bg-plan-tile border-2' : 'bg-plan-panel')}>
-      <span className="text-ink font-display text-[17px] font-bold lg:text-lg">{name}</span>
-      <span className="flex items-center gap-2">
+    <div className={cx('flex items-center justify-between gap-3 rounded-lg px-4 py-3.5', highlight ? 'border-brand-800 bg-plan-tile border-2' : 'bg-plan-panel')}>
+      <span className="text-ink font-display min-w-0 text-[17px] leading-snug font-bold break-words lg:text-lg">{name}</span>
+      <span className="flex shrink-0 items-center gap-2">
         <span className="text-ink font-display text-xl font-extrabold lg:text-[23px]">{formatInr(price)}</span>
         {cost != null && cost > price && <span className="text-neutral-350 text-[12px] line-through">{formatInr(cost)}</span>}
       </span>
@@ -190,9 +240,9 @@ function PricingDialog({ exam, classId, planId, onClose }: { exam: ExamConfig; c
             <>
               <p className="text-ink font-display mt-4 text-[19px] leading-5 font-bold lg:text-xl">What it costs after 1 month</p>
               <div className="mt-4 flex flex-col gap-3">
-                {row(names.basic, 0, null)}
-                {monthly && row(names.monthly, monthly.price, monthly.costPrice)}
-                {academic && academic !== monthly && row(names.yearly, academic.price, academic.costPrice, true)}
+                {basic && row(basic.name, 0, null)}
+                {monthly && row(monthly.name, monthly.price, monthly.costPrice)}
+                {academic && row(academic.name, academic.price, academic.costPrice, true)}
               </div>
               <p className="text-plan-applied mt-3 text-[12px] font-bold">Your first month is free. You pay nothing today.</p>
               <button type="button" onClick={onClose} className="bg-brand-800 text-on-brand mt-3 w-full rounded-lg py-3.5 text-[15px] font-bold">
@@ -239,10 +289,8 @@ function WelcomeContent({ exam }: { exam: ExamConfig }) {
   const router = useRouter();
   const params = useSearchParams();
   const plan = useActivePlan(exam);
-  const category = isPlanCategory(exam.category) ? exam.category : 'board';
   const dashboard = routes.dashboard(exam.slug);
-  const signupPlan = useQuery({ queryKey: ['plans', 'signup-plan', exam.examId], queryFn: () => plansApi.signupPlanId(exam.examId) });
-  const planId = signupPlan.data ?? plan.data?.planId ?? null;
+  const planId = plan.data?.planId ?? null;
   const classId = Number(params.get('class_id')) || plan.data?.classId || null;
   const expiry = plan.data?.expiryDate ?? read('prepzy-plan-expiry-date');
 
@@ -311,7 +359,8 @@ function WelcomeContent({ exam }: { exam: ExamConfig }) {
     if (!code) return;
     setCoupon((state) => ({ ...state, busy: true, error: '', applied: false }));
     try {
-      const result = await plansApi.extend(category, code, category === 'competitive' ? planId : null);
+      // The server extends the newest eligible plan of this exam (the free Topper month).
+      const result = await plansApi.extend(exam, code);
       setCoupon((state) => ({ ...state, busy: false, applied: true, months: result.months, expiry: result.expiryDate }));
     } catch (error) {
       setCoupon((state) => ({ ...state, busy: false, error: userMessage(error, 'Invalid coupon code') }));
@@ -439,7 +488,7 @@ function WelcomeContent({ exam }: { exam: ExamConfig }) {
                 <button
                   type="button"
                   onClick={() => setDialog('pricing')}
-                  disabled={!classId || !planId}
+                  disabled={!classId}
                   className="text-brand text-[14px] font-bold hover:underline"
                 >
                   See pricing
@@ -450,7 +499,7 @@ function WelcomeContent({ exam }: { exam: ExamConfig }) {
         </div>
       </main>
       {dialog === 'limits' && <LimitsDialog exam={exam} onClose={() => setDialog(null)} />}
-      {dialog === 'pricing' && classId && planId && <PricingDialog exam={exam} classId={classId} planId={planId} onClose={() => setDialog(null)} />}
+      {dialog === 'pricing' && classId && <PricingDialog exam={exam} classId={classId} planId={planId} onClose={() => setDialog(null)} />}
     </div>
   );
 }

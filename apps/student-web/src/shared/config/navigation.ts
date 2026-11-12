@@ -60,16 +60,6 @@ export function navigationFor(exam: Pick<ExamConfig, 'category'>): readonly NavI
   return NAVIGATION[exam.category];
 }
 
-/** Text links in the desktop header. */
-export const HEADER_LINKS: Record<ExamCategory, readonly { label: string; href: (exam: string) => string }[]> = {
-  board: [
-    { label: 'Dashboard', href: routes.dashboard },
-    { label: 'Courses', href: routes.courses },
-  ],
-  competitive: [{ label: 'Dashboard', href: routes.dashboard }],
-  reference: [{ label: 'Reference Books', href: () => routes.referenceBooks() }],
-};
-
 /** Section pages each category serves (placeholders until ported), with the page title. */
 export const SECTIONS: Record<ExamCategory, Partial<Record<SectionKey, string>>> = {
   board: {

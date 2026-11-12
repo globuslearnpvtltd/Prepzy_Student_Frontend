@@ -134,3 +134,26 @@ export const SCHOOLS_MOCKS: Record<string, unknown> = {
     },
   },
 };
+
+/** The same data under the v4 paths the new app calls (the keys above still serve the old app). */
+const OLD_SCHOOLS = '/api/mentor/v1/schools';
+const V4_SCHOOLS = '/api/v4/schools';
+const STUDENT_REPORTS: Array<[v4: string, old: string]> = [
+  ['', 'get-student-info'],
+  ['/learning-hours', 'get-student-learning-hours-info'],
+  ['/videos', 'get-student-video-completion-info'],
+  ['/doubts', 'get-student-doubts-section-info'],
+  ['/assessments', 'get-student-assessment-section-info'],
+];
+Object.assign(SCHOOLS_MOCKS, {
+  [`${V4_SCHOOLS}/auth/me`]: SCHOOLS_MOCKS['/api/mentor/v1/auth/get-teacher-info'],
+  [`${V4_SCHOOLS}/school`]: SCHOOLS_MOCKS[`${OLD_SCHOOLS}/get-school-info`],
+  [`${V4_SCHOOLS}/hours`]: SCHOOLS_MOCKS[`${OLD_SCHOOLS}/get-hours-data`],
+  [`${V4_SCHOOLS}/students`]: SCHOOLS_MOCKS[`${OLD_SCHOOLS}/get-student-list`],
+  [`${V4_SCHOOLS}/feature-usage`]: SCHOOLS_MOCKS[`${OLD_SCHOOLS}/get-feature-usage`],
+  ...Object.fromEntries(
+    [7, 8, 9, 10, 12, 13, 14].flatMap((id) =>
+      STUDENT_REPORTS.map(([v4, old]) => [`${V4_SCHOOLS}/students/${id}${v4}`, SCHOOLS_MOCKS[`${OLD_SCHOOLS}/${old}`]]),
+    ),
+  ),
+});

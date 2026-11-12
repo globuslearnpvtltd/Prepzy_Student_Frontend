@@ -5,11 +5,10 @@ import { Lock } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAtlas } from '@/features/assistant';
-import { planTier, useActivePlan } from '@/features/auth';
+import { planTier, useActivePlan, type ActivePlan } from '@/features/auth';
 import type { ExamConfig } from '@/shared/config/exams';
 import { isActivePath, isNavLocked, navigationFor, type NavAccess, type NavItem } from '@/shared/config/navigation';
 import { routes } from '@/shared/config/routes';
-import { ClassSwitcher, classLabel } from './class-switcher';
 import { useHasStudyPlan } from './shell-api';
 
 /** What the student can open: Learn / Assessments / Notes need a plan, Study Plan needs a built study plan. */
@@ -18,6 +17,10 @@ export function useNavAccess(exam: ExamConfig): NavAccess {
   const studyPlan = useHasStudyPlan(plan.data?.classId ?? null);
   return { hasPlan: !!plan.data, hasStudyPlan: !!studyPlan.data };
 }
+
+/** "CLASS 12 (PCB)" */
+const classLabel = (plan: Pick<ActivePlan, 'className' | 'streamName'>) =>
+  `${plan.className}${plan.streamName ? ` (${plan.streamName})` : ''}`;
 
 const formatDate = (iso: string) =>
   new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
@@ -90,13 +93,12 @@ function ActivePlanCard({ exam }: { exam: ExamConfig }) {
   );
 }
 
-/** Board desktop sidebar (240px): class switcher, labelled navigation with locks, active plan card. */
+/** Board desktop sidebar (240px): labelled navigation with locks, active plan card (classes switch from the header's goals pill). */
 export function BoardSidebar({ exam }: { exam: ExamConfig }) {
   const pathname = usePathname();
   const access = useNavAccess(exam);
   return (
     <aside className="border-line bg-surface shadow-header fixed top-[76px] left-0 z-30 hidden h-[calc(100dvh-76px)] w-60 flex-col gap-[38px] overflow-y-auto border-t border-r px-3 py-5 md:flex">
-      <ClassSwitcher exam={exam} />
       <nav aria-label="Main" className="flex-1">
         <ul className="flex flex-col gap-2">
           {navigationFor(exam).map((item) => (

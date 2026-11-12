@@ -1,16 +1,15 @@
 'use client';
 
 import { cx } from '@prepzy/design-system';
-import { AlertCircle, CalendarDays, Check, Ticket, TriangleAlert } from 'lucide-react';
+import { AlertCircle, CalendarDays, Check, Ticket } from 'lucide-react';
 import { useState } from 'react';
-import { userMessage } from '@/shared/lib/errors';
-import { plansApi, type BoardPlan, type LearningPlan, type PlanCategory } from '../api';
+import type { ExamRef } from '@/shared/config/exams';
+import { billingMessage, plansApi } from '../api';
 import { formatShortDate } from '../money';
 import { CloseButton, Modal } from './modal';
-import { CourseStatusPill, ReceiptRow } from './plan-bits';
 
-/** Coupon-only extension: a valid code moves the expiry date and nothing is charged. */
-export function useExtend(category: PlanCategory, planId: number | null) {
+/** Coupon-only extension (POST /extensions): a valid code moves the purchase's expiry date and nothing is charged. */
+export function useExtend(exam: ExamRef, purchaseId: number | null) {
   const [code, setCode] = useState('');
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState('');
@@ -20,9 +19,9 @@ export function useExtend(category: PlanCategory, planId: number | null) {
     setApplying(true);
     setError('');
     try {
-      setResult(await plansApi.extend(category, code.trim(), planId));
+      setResult(await plansApi.extend(exam, code.trim(), purchaseId));
     } catch (failure) {
-      setError(userMessage(failure, 'Invalid coupon code'));
+      setError(billingMessage(failure, 'Invalid coupon code'));
     } finally {
       setApplying(false);
     }
@@ -40,9 +39,16 @@ export function useExtend(category: PlanCategory, planId: number | null) {
   };
 }
 
-/** Board manage page: one dialog that turns into its own success state. */
-export function BoardExtendDialog({ plan, onClose }: { plan: BoardPlan; onClose: () => void }) {
-  const extend = useExtend('board', plan.planId);
+/** The plan an extension acts on. */
+export interface ExtendTarget {
+  purchaseId: number;
+  name: string;
+  expiryDate: string | null;
+}
+
+/** Coupon extension of one purchase: a single dialog that turns into its own success state. */
+export function ExtendDialog({ exam, plan, onClose }: { exam: ExamRef; plan: ExtendTarget; onClose: () => void }) {
+  const extend = useExtend(exam, plan.purchaseId);
   const applied = extend.result !== null;
   return (
     <Modal label="Extend your plan" onClose={onClose} className="max-w-[420px] rounded-lg p-6">
@@ -59,7 +65,7 @@ export function BoardExtendDialog({ plan, onClose }: { plan: BoardPlan; onClose:
           <div>
             <p className="m-0 text-md font-bold text-neutral-950 sm:text-lg">{applied ? 'Plan extended' : 'Extend your plan'}</p>
             <p className="text-neutral-500 m-0 mt-0.5 text-[13px]">
-              {applied ? `${extend.result?.months ?? ''} months added` : 'Use a coupon code to add more days'}
+              {applied ? `${extend.result?.months ?? ''} months added to ${plan.name}` : `Use a coupon code to add more days to ${plan.name}`}
             </p>
           </div>
         </div>
@@ -135,91 +141,6 @@ export function BoardExtendDialog({ plan, onClose }: { plan: BoardPlan; onClose:
       ) : (
         <p className="text-neutral-350 m-0 mt-3 text-[12px]">No payment needed — a valid code only extends your validity.</p>
       )}
-    </Modal>
-  );
-}
-
-/** Competitive manage page: coupon form, then a separate success receipt. */
-export function CompetitiveExtendDialog({ plan, onClose }: { plan: LearningPlan; onClose: () => void }) {
-  const extend = useExtend('competitive', plan.planId);
-  if (extend.result) {
-    const months = extend.result.months;
-    return (
-      <Modal label="Plan extended" onClose={onClose} className="max-w-[400px] p-6 text-center">
-        <span className="border-plan-ok-line bg-plan-ok-soft text-plan-extend mx-auto flex size-[52px] items-center justify-center rounded-full border-2">
-          <Check aria-hidden className="size-[21px]" strokeWidth={2.6} />
-        </span>
-        <h3 className="text-plan-ink m-0 mt-4 text-[19px] font-bold">Plan Extended Successfully!</h3>
-        <p className="text-neutral-550 m-0 mt-2 text-[13px] leading-[19px]">
-          Your validity has been updated. Pick up right where you left off — nothing was charged.
-        </p>
-        <dl className="bg-plan-receipt mt-[18px] rounded-[10px] px-4 py-3 text-left">
-          <ReceiptRow label="Learning Plan" value={plan.name} />
-          {extend.result.expiryDate && <ReceiptRow label="New Expiry Date" value={formatShortDate(extend.result.expiryDate)} success />}
-          {months ? <ReceiptRow label="Extended By" value={`${months} month${months > 1 ? 's' : ''}`} /> : null}
-        </dl>
-        <button type="button" onClick={onClose} className="bg-brand text-on-brand hover:bg-brand-800 mt-[18px] w-full rounded-sm py-3 text-[13px] font-semibold">
-          Back to My Learning Plans
-        </button>
-      </Modal>
-    );
-  }
-  return (
-    <Modal label="Extend Learning Plan" onClose={extend.applying ? undefined : onClose} className="max-w-[430px] p-5 md:p-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-plan-ink m-0 text-lg font-bold">Extend Learning Plan</h3>
-          <p className="text-neutral-550 m-0 mt-1.5 text-[13px]">Secure continuous access to expert learning modules.</p>
-        </div>
-        <CloseButton onClick={onClose} />
-      </div>
-      <div className="bg-plan-receipt mt-4 flex items-center justify-between gap-3 rounded-[10px] px-3.5 py-3">
-        <div className="min-w-0">
-          <p className="text-plan-ink m-0 truncate text-[13px] font-bold">{plan.name}</p>
-          <p className="text-neutral-550 m-0 mt-[3px] text-[11px]">Currently Expires: {formatShortDate(plan.expiryDate)}</p>
-        </div>
-        <CourseStatusPill status={plan.status} />
-      </div>
-      <p className="text-plan-navy mt-[18px] text-[11px] font-bold tracking-[0.08em] uppercase">Apply coupon code</p>
-      <input
-        type="text"
-        value={extend.code}
-        onChange={(event) => extend.setCode(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') void extend.apply();
-        }}
-        placeholder="Enter coupon code"
-        aria-label="Coupon code"
-        className={cx(
-          'text-plan-ink placeholder:text-neutral-350 focus:border-brand mt-2 w-full rounded-sm border px-3 py-2.5 text-[13px] font-medium tracking-[0.04em] uppercase outline-none placeholder:tracking-normal placeholder:normal-case',
-          extend.error ? 'border-plan-alert-line bg-plan-alert-soft' : 'border-plan-input-line bg-surface',
-        )}
-      />
-      {extend.error && (
-        <div role="alert" className="bg-plan-alert-soft mt-2.5 flex items-start gap-2 rounded-sm px-3 py-2.5">
-          <TriangleAlert aria-hidden className="text-plan-alert mt-px size-3.5 shrink-0" />
-          <p className="text-plan-alert m-0 text-[12px] font-semibold">{extend.error}</p>
-        </div>
-      )}
-      <p className="text-neutral-350 m-0 mt-2.5 text-[11px]">No payment needed — a valid code only extends your validity.</p>
-      <div className="mt-[18px] flex gap-3">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={extend.applying}
-          className="border-plan-input-line bg-surface hover:bg-canvas flex-1 rounded-sm border py-[11px] text-[13px] font-semibold text-neutral-700 disabled:opacity-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={extend.apply}
-          disabled={extend.applying || !extend.code.trim()}
-          className="bg-brand text-on-brand hover:bg-brand-800 flex-1 rounded-sm py-[11px] text-[13px] font-semibold disabled:opacity-50"
-        >
-          {extend.applying ? 'Extending…' : 'Confirm'}
-        </button>
-      </div>
     </Modal>
   );
 }

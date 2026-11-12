@@ -2,10 +2,13 @@ import { apiClient } from '@/shared/lib/api-client';
 import { assertOk } from '@/shared/lib/unwrap';
 
 /**
- * Schools (teacher) portal endpoints: /api/mentor/v1/auth/* (teacher OTP login, session) and /api/mentor/v1/schools/*.
- * The session is the `teacherAccessToken` cookie the backend sets on verify. Responses are normalised here so screens
- * never see the backend's snake_case or missing fields.
+ * Schools (teacher) portal endpoints: /api/v4/schools/auth/* (teacher OTP login, session) and /api/v4/schools/*.
+ * The session is the `teacherAccessToken` cookie the backend sets on verify. The backend takes the school from the
+ * teacher's account, so only the class is sent. Responses are normalised here so screens never see the backend's
+ * snake_case or missing fields.
  */
+
+const BASE = '/api/v4/schools';
 
 type Envelope<T> = { success?: boolean; message?: string; error?: unknown; data?: T };
 type Raw = Record<string, unknown>;
@@ -135,48 +138,42 @@ const toCounts = (raw: unknown, nameKey: string): CountItem[] =>
   list(raw).map((item) => ({ name: str(item[nameKey]) || 'Others', count: num(item.count) }));
 
 type ClassQuery = { classId: number; institutionId: number };
-const classParams = ({ classId, institutionId }: ClassQuery) => ({ class_id: classId, institution_id: institutionId });
+const classParams = ({ classId }: ClassQuery) => ({ class_id: classId });
 type StudentQuery = { studentId: string; classId?: string | null };
-const studentParams = ({ studentId, classId }: StudentQuery) => ({
-  student_id: studentId,
-  class_id: classId ?? undefined,
-});
+const studentPath = (studentId: string, report = '') => `${BASE}/students/${encodeURIComponent(studentId)}${report}`;
+const studentParams = ({ classId }: StudentQuery) => ({ class_id: classId ?? undefined });
 
 const get = async <T>(path: string, params?: Record<string, string | number | undefined>): Promise<T | undefined> =>
   assertOk(await apiClient.get<Envelope<T>>(path, { params })).data;
 
 export const schoolsApi = {
-  /** Emails a 6-digit code. Unknown emails fail with 400; some failures come back as HTTP 200 `{ success: false }`. */
+  /** Emails a 6-digit code. Unknown emails fail with 404 ACCOUNT_NOT_FOUND, too many requests with 429. */
   async requestOtp(email: string): Promise<void> {
-    const body = assertOk(
-      await apiClient.post<Envelope<unknown>>('/api/mentor/v1/auth/generate-teacher-login-otp', { email }),
-    );
+    const body = assertOk(await apiClient.post<Envelope<unknown>>(`${BASE}/auth/otp`, { email }));
     if (body?.success !== true) throw new Error('Failed to send code. Please try again.');
   },
 
-  /** Wrong / expired codes answer HTTP 200 `{ error: 'Invalid Otp' }`; success sets the cookie and returns the teacher. */
+  /** Wrong / expired codes fail with 400 INVALID_OTP / OTP_EXPIRED; success sets the cookie and returns the teacher. */
   async verifyOtp(email: string, otp: string): Promise<Teacher | null> {
-    const body = assertOk(
-      await apiClient.post<Raw & { success?: boolean }>('/api/mentor/v1/auth/verify-teacher-login-otp', { email, otp }),
-    );
+    const body = assertOk(await apiClient.post<Envelope<{ teacher_data?: unknown }>>(`${BASE}/auth/verify`, { email, otp }));
     if (body?.success !== true) throw new Error('Invalid OTP. Please try again.');
-    return toTeacher(body);
+    return toTeacher(body.data?.teacher_data);
   },
 
-  logout: () => apiClient.post<unknown>('/api/mentor/v1/auth/teacher-logout'),
+  logout: () => apiClient.post<unknown>(`${BASE}/auth/logout`),
 
   async me(): Promise<Teacher | null> {
-    const data = await get<{ teacher_data?: unknown }>('/api/mentor/v1/auth/get-teacher-info');
+    const data = await get<{ teacher_data?: unknown }>(`${BASE}/auth/me`);
     return toTeacher(data?.teacher_data);
   },
 
   async school(): Promise<School | null> {
-    const data = await get<{ institution_data?: unknown }>('/api/mentor/v1/schools/get-school-info');
+    const data = await get<{ institution_data?: unknown }>(`${BASE}/school`);
     return toSchool(data?.institution_data);
   },
 
   async classStats(query: ClassQuery): Promise<ClassStats> {
-    const data = (await get<Raw>('/api/mentor/v1/schools/get-hours-data', classParams(query))) ?? {};
+    const data = (await get<Raw>(`${BASE}/hours`, classParams(query))) ?? {};
     return {
       studentCount: num(data.student_count),
       activeStudents: num(data.unique_students),
@@ -185,7 +182,7 @@ export const schoolsApi = {
   },
 
   async featureUsage(query: ClassQuery): Promise<FeatureUsage> {
-    const data = (await get<Raw>('/api/mentor/v1/schools/get-feature-usage', classParams(query))) ?? {};
+    const data = (await get<Raw>(`${BASE}/feature-usage`, classParams(query))) ?? {};
     return {
       exams: num(data.avg_exam_attempts),
       doubts: num(data.chat_doubts),
@@ -197,7 +194,7 @@ export const schoolsApi = {
   },
 
   async students(query: ClassQuery): Promise<StudentSummary[]> {
-    const data = await get<{ student_list?: unknown }>('/api/mentor/v1/schools/get-student-list', classParams(query));
+    const data = await get<{ student_list?: unknown }>(`${BASE}/students`, classParams(query));
     return list(data?.student_list).map((s) => ({
       id: num(s.account_id),
       firstName: str(s.first_name),
@@ -206,9 +203,7 @@ export const schoolsApi = {
   },
 
   async student(studentId: string): Promise<StudentProfile | null> {
-    const data = await get<{ student_data?: Raw | null }>('/api/mentor/v1/schools/get-student-info', {
-      student_id: studentId,
-    });
+    const data = await get<{ student_data?: Raw | null }>(studentPath(studentId));
     const s = data?.student_data;
     if (!s) return null;
     return {
@@ -224,7 +219,7 @@ export const schoolsApi = {
   async learningHours(query: StudentQuery): Promise<LearningHours> {
     const data =
       (await get<{ graph_data?: Raw; study_engagement?: Raw | null }>(
-        '/api/mentor/v1/schools/get-student-learning-hours-info',
+        studentPath(query.studentId, '/learning-hours'),
         studentParams(query),
       )) ?? {};
     const graph = Object.fromEntries(Object.entries(data.graph_data ?? {}).map(([key, value]) => [key, num(value)]));
@@ -240,7 +235,7 @@ export const schoolsApi = {
 
   async lectures(query: StudentQuery): Promise<LectureCompletion> {
     const data = await get<{ video_completion?: Raw }>(
-      '/api/mentor/v1/schools/get-student-video-completion-info',
+      studentPath(query.studentId, '/videos'),
       studentParams(query),
     );
     const v = data?.video_completion ?? {};
@@ -253,7 +248,7 @@ export const schoolsApi = {
 
   async doubts(query: StudentQuery): Promise<DoubtsSummary> {
     const data = await get<{ doubts?: Raw }>(
-      '/api/mentor/v1/schools/get-student-doubts-section-info',
+      studentPath(query.studentId, '/doubts'),
       studentParams(query),
     );
     const d = data?.doubts ?? {};
@@ -262,7 +257,7 @@ export const schoolsApi = {
 
   async assessments(query: StudentQuery): Promise<AssessmentsSummary> {
     const data = await get<{ assessments?: Raw }>(
-      '/api/mentor/v1/schools/get-student-assessment-section-info',
+      studentPath(query.studentId, '/assessments'),
       studentParams(query),
     );
     const a = data?.assessments ?? {};

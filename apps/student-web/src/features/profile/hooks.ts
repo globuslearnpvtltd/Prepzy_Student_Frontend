@@ -54,7 +54,7 @@ export function useDeleteAccount() {
   const queryClient = useQueryClient();
   const router = useRouter();
   return useMutation({
-    mutationFn: (accountId: number) => profileApi.deleteAccount(accountId),
+    mutationFn: () => profileApi.deleteAccount(),
     onSuccess: () => {
       forgetExam();
       try {

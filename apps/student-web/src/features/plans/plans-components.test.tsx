@@ -1,21 +1,21 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { http } from 'msw';
 import type { ReactNode } from 'react';
 import { ExamProvider } from '@/shared/hooks/use-exam';
 import { renderWithProviders } from '@/test/render';
-import { API, server } from '@/test/server';
+import { server } from '@/test/server';
 import { navigation } from '@/test/setup';
-import type { BoardPlan, LearningPlan } from './api';
+import AccountLayout from '@/app/(student)/[exam]/(account)/layout';
 import type { Plan } from './catalog';
 import { PaymentFailed, PaymentPending, PaymentSuccess } from './components/checkout/outcome-overlays';
 import { EmptyPlans, ExamCard, MobileActionBar, OptionCard, PlanCard, PlanSkeleton, Switch } from './components/checkout/primitives';
-import { BoardExtendDialog, CompetitiveExtendDialog } from './components/extend-dialogs';
-import { BoardManagePlans } from './components/manage-board';
-import { BillingPage } from './components/manage-plans';
+import { PaymentStatusChip } from './components/billing-history';
+import { ExtendDialog } from './components/extend-dialogs';
+import { BillingPage, ManagePlans } from './components/manage-plans';
 import { Modal, WarningDialog } from './components/modal';
-import { CourseCard, PlanStatusPill } from './components/plan-bits';
-import { PlansChrome } from './components/plans-chrome';
+import { CheckoutChrome } from './components/plans-chrome';
+import { billingError, billingOk, billingUrl, paymentDto, purchaseDto } from '@/test/billing';
 import { testExam } from '@/test/exams';
 
 vi.mock('@/shared/layout/app-header', () => ({
@@ -33,6 +33,7 @@ const plan = (extra: Partial<Plan> = {}): Plan => ({
   priceId: 2,
   planId: 10,
   name: 'Topper Monthly',
+  tier: 'monthly',
   durationName: '1 Month',
   badge: { label: 'Most popular', tone: 'popular' },
   price: 499,
@@ -43,6 +44,7 @@ const plan = (extra: Partial<Plan> = {}): Plan => ({
   perDay: 16,
   durationMonths: 1,
   isCombo: false,
+  bundled: [],
   isFree: false,
   isCurrent: false,
   ...extra,
@@ -163,11 +165,13 @@ describe('checkout primitives', () => {
     fireEvent.keyDown(card, { key: 'a' });
     expect(onSelect).toHaveBeenCalledTimes(2);
     rerender(<PlanCard plan={plan({ isCurrent: true, badge: { label: 'Current plan', tone: 'current' } })} active onSelect={onSelect} onContinue={onContinue} />);
-    await userEvent.click(screen.getByRole('button', { name: /Renew this plan/ }));
+    // Renewal is blocked: the active plan shows as current, with nothing to continue to.
+    expect(screen.getByText('Your current active plan')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Renew|Continue with this plan/ })).toBeNull();
+    rerender(<PlanCard plan={plan()} active onSelect={onSelect} onContinue={onContinue} />);
+    await userEvent.click(screen.getByRole('button', { name: /Continue with this plan/ }));
     expect(onContinue).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledTimes(2);
-    rerender(<PlanCard plan={plan()} active onSelect={onSelect} onContinue={onContinue} />);
-    expect(screen.getByRole('button', { name: /Continue with this plan/ })).toBeInTheDocument();
   });
 
   it('plan card marks a free plan without a badge', () => {
@@ -221,257 +225,268 @@ describe('plan modals', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it('status pills and course cards', () => {
+  it('payment status chips', () => {
     render(
       <>
-        <PlanStatusPill status="EXPIRED" />
-        <CourseCard course={{ id: 1, label: 'MAIN PLAN', title: 'NEET 2027', status: 'CANCELLED' }} />
+        <PaymentStatusChip status="paid" />
+        <PaymentStatusChip status="refunded" />
       </>,
     );
-    expect(screen.getByText('EXPIRED')).toBeInTheDocument();
-    expect(screen.getByText('CANCELLED')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'NEET 2027' })).toBeInTheDocument();
+    expect(screen.getByText('Paid')).toBeInTheDocument();
+    expect(screen.getByText('Refunded')).toBeInTheDocument();
   });
 });
 
-describe('extend dialogs', () => {
-  const learning: LearningPlan = {
-    id: 1,
-    planId: 7,
-    name: 'Topper NEET 2027',
-    billingCycle: 'Target Year',
-    status: 'ACTIVE',
-    startDate: '01 Apr, 2026',
-    expiryDate: '2027-05-31',
-    remainingDays: 300,
-    durationMonths: 12,
-    courses: [],
-  };
-  const board: BoardPlan = {
-    planId: 5,
-    classId: 12,
-    className: 'CLASS 12',
-    streamName: '',
-    durationMonths: 1,
-    startDate: '2026-06-01',
-    expiryDate: '2026-07-01',
-    status: 'active',
-    pendingRenewal: null,
-  };
-  const neetExtend = (respond: (code: string) => Response) =>
-    http.post(`${API}/api/v1/purchase/apply-custom-duration-coupon-neet`, async ({ request }) => {
-      const body = (await request.json()) as { coupon_code: string; plan_id?: number };
-      expect(body.plan_id).toBe(7);
-      return respond(body.coupon_code);
-    });
+describe('extend dialog', () => {
+  const target = { purchaseId: 50, name: 'Topper CBSE Monthly', expiryDate: '2026-07-01' };
 
-  it('competitive: Enter applies, a 200 error body shows, then the receipt', async () => {
-    server.use(
-      neetExtend((code) =>
-        code === 'GOOD'
-          ? HttpResponse.json({ success: true, data: { months: 1, expiry_date: '2027-06-30' } })
-          : HttpResponse.json({ success: false, message: 'Coupon expired' }),
-      ),
-    );
-    const onClose = vi.fn();
-    renderWithProviders(<CompetitiveExtendDialog plan={learning} onClose={onClose} />);
-    expect(screen.getByText('Currently Expires: 31 May 2027')).toBeInTheDocument();
-    const input = screen.getByRole('textbox', { name: 'Coupon code' });
-    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled();
-    await userEvent.type(input, 'OLD{Enter}');
-    expect(await screen.findByRole('alert')).toHaveTextContent('Coupon expired');
-    await userEvent.clear(input);
-    expect(screen.queryByRole('alert')).toBeNull();
-    await userEvent.type(input, 'GOOD');
-    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
-    const receipt = await screen.findByRole('dialog', { name: 'Plan extended' });
-    expect(within(receipt).getByText('30 Jun 2027')).toBeInTheDocument();
-    expect(within(receipt).getByText('1 month')).toBeInTheDocument();
-    await userEvent.click(within(receipt).getByRole('button', { name: 'Back to My Learning Plans' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('competitive: a receipt without dates or months, plural months, and cancel', async () => {
-    let reply: Record<string, unknown> = {};
-    server.use(neetExtend(() => HttpResponse.json({ success: true, data: reply })));
-    const onClose = vi.fn();
-    const { unmount } = renderWithProviders(<CompetitiveExtendDialog plan={learning} onClose={onClose} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(onClose).toHaveBeenCalledTimes(2);
-    await userEvent.type(screen.getByRole('textbox', { name: 'Coupon code' }), 'X{Enter}');
-    await screen.findByText('Plan Extended Successfully!');
-    expect(screen.queryByText('New Expiry Date')).toBeNull();
-    expect(screen.queryByText('Extended By')).toBeNull();
-    unmount();
-
-    reply = { months: 3 };
-    renderWithProviders(<CompetitiveExtendDialog plan={learning} onClose={onClose} />);
-    await userEvent.type(screen.getByRole('textbox', { name: 'Coupon code' }), 'Y{Enter}');
-    expect(await screen.findByText('3 months')).toBeInTheDocument();
-  });
-
-  it('board: an error state, then a success without a new date', async () => {
+  it('shows an error, then a success with the new date', async () => {
     let calls = 0;
     server.use(
-      http.post(`${API}/api/v1/purchase/apply-custom-duration-coupon`, async ({ request }) => {
+      http.post(billingUrl(cbse, '/extensions'), async ({ request }) => {
         calls += 1;
-        expect(await request.json()).toMatchObject({ plan_id: 5 });
+        expect(await request.json()).toMatchObject({ purchase_id: 50 });
         return calls === 1
-          ? HttpResponse.json({ success: false, message: 'Invalid coupon code' }, { status: 400 })
-          : HttpResponse.json({ success: true, data: { months: 2 } });
+          ? billingError(400, 'INVALID_COUPON', 'Invalid coupon code', { reason: 'not_found' })
+          : billingOk({ months: 1, expiry_date: '2026-08-01', purchase: purchaseDto() });
       }),
     );
     const onClose = vi.fn();
-    renderWithProviders(<BoardExtendDialog plan={board} onClose={onClose} />);
+    renderWithProviders(<ExtendDialog exam={cbse} plan={target} onClose={onClose} />);
+    expect(screen.getByText('Use a coupon code to add more days to Topper CBSE Monthly')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Extend' })).toBeDisabled();
     await userEvent.type(screen.getByRole('textbox', { name: 'Coupon code' }), 'BAD');
     await userEvent.click(screen.getByRole('button', { name: 'Extend' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid coupon code');
     await userEvent.click(screen.getByRole('button', { name: 'Extend' }));
-    expect(await screen.findByText('2 months added')).toBeInTheDocument();
-    expect(screen.getByText('BAD')).toBeInTheDocument();
-    expect(screen.queryByText(/Your plan now runs till/)).toBeNull();
+    expect(await screen.findByText(/Your plan now runs till 01 Aug 2026/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('succeeds without a new date', async () => {
+    server.use(http.post(billingUrl(cbse, '/extensions'), () => billingOk({ months: 2, purchase: purchaseDto() })));
+    renderWithProviders(<ExtendDialog exam={cbse} plan={target} onClose={vi.fn()} />);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Coupon code' }), 'MORE');
+    await userEvent.click(screen.getByRole('button', { name: 'Extend' }));
+    expect(await screen.findByText('2 months added to Topper CBSE Monthly')).toBeInTheDocument();
+    expect(screen.getByText('MORE')).toBeInTheDocument();
+    expect(screen.queryByText(/Your plan now runs till/)).toBeNull();
+  });
 });
 
-describe('BoardManagePlans', () => {
-  const activePlans = (plans: Record<string, unknown>[]) =>
-    http.get(`${API}/api/subscriptions/get-active-student-plans`, () => HttpResponse.json({ plans }));
+describe('ManagePlans', () => {
+  const purchases = (rows: Record<string, unknown>[]) => http.get(billingUrl(cbse, '/purchases'), () => billingOk({ purchases: rows }));
+  const noPayments = http.get(billingUrl(cbse, '/payments'), () => billingOk({ payments: [] }));
 
-  it('invites a student without plans to browse', async () => {
-    server.use(activePlans([]));
-    renderWithProviders(<BoardManagePlans exam={cbse} />, { exam: cbse });
-    expect(await screen.findByText('No Active Plans Yet')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Browse Plans' })).toHaveAttribute('href', '/cbse/plans/purchase');
-    expect(screen.queryByRole('link', { name: 'View All Plans' })).toBeNull();
+  it('invites a student without plans to the purchase page', async () => {
+    server.use(purchases([]), noPayments);
+    renderWithProviders(<ManagePlans />, { exam: cbse });
+    expect(await screen.findByText('No plans yet')).toBeInTheDocument();
+    for (const link of screen.getAllByRole('link', { name: /Explore plans/ })) expect(link).toHaveAttribute('href', '/cbse/plans/purchase');
+    expect(screen.getByRole('link', { name: /Billing history/ })).toHaveAttribute('href', '#billing');
   });
 
-  it('shows a cancellation error from an HTTP-200 body', async () => {
+  it('shows a load error with a retry', async () => {
+    let calls = 0;
     server.use(
-      activePlans([{ plan_id: 5, class_id: 12, class_name: 'CLASS 12', duration_months: 12, purchase_start_date: '2026-01-01', expiry_date: '2027-03-31', status: 'active' }]),
-      http.post(`${API}/api/v1/purchase/cancel-active-plan`, () => HttpResponse.json({ success: false, message: 'Plan is locked' })),
+      noPayments,
+      http.get(billingUrl(cbse, '/purchases'), () => {
+        calls += 1;
+        return calls === 1 ? billingError(500, 'INTERNAL', 'Server down') : billingOk({ purchases: [] });
+      }),
     );
-    renderWithProviders(<BoardManagePlans exam={cbse} />, { exam: cbse });
-    expect((await screen.findAllByText('Topper Academic Year')).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'Renew Plan' })[0]).toHaveAttribute('href', '/cbse/plans/purchase?CLASSID=12');
-    await userEvent.click(screen.getAllByRole('button', { name: 'Cancel Plan' })[1]!);
-    await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel it!' }));
-    expect(await screen.findByText('Error!')).toBeInTheDocument();
-    expect(screen.getByText('Plan is locked')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'OK' }));
-    expect(screen.queryByText('Error!')).toBeNull();
+    renderWithProviders(<ManagePlans />, { exam: cbse });
+    expect(await screen.findByText("We couldn't load your plans")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByText('No plans yet')).toBeInTheDocument();
   });
 
-  it('blocks renewal while a renewal is pending and shows when it starts', async () => {
+  it('shows dates, days left, amount, invoice and a queued renewal', async () => {
     server.use(
-      activePlans([
-        {
-          plan_id: 6,
-          class_id: 0,
+      noPayments,
+      purchases([
+        purchaseDto({
+          display_name: 'Topper CBSE Monthly',
+          exam_title: 'CBSE',
           class_name: 'CLASS 11',
+          stream_name: 'PCB',
           duration_months: 1,
           purchase_start_date: '2026-06-01',
           expiry_date: '2026-07-01',
-          status: 'active',
-          has_pending_plan: 1,
+          remaining_days: 6,
+          paid_amount: 588.82,
+          invoice_number: 'INV-9',
+          invoice_url: 'https://x.test/9.pdf',
+          has_pending_plan: true,
           pending_start_date: '2026-07-02',
-          pending_purchase_date: '2026-06-20',
-        },
+        }),
       ]),
-      http.get(`${API}/api/subscriptions/get-purchase-payment-history`, () => HttpResponse.json({ data: [{ amount: 1, status: 'pending', invoice: null, created_at: '2026-06-20' }] })),
     );
-    renderWithProviders(<BoardManagePlans exam={cbse} />, { exam: cbse });
-    expect((await screen.findAllByText(/Plan will be renewed on/)).length).toBe(2);
-    expect(screen.getAllByText('2 Jul 2026').length).toBeGreaterThan(0);
-    // The mobile renew link is inert.
-    const mobileRenew = screen.getByRole('link', { name: 'Renew Plan' });
-    expect(mobileRenew).toHaveAttribute('aria-disabled', 'true');
-    expect(fireEvent.click(mobileRenew)).toBe(false);
-    // The row toggles its billing history; pending payments are hidden.
-    await userEvent.click(screen.getAllByText('Topper Monthly')[0]!);
-    expect(await screen.findByText('No billing history available for this plan')).toBeInTheDocument();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Hide billing history' })[1]!);
-    expect(screen.queryByText('Billing History for this Plan')).toBeNull();
+    renderWithProviders(<ManagePlans />, { exam: cbse });
+    const card = await screen.findByRole('heading', { name: 'Topper CBSE Monthly' });
+    expect(screen.getByText('CBSE · Class 11 PCB')).toBeInTheDocument();
+    expect(card).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByText('1 Jun 2026 – 1 Jul 2026')).toBeInTheDocument();
+    expect(screen.getByText('6 days left')).toBeInTheDocument();
+    expect(screen.getByText('20% remaining')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Time remaining' })).toBeInTheDocument();
+    expect(screen.getByText('₹588.82')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'INV-9' })).toHaveAttribute('href', 'https://x.test/9.pdf');
+    expect(screen.getByText(/Renews on/)).toHaveTextContent('Renews on 2 Jul 2026');
   });
 
-  it('pages the billing history of a free expired plan', async () => {
+  it('labels every status and pages a plan\'s payments both ways', async () => {
     const pages: string[] = [];
     server.use(
-      activePlans([{ plan_id: 7, class_id: 12, class_name: 'CLASS 12', duration_months: 0, purchase_start_date: '2026-01-01', status: 'expired' }]),
-      http.get(`${API}/api/subscriptions/get-purchase-payment-history`, ({ request }) => {
+      noPayments,
+      purchases(
+        (['pending', 'expired', 'cancelled', 'refunded'] as const).map((status, index) =>
+          purchaseDto({ purchase_id: index + 1, plan_id: index + 7, status, display_name: `Plan ${status}` }),
+        ),
+      ),
+      http.get(billingUrl(cbse, '/purchases/7/payments'), ({ request }) => {
         const page = new URL(request.url).searchParams.get('page')!;
         pages.push(page);
-        return HttpResponse.json({
-          data: [{ amount: '0', status: 'Failed', invoice: '', created_at: '2026-01-02', duration: null }],
-          pagination: { page: Number(page), totalPages: 2 },
+        return billingOk({
+          payments: [paymentDto({ id: Number(page), amount: 0, status: 'failed', invoice_url: '' })],
+          pagination: { page: Number(page), limit: 10, total: 12, total_pages: 2 },
         });
       }),
     );
-    renderWithProviders(<BoardManagePlans exam={cbse} />, { exam: cbse });
-    expect((await screen.findAllByText('______')).length).toBe(2);
-    expect(screen.queryByRole('button', { name: 'Extend plan' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Cancel Plan' })).toBeNull();
-    expect(screen.getAllByText('Expired').length).toBeGreaterThan(0);
-    await userEvent.click(screen.getAllByRole('button', { name: 'Show billing history' })[0]!);
-    expect((await screen.findAllByText('Payment Months Plan')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Failed').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('No invoice').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Prev' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    renderWithProviders(<ManagePlans />, { exam: cbse });
+    await screen.findByRole('heading', { name: 'Plan pending' });
+    for (const label of ['Pending', 'Expired', 'Cancelled', 'Refunded']) expect(screen.getByText(label)).toBeInTheDocument();
+    // Cancel only for an active paid plan; extend for active or expired ones.
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Extend with coupon' })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: 'Upgrade' })).toHaveLength(1);
+    await userEvent.click(screen.getAllByRole('button', { name: /View payments/ })[0]!);
+    expect(await screen.findByText('Page 1 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Prev/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: /Next/ }));
     expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'Prev' }));
+    expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: /Prev/ }));
     expect(await screen.findByText('Page 1 of 2')).toBeInTheDocument();
     expect(pages.slice(0, 2)).toEqual(['1', '2']);
+    await userEvent.click(screen.getAllByRole('button', { name: /View payments/ })[0]!);
+    expect(screen.queryByText('Page 1 of 2')).toBeNull();
   });
 
-  it('opens and closes the extend dialog', async () => {
+  it('shows an empty or failed plan payments list', async () => {
+    server.use(
+      noPayments,
+      purchases([purchaseDto({ plan_id: 5 }), purchaseDto({ purchase_id: 2, plan_id: 6, display_name: 'Second' })]),
+      http.get(billingUrl(cbse, '/purchases/5/payments'), () => billingOk({ payments: [] })),
+      http.get(billingUrl(cbse, '/purchases/6/payments'), () => billingError(500, 'INTERNAL', 'History offline')),
+    );
+    renderWithProviders(<ManagePlans />, { exam: cbse });
+    const [first, second] = await screen.findAllByRole('button', { name: /View payments/ });
+    await userEvent.click(first!);
+    expect(await screen.findByText('No payments for this plan yet.')).toBeInTheDocument();
+    await userEvent.click(second!);
+    // A 5xx shows the generic message, not the server's.
+    expect(await screen.findByText("Couldn't load this plan's payments.")).toBeInTheDocument();
+  });
+
+  it('offers no cancel on free plans (Basic or free premium) and shows a payment-provider outage plainly', async () => {
+    server.use(
+      noPayments,
+      purchases([
+        purchaseDto({ purchase_id: 1, plan_id: 5, class_name: 'CLASS 12', duration_months: 0, price: 0, paid_amount: 0, expiry_date: null }),
+        // The free sign-up Topper month: a list price, but nothing paid (is_free).
+        purchaseDto({ purchase_id: 2, plan_id: 6, class_name: 'CLASS 11', duration_months: 1, price: 499, paid_amount: 0, is_free: true }),
+        purchaseDto({ purchase_id: 3, plan_id: 7, class_name: 'CLASS 10', duration_months: 1, price: 499 }),
+      ]),
+      http.post(billingUrl(cbse, '/purchases/3/cancel'), () => billingError(502, 'PAYMENT_PROVIDER_ERROR', 'Razorpay refund failed')),
+    );
+    renderWithProviders(<ManagePlans />, { exam: cbse });
+    // Only the paid Class 10 plan can be cancelled.
+    const cancel = await screen.findAllByRole('button', { name: 'Cancel' });
+    expect(cancel).toHaveLength(1);
+    await userEvent.click(cancel[0]!);
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel plan' }));
+    expect(await screen.findByText('The payment service is unavailable right now. Please try again in a few minutes.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('closes the cancellation receipt and reloads the plans after an extension', async () => {
     let loads = 0;
     server.use(
-      http.get(`${API}/api/subscriptions/get-active-student-plans`, () => {
+      noPayments,
+      http.get(billingUrl(cbse, '/purchases'), () => {
         loads += 1;
-        return HttpResponse.json({ plans: [{ plan_id: 5, class_name: 'CLASS 12', stream_name: 'PCM', duration_months: 1, expiry_date: '2026-07-01', status: 'active' }] });
+        return billingOk({ purchases: [purchaseDto({ purchase_id: 9, plan_id: 5, duration_months: 1, expiry_date: '2026-07-01' })] });
       }),
+      http.post(billingUrl(cbse, '/purchases/9/cancel'), () => billingOk({ purchase: purchaseDto(), refund: null })),
     );
-    renderWithProviders(<BoardManagePlans exam={cbse} />, { exam: cbse });
-    await userEvent.click((await screen.findAllByRole('button', { name: 'Extend plan' }))[1]!);
+    renderWithProviders(<ManagePlans />, { exam: cbse });
+    await userEvent.click(await screen.findByRole('button', { name: 'Extend with coupon' }));
     expect(screen.getByRole('dialog', { name: 'Extend your plan' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog', { name: 'Extend your plan' })).toBeNull();
     await waitFor(() => expect(loads).toBe(2));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel plan' }));
+    const receipt = await screen.findByRole('dialog', { name: 'Cancellation confirmed' });
+    expect(within(receipt).getByRole('link', { name: /Explore plans/ })).toHaveAttribute('href', '/cbse/plans/purchase');
+    await userEvent.click(within(receipt).getByRole('button', { name: 'Back to my plans' }));
+    expect(screen.queryByRole('dialog', { name: 'Cancellation confirmed' })).toBeNull();
   });
 });
 
-describe('BillingPage and PlansChrome', () => {
-  it('shows the invoice list for competitive exams', async () => {
-    server.use(http.get(`${API}/api/neet/v1/purchase/billing-history`, () => HttpResponse.json({ success: true, data: [] })));
-    renderWithProviders(<BillingPage />, { exam: neet });
-    expect(await screen.findByText('No invoices yet')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Billing & Invoices' })).toBeInTheDocument();
+describe('BillingPage and chrome', () => {
+  it('shows the same billing page for every exam, with a retry on errors', async () => {
+    let calls = 0;
+    server.use(
+      http.get(billingUrl(neet, '/payments'), () => billingOk({ payments: [], pagination: { page: 1, limit: 10, total: 0, total_pages: 0 } })),
+      http.get(billingUrl(cbse, '/payments'), () => {
+        calls += 1;
+        return calls === 1 ? billingError(500, 'INTERNAL', 'Payments offline') : billingOk({ payments: [paymentDto({ description: '', display_name: null })] });
+      }),
+    );
+    const { unmount } = renderWithProviders(<BillingPage />, { exam: neet });
+    expect(await screen.findByText('No payments yet')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Billing history' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to my plans' })).toHaveAttribute('href', '/neet/plans');
+    unmount();
+    renderWithProviders(<BillingPage />, { exam: cbse });
+    expect(await screen.findByText("Couldn't load your payments. Try again.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect((await screen.findAllByText('Plan purchase')).length).toBeGreaterThan(0);
     expect(navigation.replace).not.toHaveBeenCalled();
   });
 
-  it('keeps the navigation rail for competitive exams and the header only for boards', () => {
-    const { unmount } = render(
-      <ExamProvider value={neet}>
-        <PlansChrome>
-          <p>plans</p>
-        </PlansChrome>
-      </ExamProvider>,
-    );
-    expect(screen.getByTestId('app-chrome')).toHaveTextContent('plans');
-    unmount();
-    render(
-      <ExamProvider value={cbse}>
-        <PlansChrome>
-          <p>plans</p>
-        </PlansChrome>
-      </ExamProvider>,
-    );
-    expect(screen.queryByTestId('app-chrome')).toBeNull();
-    expect(screen.getByText('header:board')).toBeInTheDocument();
-    expect(screen.getByRole('main')).toHaveTextContent('plans');
+  it('gives the plans pages the app chrome for every exam', () => {
+    for (const exam of [cbse, neet]) {
+      const { unmount } = render(
+        <ExamProvider value={exam}>
+          <AccountLayout>
+            <p>plans</p>
+          </AccountLayout>
+        </ExamProvider>,
+      );
+      expect(screen.getByTestId('app-chrome')).toHaveTextContent('plans');
+      unmount();
+    }
+  });
+
+  it('gives the purchase page the app header, with no navigation rail, for every exam', () => {
+    for (const exam of [cbse, neet]) {
+      const { unmount } = render(
+        <ExamProvider value={exam}>
+          <CheckoutChrome>
+            <p>checkout</p>
+          </CheckoutChrome>
+        </ExamProvider>,
+      );
+      expect(screen.getByText(`header:${exam.category}`)).toBeInTheDocument();
+      expect(screen.queryByTestId('app-chrome')).toBeNull();
+      expect(screen.getByRole('main')).toHaveTextContent('checkout');
+      unmount();
+    }
   });
 });

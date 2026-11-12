@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { usePlanSelection } from '@/features/auth';
+import { routes } from '@/shared/config/routes';
 import { apiClient } from '@/shared/lib/api-client';
 import { useExam } from '@/shared/hooks/use-exam';
 import { renderWithProviders } from '@/test/render';
@@ -43,6 +44,11 @@ const boardPlan = (extra: RawPlan = {}): RawPlan => ({
 });
 const plans = (...rows: RawPlan[]) =>
   http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans: rows } }));
+/** Plans per exam (the purchased() helper numbers exams 1, 2 … in order). */
+const plansByExam = (rows: Record<number, RawPlan[]>) =>
+  http.get(`${API}/api/v4/student/plans/active`, ({ request }) =>
+    HttpResponse.json({ success: true, data: { plans: rows[Number(new URL(request.url).searchParams.get('exam_id'))] ?? [] } }),
+  );
 const studyPlan = (hasPlan: boolean) =>
   http.get(`${API}/api/v4/study-plan/classes/:classId/status`, () => HttpResponse.json({ success: true, data: { has_plan: hasPlan } }));
 
@@ -102,7 +108,7 @@ describe('board shell', () => {
     navigation.pathname = '/cbse/dashboard';
   });
 
-  it('shows the labelled sidebar, header links and the active plan card', async () => {
+  it('shows the labelled sidebar, the goals pill (no header links, no class switcher) and the active plan card', async () => {
     server.use(purchased(['cbse', 'CBSE']), account, plans(boardPlan()), studyPlan(false));
     renderShell('cbse');
     await screen.findByText('Page');
@@ -115,9 +121,16 @@ describe('board shell', () => {
     expect(within(sidebar!).queryByRole('link', { name: /Study Plan/ })).not.toBeInTheDocument();
     expect(within(sidebar!).getByText('Study Plan').closest('[aria-disabled]')).not.toBeNull();
 
-    const header = screen.getByRole('navigation', { name: 'Header' });
-    expect(within(header).getByRole('link', { name: 'Courses' })).toHaveAttribute('href', '/cbse/courses');
-    expect(within(header).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
+    // One header for every exam: no Dashboard / Courses links, the "{Exam} · {Class}" pill instead.
+    expect(screen.queryByRole('navigation', { name: 'Header' })).not.toBeInTheDocument();
+    const header = screen.getByRole('banner');
+    expect(within(header).queryByRole('link', { name: 'Courses' })).not.toBeInTheDocument();
+    expect(within(header).queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
+    const [pill] = await within(header).findAllByRole('button', { name: 'My goals: CBSE · Class 12 PCB' });
+    expect(pill).toBeInTheDocument();
+    // The class is picked from the pill, not the sidebar.
+    expect(screen.queryByRole('button', { name: /Switch class/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('MY PLANS')).not.toBeInTheDocument();
 
     expect(await screen.findByRole('link', { name: 'Active plan: CLASS 12 (PCB) Topper. Manage' })).toHaveAttribute(
       'href',
@@ -150,50 +163,94 @@ describe('board shell', () => {
     expect(await within(sidebar!).findByRole('link', { name: 'Study Plan' })).toHaveAttribute('href', '/cbse/study-plan');
   });
 
-  it('switches class from the class switcher', async () => {
-    server.use(
-      purchased(['cbse', 'CBSE']),
-      account,
-      studyPlan(false),
-      plans(
-        boardPlan(),
-        boardPlan({ plan_id: 2, class_id: 11, class_name: 'CLASS 11', stream_name: '', duration_months: 0 }),
-        boardPlan({ plan_id: 3, class_id: 10, class_name: 'CLASS 10', stream_name: '', status: 'expired' }),
-      ),
-    );
-    renderShell('cbse');
-    await userEvent.click(await screen.findByRole('button', { name: /Class: CLASS 12 \(PCB\)/ }));
-    expect(await screen.findByRole('menuitem', { name: /CLASS 10/ })).toHaveAttribute('data-disabled');
-    expect(screen.getByText('expired')).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Add New Class' })).toHaveAttribute('href', '/cbse/plans');
-    await userEvent.click(screen.getByRole('menuitem', { name: /CLASS 11/ }));
-
-    expect(localStorage.getItem('selectedPlanId')).toBe('2');
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/dashboard');
-    expect(await screen.findByRole('button', { name: /Class: CLASS 11/ })).toBeInTheDocument();
+  const goalPlans = plansByExam({
+    1: [
+      boardPlan(),
+      boardPlan({ plan_id: 2, class_id: 11, class_name: 'CLASS 11', stream_name: '', duration_months: 0, expiry_date: null }),
+      boardPlan({ plan_id: 3, class_id: 10, class_name: 'CLASS 10', stream_name: '', status: 'expired' }),
+    ],
+    2: [boardPlan({ plan_id: 7, exam_id: 2, class_id: 20, class_name: 'CLASS 12', stream_name: '', duration_months: 0, expiry_date: null })],
   });
 
-  it('opens the mobile menu drawer with the profile, class switcher and account links', async () => {
-    server.use(
-      purchased(['cbse', 'CBSE'], ['neet-ug', 'NEET-UG']),
-      account,
-      studyPlan(false),
-      plans(boardPlan(), boardPlan({ plan_id: 2, class_id: 11, class_name: 'CLASS 11', stream_name: '' })),
-    );
+  it('lists every goal grouped by exam in the goals menu, the current one checked, and switches class', async () => {
+    server.use(purchased(['cbse', 'CBSE'], ['neet-ug', 'NEET-UG']), account, studyPlan(false), goalPlans);
     renderShell('cbse');
-    await userEvent.click(await screen.findByRole('button', { name: 'Open menu' }));
-    const drawer = screen.getByRole('dialog', { name: 'Menu' });
-    expect(await within(drawer).findByText('12 Months Plan')).toBeInTheDocument();
-    expect(within(drawer).getByRole('link', { name: /Refer & Earn/ })).toHaveAttribute('href', '/cbse/refer-and-earn');
-    expect(within(drawer).getByRole('link', { name: /NEET-UG/ })).toHaveAttribute('href', '/neet/dashboard');
+    const [pill] = await screen.findAllByRole('button', { name: 'My goals: CBSE · Class 12 PCB' });
+    await userEvent.click(pill!);
+    const menu = await screen.findByRole('menu', { name: /My goals/ });
 
-    await userEvent.click(within(drawer).getByRole('button', { name: /CLASS 12 PCB/ }));
-    await userEvent.click(within(drawer).getByRole('button', { name: /CLASS 11/ }));
+    const cbse = within(menu).getByRole('group', { name: 'CBSE' });
+    expect(within(cbse).getAllByRole('menuitem').map((i) => i.getAttribute('aria-label'))).toEqual([
+      'CBSE Class 12 PCB, Topper plan · Valid till 1 May 2027, current goal',
+      'CBSE Class 11, Free plan',
+      'CBSE Class 10, Topper plan · Valid till 1 May 2027 · expired',
+    ]);
+    expect(within(cbse).getByRole('menuitem', { name: /Class 12 PCB/ })).toHaveAttribute('aria-current', 'true');
+    // Expired plans are listed but can't be switched to.
+    expect(within(cbse).getByRole('menuitem', { name: /Class 10/ })).toHaveAttribute('data-disabled');
+    const neet = within(menu).getByRole('group', { name: 'NEET-UG' });
+    expect(within(neet).getByRole('menuitem', { name: 'NEET-UG Class 12, Free plan' })).toBeInTheDocument();
+
+    expect(within(menu).getByRole('menuitem', { name: 'Manage plans' })).toHaveAttribute('href', '/cbse/plans');
+    expect(within(menu).getByRole('menuitem', { name: 'Add another goal' })).toHaveAttribute('href', '/cbse/plans/purchase');
+
+    await userEvent.click(within(cbse).getByRole('menuitem', { name: /Class 11/ }));
     expect(localStorage.getItem('selectedPlanId')).toBe('2');
-    expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
+    expect(navigation.push).toHaveBeenCalledWith('/cbse/dashboard');
+    expect((await screen.findAllByRole('button', { name: 'My goals: CBSE · Class 11' })).length).toBeGreaterThan(0);
+  });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Open menu' }));
-    await userEvent.click(within(screen.getByRole('dialog', { name: 'Menu' })).getByRole('button', { name: 'Close menu' }));
+  it('switches exam from the goals menu', async () => {
+    server.use(purchased(['cbse', 'CBSE'], ['neet-ug', 'NEET-UG']), account, studyPlan(false), goalPlans);
+    renderShell('cbse');
+    const [pill] = await screen.findAllByRole('button', { name: /My goals/ });
+    await userEvent.click(pill!);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'NEET-UG Class 12, Free plan' }));
+    expect(localStorage.getItem('selectedPlanId')).toBe('7');
+    expect(navigation.push).toHaveBeenCalledWith('/neet/dashboard');
+  });
+
+  it('opens the goals bottom sheet on mobile and closes it on Escape, the close button and selection', async () => {
+    server.use(purchased(['cbse', 'CBSE'], ['neet-ug', 'NEET-UG']), account, studyPlan(false), goalPlans);
+    renderShell('cbse');
+    const pills = await screen.findAllByRole('button', { name: 'My goals: CBSE · Class 12 PCB' });
+    const mobilePill = pills[1]!;
+    expect(mobilePill).toHaveAttribute('aria-haspopup', 'dialog');
+
+    await userEvent.click(mobilePill);
+    let sheet = await screen.findByRole('dialog', { name: 'My goals' });
+    expect(within(sheet).getAllByRole('heading').map((h) => h.textContent)).toEqual(['My goals', 'CBSE', 'NEET-UG']);
+    expect(within(sheet).getByRole('button', { name: /Class 12 PCB/ })).toHaveAttribute('aria-current', 'true');
+    expect(within(sheet).getByRole('button', { name: /Class 10/ })).toBeDisabled();
+    expect(within(sheet).getByRole('link', { name: 'Manage plans' })).toHaveAttribute('href', '/cbse/plans');
+    expect(within(sheet).getByRole('link', { name: 'Add another goal' })).toHaveAttribute('href', '/cbse/plans/purchase');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'My goals' })).not.toBeInTheDocument());
+
+    await userEvent.click(mobilePill);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'My goals' })).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'My goals' })).not.toBeInTheDocument());
+
+    await userEvent.click(mobilePill);
+    sheet = await screen.findByRole('dialog', { name: 'My goals' });
+    await userEvent.click(within(sheet).getByRole('button', { name: /Class 11/ }));
+    expect(localStorage.getItem('selectedPlanId')).toBe('2');
+    expect(navigation.push).toHaveBeenCalledWith('/cbse/dashboard');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'My goals' })).not.toBeInTheDocument());
+  });
+
+  it('opens the mobile menu drawer with the profile and account links', async () => {
+    server.use(purchased(['cbse', 'CBSE'], ['neet-ug', 'NEET-UG']), account, studyPlan(false), plans(boardPlan()));
+    renderShell('cbse');
+    await userEvent.click(await screen.findByRole('button', { name: 'Open account menu' }));
+    const drawer = screen.getByRole('dialog', { name: 'Menu' });
+    expect(await within(drawer).findByText('Asha Rao')).toBeInTheDocument();
+    expect(within(drawer).getByRole('link', { name: /Refer & Earn/ })).toHaveAttribute('href', '/cbse/refer-and-earn');
+    expect(within(drawer).getByRole('link', { name: /Manage Plans/ })).toHaveAttribute('href', '/cbse/plans');
+    // Classes and exams switch from the goals pill now.
+    expect(within(drawer).queryByRole('button', { name: /CLASS 12/ })).not.toBeInTheDocument();
+
+    await userEvent.click(within(drawer).getByRole('button', { name: 'Close menu' }));
     expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
   });
 
@@ -204,11 +261,25 @@ describe('board shell', () => {
       account,
       studyPlan(false),
       plans(boardPlan()),
-      http.get(`${API}/api/v1/student/search-suggestions`, ({ request }) => {
+      http.get(`${API}/api/v4/search/board/1/suggestions`, ({ request }) => {
         query = new URL(request.url).search;
         return HttpResponse.json({
           success: true,
-          data: { suggestions: [{ topic_name: 'Electric Charge', subject_name: 'PHYSICS' }] },
+          data: {
+            suggestions: [
+              {
+                result_id: 4,
+                result_name: 'Electric Charge',
+                result_type: 'topic',
+                subject_name: 'PHYSICS',
+                class_name: 'CLASS 12',
+                course_id: 7,
+                module_id: 8,
+                module_name: null,
+                anchor_id: null,
+              },
+            ],
+          },
         });
       }),
     );
@@ -217,7 +288,7 @@ describe('board shell', () => {
     const [box] = screen.getAllByRole('combobox', { name: 'Search topics' });
     await userEvent.type(box!, 'elec');
     const suggestion = await screen.findByRole('button', { name: /electric charge/i }, { timeout: 2000 });
-    expect(query).toBe('?q=elec&classId=12');
+    expect(query).toBe('?q=elec&class_id=12');
     expect(suggestion).toHaveTextContent('Physics');
     await userEvent.click(suggestion);
     expect(navigation.push).toHaveBeenCalledWith('/cbse/learn');
@@ -247,6 +318,13 @@ describe('competitive shell', () => {
       purchased(['neet-ug', 'NEET-UG'], ['cbse', 'CBSE']),
       account,
       neetPlan,
+      // The plan card names the plan by its purchase's display_name.
+      http.get(`${API}/api/v4/billing/competitive/2/purchases`, () =>
+        HttpResponse.json({
+          success: true,
+          data: { purchases: [{ purchase_id: 9, plan_id: 5, duration_months: 12, status: 'active', display_name: 'Topper NEET-UG 2027 + CBSE' }] },
+        }),
+      ),
       http.get(`${API}/api/v4/student/plans/2/summary`, () =>
         HttpResponse.json({
           success: true,
@@ -265,12 +343,16 @@ describe('competitive shell', () => {
     expect(within(rail).getByRole('link', { name: 'Mock Tests' })).toHaveAttribute('aria-current', 'page');
     expect(within(rail).getByRole('link', { name: 'Custom Exam' })).toHaveAttribute('href', '/neet/custom-test');
     expect(within(rail).getByRole('button', { name: 'Daily Practice' })).toBeInTheDocument();
-    expect(await screen.findByText('Topper NEET 2027 + CBSE Plan')).toBeInTheDocument();
+    expect(await screen.findByText('Topper NEET-UG 2027 + CBSE')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Manage plan' })).toHaveAttribute('href', '/neet/plans');
 
-    await userEvent.click(screen.getByRole('button', { name: /Switch exam/ }));
-    expect(screen.getByRole('button', { name: /Switch exam/ })).toHaveAccessibleName('Exam: NEET-UG. Switch exam');
-    expect(await screen.findByRole('menuitem', { name: /CBSE/ })).toHaveAttribute('href', '/cbse/dashboard');
+    // Same header as board: the goals pill, no header links.
+    expect(screen.queryByRole('navigation', { name: 'Header' })).not.toBeInTheDocument();
+    const [pill] = await screen.findAllByRole('button', { name: 'My goals: NEET-UG · NEET' });
+    await userEvent.click(pill!);
+    const goals = await screen.findByRole('menu', { name: /My goals/ });
+    expect(within(goals).getByRole('menuitem', { name: /^NEET-UG NEET, Topper plan/ })).toHaveAttribute('aria-current', 'true');
+    expect(within(goals).getByRole('group', { name: 'CBSE' })).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
 
     await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
@@ -303,12 +385,13 @@ describe('competitive shell', () => {
     expect(container.querySelector('aside[data-open="false"]')).not.toBeNull();
   });
 
-  it('opens the mobile account panel with the exam list', async () => {
+  it('opens the mobile account panel', async () => {
     server.use(purchased(['neet-ug', 'NEET-UG']), account, neetPlan);
     renderShell('neet');
     await userEvent.click(await screen.findByRole('button', { name: 'Open account menu' }));
     const panel = screen.getByRole('dialog', { name: 'Account' });
-    expect(await within(panel).findByText('Currently Active')).toBeInTheDocument();
+    expect(await within(panel).findByText('Asha Rao')).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: /My Plans/ })).toHaveAttribute('href', '/neet/plans');
     await userEvent.click(screen.getByRole('button', { name: 'Open account menu' }));
     expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument();
   });
@@ -345,14 +428,31 @@ describe('daily practice resolution', () => {
 });
 
 describe('shell API', () => {
-  it('reads NEET search suggestions and live DPP details', async () => {
+  it('reads competitive search suggestions and live DPP details', async () => {
+    let query = '';
     server.use(
-      http.get(`${API}/api/v1/student/neet-search-suggestions`, () =>
-        HttpResponse.json({
+      http.get(`${API}/api/v4/search/competitive/2/suggestions`, ({ request }) => {
+        query = new URL(request.url).search;
+        return HttpResponse.json({
           success: true,
-          data: { suggestions: [{ result_name: 'Cell cycle', module_name: 'Cell Division', subject_name: 'NEET-BOTANY' }] },
-        }),
-      ),
+          data: {
+            suggestions: [
+              { result_name: 'Cell cycle', result_type: 'topic', module_name: 'Cell Division', subject_name: 'NEET-BOTANY' },
+              {
+                result_name: 'Cell cycle',
+                result_type: 'topic',
+                module_name: 'Cell Division',
+                subject_name: 'NEET-BOTANY',
+                course_id: 3,
+                module_id: 9,
+                anchor_id: 'cell cycle',
+              },
+              { result_name: 'Cell Division', result_type: 'module', module_name: null, subject_name: 'NEET-BOTANY', course_id: 3, module_id: 9 },
+              { result_name: 'Botany', result_type: 'course', module_name: null, subject_name: 'NEET-BOTANY', course_id: 3, module_id: null },
+            ],
+          },
+        });
+      }),
       http.get(`${API}/api/v4/assessments/competitive/2/dpp/live`, () =>
         HttpResponse.json({
           success: true,
@@ -367,8 +467,13 @@ describe('shell API', () => {
       ),
     );
     const neet = testExam('neet');
-    expect(await shellApi.searchSuggestions(neet, 'cell', null)).toEqual([
-      { key: '0-Cell cycle', title: 'Cell cycle', context: 'in cell division', subject: 'Botany', href: null },
+    const results = await shellApi.searchSuggestions(neet, `cell${'x'.repeat(200)}`, null);
+    expect(query).toBe(`?q=cell${'x'.repeat(96)}`);
+    expect(results[0]).toEqual({ key: '0-Cell cycle', title: 'Cell cycle', context: 'in cell division', subject: 'Botany', href: null });
+    expect(results.slice(1).map((r) => r.href)).toEqual([
+      `${routes.learnModule('neet', 3, 9, 'study-notes')}#cell%20cycle`,
+      routes.learnModule('neet', 3, 9, 'video-lectures'),
+      routes.learnCourse('neet', 3),
     ]);
     expect(await shellApi.liveDpp(neet)).toEqual({
       dppId: '9',
@@ -393,11 +498,8 @@ describe('reference frame and placeholders', () => {
       </ReferenceFrame>,
     );
     expect(container.querySelector('[data-theme="reference"]')).not.toBeNull();
-    expect(within(screen.getByRole('navigation', { name: 'Header' })).getByRole('link', { name: 'Reference Books' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    expect(await screen.findByRole('button', { name: /Exam: Reference Books/ })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Header' })).not.toBeInTheDocument();
+    expect((await screen.findAllByRole('button', { name: 'My goals: Reference Books' })).length).toBeGreaterThan(0);
   });
 
   it('explains that a section is being moved', () => {

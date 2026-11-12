@@ -115,13 +115,13 @@ describe('dashboard normalisers: missing and odd fields', () => {
   });
 
   it('referral summary is null for failures and empty data, otherwise defaults the tier', async () => {
-    server.use(get('/api/referral/me', { success: false, message: 'No referral' }));
+    server.use(get('/api/v4/referral/me', { success: false, message: 'No referral' }));
     expect(await dashboardApi.referralSummary()).toBeNull();
-    server.use(get('/api/referral/me', { success: true, data: [] }));
+    server.use(get('/api/v4/referral/me', { success: true, data: [] }));
     expect(await dashboardApi.referralSummary()).toBeNull();
-    server.use(get('/api/referral/me', { success: true, data: { balance: '150', tier: 'gold' } }));
+    server.use(get('/api/v4/referral/me', { success: true, data: { balance: '150', tier: 'gold' } }));
     expect(await dashboardApi.referralSummary()).toEqual({ balance: 150, friendCount: 0, tier: 'free' });
-    server.use(get('/api/referral/me', { success: true, data: { balance: 0, friendCount: 3, tier: 'paid' } }));
+    server.use(get('/api/v4/referral/me', { success: true, data: { balance: 0, friendCount: 3, tier: 'paid' } }));
     expect(await dashboardApi.referralSummary()).toEqual({ balance: 0, friendCount: 3, tier: 'paid' });
   });
 });

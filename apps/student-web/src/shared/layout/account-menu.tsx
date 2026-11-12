@@ -9,8 +9,9 @@ import { useCurrentUser, useLogout, type Student } from '@/features/auth';
 import { DeleteAccountDialog } from '@/features/profile/ui';
 import type { ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
-import { ExamList, sectionLabel, useOwnedExams } from './exam-selector';
 import { usePlanSummary } from './shell-api';
+
+const sectionLabel = 'text-foreground-subtle block text-[11px] font-semibold tracking-wide uppercase';
 
 export function initialsOf(student: Pick<Student, 'firstName' | 'lastName'> | undefined): string {
   if (!student) return 'U';
@@ -164,38 +165,27 @@ function PlanSummaryCard({ exam, onNavigate }: { exam: ExamConfig | null; onNavi
 
 /**
  * Body of every account menu (desktop dropdown, NEET mobile panel, board mobile drawer).
- * `top` lets the board drawer put its class switcher card first.
+ * `top` replaces the profile header (the board drawer's purple card). Exams and classes switch from the goals pill.
  */
 export function AccountMenuBody({
   exam,
   asMenuItems = false,
-  showExams = false,
   showReferral = false,
   onNavigate,
   top,
 }: {
   exam: ExamConfig | null;
   asMenuItems?: boolean;
-  showExams?: boolean;
   showReferral?: boolean;
   onNavigate?: () => void;
   top?: ReactNode;
 }) {
   const user = useCurrentUser();
-  const owned = useOwnedExams();
   const competitive = exam?.category === 'competitive';
   return (
     <div className="flex flex-col gap-3">
       {top ?? <ProfileHeader student={user.data} />}
       <PlanSummaryCard exam={exam} onNavigate={onNavigate} />
-      {showExams && owned.length > 0 && (
-        <div>
-          <span className={sectionLabel}>Active course</span>
-          <div className="mt-2">
-            <ExamList owned={owned} current={exam} onSelect={onNavigate} />
-          </div>
-        </div>
-      )}
       {exam && (
         <>
           <MenuCard

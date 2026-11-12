@@ -121,9 +121,9 @@ describe('useCountdown', () => {
 });
 
 describe('SignupSuccess', () => {
-  const V1 = `${API}/api/partner/v1`;
+  const V4 = `${API}/api/v4/partners`;
   const summary = (shareLink: string | null) =>
-    http.get(`${V1}/dashboard/me`, () => HttpResponse.json({ success: true, data: { code: 'ANITA50', shareLink, balance: 0, friendCount: 0 } }));
+    http.get(`${V4}/summary`, () => HttpResponse.json({ success: true, data: { code: 'ANITA50', shareLink, balance: 0, friendCount: 0 } }));
 
   it('waits for the link, then copies it and goes to the dashboard', async () => {
     const user = userEvent.setup();

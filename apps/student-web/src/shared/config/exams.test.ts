@@ -1,7 +1,6 @@
 import { availableTestTypes } from '@/features/exam-engine';
 import { examList, findExam, getExam, hasTestType, REFERENCE } from './exams';
 import {
-  HEADER_LINKS,
   isActivePath,
   isNavLocked,
   NAVIGATION,
@@ -78,15 +77,6 @@ describe('navigation', () => {
 
   it('reference navigation points at the reference books page', () => {
     expect(NAVIGATION.reference.map((i) => i.href(''))).toEqual(['/reference-books']);
-    expect(HEADER_LINKS.reference.map((l) => l.href(''))).toEqual(['/reference-books']);
-  });
-
-  it('has the old header links per category', () => {
-    expect(HEADER_LINKS.board.map((l) => [l.label, l.href('cbse')])).toEqual([
-      ['Dashboard', '/cbse/dashboard'],
-      ['Courses', '/cbse/courses'],
-    ]);
-    expect(HEADER_LINKS.competitive.map((l) => l.label)).toEqual(['Dashboard']);
   });
 
   it('locks items by plan and study plan', () => {
@@ -104,9 +94,9 @@ describe('navigation', () => {
     expect(isActivePath('/cbse/learn', '/cbse/learning')).toBe(false);
   });
 
-  it.each(examList)('$label: every sidebar and header link resolves to a page (no 404s)', (exam) => {
+  it.each(examList)('$label: every sidebar link resolves to a page (no 404s)', (exam) => {
     const known = new Set(['dashboard', 'tests', ...Object.keys(SECTIONS[exam.category])]);
-    const hrefs = [...navigationFor(exam).map((i) => i.href(exam.slug)), ...HEADER_LINKS[exam.category].map((l) => l.href(exam.slug))];
+    const hrefs = navigationFor(exam).map((i) => i.href(exam.slug));
     for (const href of hrefs) {
       const [, slug, section] = href.split('/');
       expect(slug).toBe(exam.slug);

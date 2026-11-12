@@ -78,7 +78,7 @@ export function ParentLink() {
   const save = useMutation({
     mutationFn: async (next: ParentDetails) => {
       if (mode === 'edit' && existing && sameContact(existing, next)) {
-        await profileApi.renameParent(existing.id, next);
+        await profileApi.renameParent(next);
         return 'saved' as const;
       }
       await profileApi.sendParentOtp(next);

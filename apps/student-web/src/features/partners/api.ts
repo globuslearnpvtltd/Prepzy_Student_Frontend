@@ -214,29 +214,28 @@ export const toPartnerTypes = (raw: unknown): PartnerType[] =>
 /** The backend wants the number with its country code. */
 export const withCountryCode = (phone: string) => `+91${phone}`;
 
-const V1 = '/api/partner/v1';
-const data = async <T>(path: string) => unwrapData(await partnerClient.get<Envelope<T>>(`${V1}${path}`));
+/** v4 partner portal API (`partnerAccessToken` cookie). Same JSON fields as before, in the v4 envelope. */
+const V4 = '/api/v4/partners';
+const data = async <T>(path: string) => unwrapData(await partnerClient.get<Envelope<T>>(`${V4}${path}`));
 const send = async (path: string, body?: unknown) => {
-  assertOk(await partnerClient.post<Envelope<unknown>>(`${V1}${path}`, body));
+  assertOk(await partnerClient.post<Envelope<unknown>>(`${V4}${path}`, body));
 };
 
 export const partnerApi = {
-  sendLoginOtp: (phone: string) => send('/auth/generate-login-otp', { phone: withCountryCode(phone) }),
-  verifyLoginOtp: (phone: string, otp: string) =>
-    send('/auth/verify-login-otp', { phone: withCountryCode(phone), otp }),
-  sendSignupOtp: (input: SignupInput) =>
-    send('/auth/generate-signup-otp', { ...input, phone: withCountryCode(input.phone) }),
+  sendLoginOtp: (phone: string) => send('/auth/login/otp', { phone: withCountryCode(phone) }),
+  verifyLoginOtp: (phone: string, otp: string) => send('/auth/login/verify', { phone: withCountryCode(phone), otp }),
+  sendSignupOtp: (input: SignupInput) => send('/auth/signup/otp', { ...input, phone: withCountryCode(input.phone) }),
   verifySignupOtp: (input: SignupInput, otp: string) =>
-    send('/auth/verify-signup-otp', { ...input, phone: withCountryCode(input.phone), otp }),
+    send('/auth/signup/verify', { ...input, phone: withCountryCode(input.phone), otp }),
   logout: () => send('/auth/logout'),
-  partnerTypes: async () => toPartnerTypes(await data('/kyc/partner-types')),
-  submitSignupDetails: (input: SignupDetailsInput) => send('/kyc/signup-details', input),
-  profile: async () => toProfile(await data('/kyc/me')),
-  summary: async () => toSummary(await data('/dashboard/me')),
-  friends: async () => toFriends(await data('/dashboard/friends')),
-  statement: async () => toStatement(await data('/dashboard/statement')),
+  partnerTypes: async () => toPartnerTypes(await data('/partner-types')),
+  submitSignupDetails: (input: SignupDetailsInput) => send('/signup-details', input),
+  profile: async () => toProfile(await data('/profile')),
+  summary: async () => toSummary(await data('/summary')),
+  friends: async () => toFriends(await data('/friends')),
+  statement: async () => toStatement(await data('/statement')),
   payouts: async () => toPayouts(await data('/payouts')),
   requestPayout: (amount: number) => send('/payouts', { amount }),
-  bankDetails: async () => toBankDetails(await data('/kyc/bank-details')),
-  saveBankDetails: (input: BankDetailsInput) => send('/kyc/bank-details', input),
+  bankDetails: async () => toBankDetails(await data('/bank-details')),
+  saveBankDetails: (input: BankDetailsInput) => send('/bank-details', input),
 };

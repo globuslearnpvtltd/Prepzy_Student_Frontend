@@ -13,8 +13,8 @@ import { SchoolsStudentDetail } from './components/student-detail';
 import { schoolsKeys } from './hooks';
 import { axisTicks, buildWeek, formatJoined, initials, schoolsRoutes, share } from './model';
 
-const AUTH = `${API}/api/mentor/v1/auth`;
-const SCHOOLS = `${API}/api/mentor/v1/schools`;
+const SCHOOLS = `${API}/api/v4/schools`;
+const AUTH = `${SCHOOLS}/auth`;
 
 const school = {
   institute_id: 3,
@@ -33,10 +33,10 @@ function dashboardHandlers(
 ) {
   const seen: string[] = [];
   server.use(
-    http.get(`${SCHOOLS}/get-school-info`, () =>
+    http.get(`${SCHOOLS}/school`, () =>
       HttpResponse.json({ success: true, data: { institution_data: school } }),
     ),
-    http.get(`${SCHOOLS}/get-hours-data`, ({ request }) => {
+    http.get(`${SCHOOLS}/hours`, ({ request }) => {
       seen.push(new URL(request.url).search);
       const tenth = new URL(request.url).searchParams.get('class_id') === '10';
       return HttpResponse.json({
@@ -44,7 +44,7 @@ function dashboardHandlers(
         data: { student_count: tenth ? 18 : 25, unique_students: 12, total_hours: 36.5 },
       });
     }),
-    http.get(`${SCHOOLS}/get-feature-usage`, () =>
+    http.get(`${SCHOOLS}/feature-usage`, () =>
       HttpResponse.json({
         success: true,
         data: {
@@ -57,7 +57,7 @@ function dashboardHandlers(
         },
       }),
     ),
-    http.get(`${SCHOOLS}/get-student-list`, () =>
+    http.get(`${SCHOOLS}/students`, () =>
       HttpResponse.json({ success: true, data: { student_list: students } }),
     ),
   );
@@ -110,9 +110,9 @@ describe('schools model', () => {
 
   it('reads student detail endpoints with missing fields', async () => {
     server.use(
-      http.get(`${SCHOOLS}/get-student-info`, () => HttpResponse.json({ success: true, data: { student_data: null } })),
-      http.get(`${SCHOOLS}/get-student-learning-hours-info`, () => HttpResponse.json({ success: true, data: {} })),
-      http.get(`${SCHOOLS}/get-student-video-completion-info`, () =>
+      http.get(`${SCHOOLS}/students/:studentId`, () => HttpResponse.json({ success: true, data: { student_data: null } })),
+      http.get(`${SCHOOLS}/students/:studentId/learning-hours`, () => HttpResponse.json({ success: true, data: {} })),
+      http.get(`${SCHOOLS}/students/:studentId/videos`, () =>
         HttpResponse.json({ success: true, data: { video_completion: { total: 0, subjects: [], chapters: [] } } }),
       ),
     );
@@ -144,13 +144,17 @@ describe('SchoolsLogin', () => {
     let requested: unknown;
     let verified: unknown;
     server.use(
-      http.post(`${AUTH}/generate-teacher-login-otp`, async ({ request }) => {
+      http.post(`${AUTH}/otp`, async ({ request }) => {
         requested = await request.json();
         return HttpResponse.json({ success: true });
       }),
-      http.post(`${AUTH}/verify-teacher-login-otp`, async ({ request }) => {
+      http.post(`${AUTH}/verify`, async ({ request }) => {
         verified = await request.json();
-        return HttpResponse.json({ success: true, account_id: 11, first_name: 'Anita', email: 'anita@school.edu' });
+        return HttpResponse.json({
+          success: true,
+          message: 'Logged in successfully',
+          data: { teacher_data: { account_id: 11, first_name: 'Anita', email: 'anita@school.edu' } },
+        });
       }),
     );
     const user = userEvent.setup();
@@ -170,10 +174,13 @@ describe('SchoolsLogin', () => {
     expect(queryClient.getQueryData(schoolsKeys.me)).toMatchObject({ firstName: 'Anita' });
   });
 
-  it('shows the backend message for unknown emails (HTTP 400)', async () => {
+  it('shows the backend message for unknown emails (404 ACCOUNT_NOT_FOUND)', async () => {
     server.use(
-      http.post(`${AUTH}/generate-teacher-login-otp`, () =>
-        HttpResponse.json({ message: 'This phone number or email is not registered.' }, { status: 400 }),
+      http.post(`${AUTH}/otp`, () =>
+        HttpResponse.json(
+          { success: false, message: 'This phone number or email is not registered.', code: 'ACCOUNT_NOT_FOUND', data: null },
+          { status: 404 },
+        ),
       ),
     );
     const user = userEvent.setup();
@@ -185,7 +192,7 @@ describe('SchoolsLogin', () => {
 
   it('treats an HTTP-200 { success: false } as a failure', async () => {
     server.use(
-      http.post(`${AUTH}/generate-teacher-login-otp`, () =>
+      http.post(`${AUTH}/otp`, () =>
         HttpResponse.json({ success: false, message: 'Mail is down' }),
       ),
     );
@@ -195,14 +202,16 @@ describe('SchoolsLogin', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Mail is down');
   });
 
-  it('shows invalid codes returned as HTTP 200 { error }, clears the boxes and can go back', async () => {
+  it('shows INVALID_OTP, clears the boxes and can go back', async () => {
     let resent = 0;
     server.use(
-      http.post(`${AUTH}/generate-teacher-login-otp`, () => {
+      http.post(`${AUTH}/otp`, () => {
         resent += 1;
         return HttpResponse.json({ success: true });
       }),
-      http.post(`${AUTH}/verify-teacher-login-otp`, () => HttpResponse.json({ error: 'Invalid Otp' })),
+      http.post(`${AUTH}/verify`, () =>
+        HttpResponse.json({ success: false, message: 'Invalid Otp', code: 'INVALID_OTP', data: null }, { status: 400 }),
+      ),
     );
     const user = userEvent.setup();
     renderWithProviders(<SchoolsLogin />);
@@ -226,7 +235,7 @@ describe('SchoolsLogin', () => {
   });
 
   it('ignores letters and moves back on Backspace', async () => {
-    server.use(http.post(`${AUTH}/generate-teacher-login-otp`, () => HttpResponse.json({ success: true })));
+    server.use(http.post(`${AUTH}/otp`, () => HttpResponse.json({ success: true })));
     const user = userEvent.setup();
     renderWithProviders(<SchoolsLogin />);
     await sendCode(user);
@@ -257,7 +266,8 @@ describe('SchoolsDashboard', () => {
     const link = await screen.findByRole('link', { name: 'Aarav Sharma' });
     expect(link).toHaveAttribute('href', '/schools/students/7?class_id=10');
     expect(seen[0]).toContain('class_id=10');
-    expect(seen[0]).toContain('institution_id=3');
+    // The backend takes the school from the teacher's session.
+    expect(seen[0]).not.toContain('institution_id');
 
     await user.click(screen.getByRole('button', { name: 'Class 9 CBSE' }));
     expect(screen.getByRole('button', { name: 'Class 9 CBSE' })).toHaveAttribute('aria-pressed', 'true');
@@ -273,21 +283,21 @@ describe('SchoolsDashboard', () => {
   it('shows errors from the school and student list', async () => {
     dashboardHandlers();
     server.use(
-      http.get(`${SCHOOLS}/get-student-list`, () => HttpResponse.json({ success: false, message: 'Class not found' })),
+      http.get(`${SCHOOLS}/students`, () => HttpResponse.json({ success: false, message: 'Class not found' })),
     );
     renderWithProviders(<SchoolsDashboard />);
     expect(await screen.findByText(/Couldn.t load students\. Class not found/)).toBeInTheDocument();
   });
 
   it('reports a failed school request', async () => {
-    server.use(http.get(`${SCHOOLS}/get-school-info`, () => HttpResponse.json({ message: 'Nope' }, { status: 403 })));
+    server.use(http.get(`${SCHOOLS}/school`, () => HttpResponse.json({ message: 'Nope' }, { status: 403 })));
     renderWithProviders(<SchoolsDashboard />);
     expect(await screen.findByText(/Couldn.t load your school/)).toBeInTheDocument();
   });
 
   it('says when the school has no classes', async () => {
     server.use(
-      http.get(`${SCHOOLS}/get-school-info`, () =>
+      http.get(`${SCHOOLS}/school`, () =>
         HttpResponse.json({ success: true, data: { institution_data: { ...school, class_list: [], class_count: 0 } } }),
       ),
     );
@@ -299,9 +309,9 @@ describe('SchoolsDashboard', () => {
 describe('SchoolsStudentDetail', () => {
   function studentHandlers() {
     const queries: string[] = [];
-    const track = (request: Request) => queries.push(new URL(request.url).search);
+    const track = (request: Request) => queries.push(new URL(request.url).pathname + new URL(request.url).search);
     server.use(
-      http.get(`${SCHOOLS}/get-student-info`, ({ request }) => {
+      http.get(`${SCHOOLS}/students/:studentId`, ({ request }) => {
         track(request);
         return HttpResponse.json({
           success: true,
@@ -317,7 +327,7 @@ describe('SchoolsStudentDetail', () => {
           },
         });
       }),
-      http.get(`${SCHOOLS}/get-student-learning-hours-info`, ({ request }) => {
+      http.get(`${SCHOOLS}/students/:studentId/learning-hours`, ({ request }) => {
         track(request);
         return HttpResponse.json({
           success: true,
@@ -331,7 +341,7 @@ describe('SchoolsStudentDetail', () => {
           },
         });
       }),
-      http.get(`${SCHOOLS}/get-student-video-completion-info`, () =>
+      http.get(`${SCHOOLS}/students/:studentId/videos`, () =>
         HttpResponse.json({
           success: true,
           data: {
@@ -346,7 +356,7 @@ describe('SchoolsStudentDetail', () => {
           },
         }),
       ),
-      http.get(`${SCHOOLS}/get-student-doubts-section-info`, () =>
+      http.get(`${SCHOOLS}/students/:studentId/doubts`, () =>
         HttpResponse.json({
           success: true,
           data: {
@@ -361,7 +371,7 @@ describe('SchoolsStudentDetail', () => {
           },
         }),
       ),
-      http.get(`${SCHOOLS}/get-student-assessment-section-info`, () =>
+      http.get(`${SCHOOLS}/students/:studentId/assessments`, () =>
         HttpResponse.json({
           success: true,
           data: { assessments: { total: 12, categories: [{ label: 'Quiz', count: 4, percentage: 78 }] } },
@@ -392,20 +402,20 @@ describe('SchoolsStudentDetail', () => {
     expect(screen.getByText('Lecture Chat')).toBeInTheDocument();
     expect(await screen.findByText('Quiz (4)')).toBeInTheDocument();
     expect(screen.getByText('78%')).toBeInTheDocument();
-    expect(queries.every((q) => q.includes('student_id=7'))).toBe(true);
+    expect(queries.every((q) => q.includes('/students/7'))).toBe(true);
     expect(queries.some((q) => q.includes('class_id=10'))).toBe(true);
   });
 
   it('shows errors per section', async () => {
     studentHandlers();
     server.use(
-      http.get(`${SCHOOLS}/get-student-info`, () => HttpResponse.json({ message: 'Missing' }, { status: 404 })),
-      http.get(`${SCHOOLS}/get-student-doubts-section-info`, () =>
+      http.get(`${SCHOOLS}/students/:studentId`, () => HttpResponse.json({ message: 'Missing' }, { status: 404 })),
+      http.get(`${SCHOOLS}/students/:studentId/doubts`, () =>
         HttpResponse.json({ success: false, message: 'No doubts' }),
       ),
-      http.get(`${SCHOOLS}/get-student-assessment-section-info`, () => HttpResponse.json({ error: 'Broken' })),
-      http.get(`${SCHOOLS}/get-student-video-completion-info`, () => HttpResponse.json({ error: 'Gone' })),
-      http.get(`${SCHOOLS}/get-student-learning-hours-info`, () => HttpResponse.json({ error: 'Later' })),
+      http.get(`${SCHOOLS}/students/:studentId/assessments`, () => HttpResponse.json({ error: 'Broken' })),
+      http.get(`${SCHOOLS}/students/:studentId/videos`, () => HttpResponse.json({ error: 'Gone' })),
+      http.get(`${SCHOOLS}/students/:studentId/learning-hours`, () => HttpResponse.json({ error: 'Later' })),
     );
     renderWithProviders(<SchoolsStudentDetail studentId="7" />);
     expect(await screen.findByText(/Couldn.t load this student\. Missing/)).toBeInTheDocument();
@@ -418,7 +428,7 @@ describe('SchoolsStudentDetail', () => {
 
 describe('SchoolsHeader', () => {
   const teacher = () =>
-    http.get(`${AUTH}/get-teacher-info`, () =>
+    http.get(`${AUTH}/me`, () =>
       HttpResponse.json({
         success: true,
         data: { teacher_data: { account_id: 11, first_name: 'Anita', email: 'anita@school.edu' } },
@@ -429,7 +439,7 @@ describe('SchoolsHeader', () => {
     let loggedOut = false;
     server.use(
       teacher(),
-      http.post(`${AUTH}/teacher-logout`, () => {
+      http.post(`${AUTH}/logout`, () => {
         loggedOut = true;
         return HttpResponse.json({ success: true });
       }),
@@ -455,7 +465,7 @@ describe('SchoolsHeader', () => {
   it('still signs out when the logout request fails, from the mobile drawer', async () => {
     server.use(
       teacher(),
-      http.post(`${AUTH}/teacher-logout`, () => HttpResponse.json({ message: 'down' }, { status: 500 })),
+      http.post(`${AUTH}/logout`, () => HttpResponse.json({ message: 'down' }, { status: 500 })),
     );
     const user = userEvent.setup();
     renderWithProviders(<SchoolsHeader />);

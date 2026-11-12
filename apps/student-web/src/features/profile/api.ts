@@ -138,17 +138,18 @@ export const profileApi = {
   async uploadPhoto(file: File): Promise<void> {
     const form = new FormData();
     form.append('image', file);
-    assertOk(await apiClient.put<Envelope<unknown>>('/api/accounts/profile_image', form, { timeout: 60_000 }));
+    assertOk(await apiClient.put<Envelope<unknown>>('/api/v4/student/account/photo', form, { timeout: 60_000 }));
   },
 
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
     assertOk(
-      await apiClient.put<Envelope<never>>('/api/changePassword', { old_password: oldPassword, new_password: newPassword }),
+      await apiClient.put<Envelope<never>>('/api/v4/student/account/password', { old_password: oldPassword, new_password: newPassword }),
     );
   },
 
-  async deleteAccount(accountId: number): Promise<void> {
-    assertOk(await apiClient.delete<Envelope<never>>(`/api/accounts/${accountId}`));
+  /** Always the signed-in student (no id is sent); the backend also clears the session cookies. */
+  async deleteAccount(): Promise<void> {
+    assertOk(await apiClient.delete<Envelope<never>>('/api/v4/student/account'));
   },
 
   /** Classes of the student's exam (the class select). */
@@ -158,13 +159,13 @@ export const profileApi = {
   },
 
   async parent(): Promise<Parent | null> {
-    const body = await apiClient.get<Envelope<{ mentor_data?: unknown }>>('/api/mentor/v1/auth/get-mentor-data');
+    const body = await apiClient.get<Envelope<{ mentor_data?: unknown }>>('/api/v4/student/mentor');
     return toParent(assertOk(body).data?.mentor_data);
   },
 
   async sendParentOtp(details: ParentDetails): Promise<void> {
     assertOk(
-      await apiClient.post<Envelope<never>>('/api/mentor/v1/auth/generate-signup-otp', {
+      await apiClient.post<Envelope<never>>('/api/v4/student/mentor/otp', {
         first_name: details.firstName,
         last_name: details.lastName,
         contact_method: details.contactMethod,
@@ -173,9 +174,9 @@ export const profileApi = {
     );
   },
 
-  /** Creates (or links) the parent account; the backend answers 200 + success:false on a wrong code. */
+  /** Creates (or links) the parent account; a wrong or expired code is a 400 (INVALID_OTP / OTP_EXPIRED). */
   async verifyParentOtp(details: ParentDetails, otp: string): Promise<number> {
-    const body = await apiClient.post<Envelope<{ mentor_id?: number }>>('/api/mentor/v1/auth/verify-signup-otp', {
+    const body = await apiClient.post<Envelope<{ mentor_id?: number }>>('/api/v4/student/mentor/verify', {
       first_name: details.firstName,
       last_name: details.lastName,
       contact_method: details.contactMethod,
@@ -185,14 +186,12 @@ export const profileApi = {
     return num(assertOk(body).data?.mentor_id);
   },
 
-  async renameParent(id: number, details: ParentDetails): Promise<void> {
+  /** Renames the student's own linked parent (the backend never takes a parent id from the client). */
+  async renameParent(details: ParentDetails): Promise<void> {
     assertOk(
-      await apiClient.put<Envelope<never>>('/api/mentor/v1/auth/edit-mentor-datas', {
-        mentor_id: id,
+      await apiClient.put<Envelope<never>>('/api/v4/student/mentor', {
         first_name: details.firstName,
         last_name: details.lastName,
-        contact_method: details.contactMethod,
-        contact_value: details.contactValue,
       }),
     );
   },

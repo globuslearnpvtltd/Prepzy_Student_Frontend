@@ -6,11 +6,11 @@ import { Crown, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { planName, useActivePlan } from '@/features/auth';
+import { useActivePlan } from '@/features/auth';
+import { useActivePlanName } from '@/features/plans';
 import type { ExamConfig } from '@/shared/config/exams';
 import { isActivePath, navigationFor, type NavItem } from '@/shared/config/navigation';
 import { routes } from '@/shared/config/routes';
-import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { useMobileNav } from './mobile-nav-store';
 import { shellApi, shellKeys } from './shell-api';
 
@@ -46,11 +46,11 @@ export function remainingPercent(expiryDate: string, durationMonths: number, now
 
 function PlanCard({ exam, onNavigate }: { exam: ExamConfig; onNavigate: () => void }) {
   const plan = useActivePlan(exam).data;
-  const catalog = useExamCatalog();
+  const name = useActivePlanName(exam, plan);
   if (!plan) return null;
   const hasExpiry = !!plan.expiryDate && plan.durationMonths > 0 && !Number.isNaN(new Date(plan.expiryDate).getTime());
   return (
-    <div className="mt-auto px-3 md:mb-[72px]">
+    <div className="mt-auto px-3">
       {/* Collapsed rail: crown only. Expanded (hover / mobile drawer): the full card. */}
       <div className="bg-brand-50 flex h-11 w-[52px] items-center justify-center rounded-md group-hover/rail:hidden group-data-[open=true]/rail:hidden">
         <Crown aria-hidden className="text-brand size-5" />
@@ -60,7 +60,7 @@ function PlanCard({ exam, onNavigate }: { exam: ExamConfig; onNavigate: () => vo
           <span className="bg-success size-2 rounded-full" />
           Active plan
         </span>
-        <p className="text-foreground mt-2 text-[15px] leading-snug font-bold">{planName(plan, exam, catalog.data)}</p>
+        <p className="text-foreground mt-2 text-[15px] leading-snug font-bold break-words">{name}</p>
         {hasExpiry && plan.expiryDate && (
           <>
             <p className="text-foreground-muted mt-0.5 text-[12px]">Ends {formatDate(plan.expiryDate)}</p>
@@ -154,7 +154,7 @@ export function CompetitiveSidebar({ exam, rail = true }: { exam: ExamConfig; ra
         data-open={open}
         className={cx(
           'group/rail border-line bg-surface fixed left-0 flex flex-col overflow-hidden border-r py-6 transition-all duration-300',
-          'top-0 z-[100] h-dvh w-[220px] md:top-[72px] md:z-30 md:h-dvh md:w-[76px] md:translate-x-0 md:hover:w-[220px]',
+          'top-0 z-[100] h-dvh w-[220px] md:top-[76px] md:z-30 md:h-[calc(100dvh-76px)] md:w-[76px] md:translate-x-0 md:hover:w-[220px]',
           open ? 'translate-x-0' : '-translate-x-full',
           // Chapter pages show the chapter sidebar instead; the menu drawer still opens on mobile.
           !rail && 'md:hidden',

@@ -49,7 +49,7 @@ function Receipt({
       <div className="border-surface/10 bg-plan-night-head flex items-center justify-between gap-4 border-b px-[22px] py-[18px]">
         <div className="min-w-0">
           <p className={LABEL}>{label}</p>
-          <p className="text-on-brand m-0 mt-1.5 truncate text-lg font-bold">{planName}</p>
+          <p className="text-on-brand m-0 mt-1.5 text-lg leading-snug font-bold break-words">{planName}</p>
         </div>
         {pill}
       </div>

@@ -2,7 +2,12 @@ import { apiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/errors';
 import { assertOk } from '@/shared/lib/unwrap';
 
-/** Parents portal endpoints (`/api/mentor/v1/...`). The backend keeps the session in the `mentorAccessToken` cookie. */
+/**
+ * Parents portal endpoints (`/api/v4/parents/...`). The backend keeps the session in the `mentorAccessToken` cookie
+ * and only answers for students linked to the signed-in parent.
+ */
+
+const BASE = '/api/v4/parents';
 
 type Envelope<T> = { success?: boolean; message?: string; error?: unknown; data?: T };
 type Raw = Record<string, unknown>;
@@ -166,55 +171,59 @@ export function toAssessments(raw: unknown): AssessmentsSummary {
 }
 
 type StudentQuery = { studentId: number; classId: number };
-const params = ({ studentId, classId }: StudentQuery) => ({ student_id: studentId, class_id: classId });
-const data = async <T>(path: string, query: StudentQuery) =>
-  assertOk(await apiClient.get<Envelope<T>>(path, { params: params(query) })).data;
+/** GET /students/:studentId/<report>?class_id= */
+const data = async <T>(report: string, { studentId, classId }: StudentQuery) =>
+  assertOk(
+    await apiClient.get<Envelope<T>>(`${BASE}/students/${encodeURIComponent(String(studentId))}/${report}`, {
+      params: { class_id: classId },
+    }),
+  ).data;
 
 export const parentsApi = {
-  /** Sends a login code by WhatsApp or email. Unregistered contacts answer HTTP 200 with `{ success: false, error }`. */
+  /** Sends a login code by WhatsApp or email. Unregistered contacts fail with 404 ACCOUNT_NOT_FOUND, too many with 429. */
   async requestOtp(channel: OtpChannel): Promise<void> {
-    const body = channel.method === 'whatsapp' ? { phone: channel.phone, email: '' } : { phone: '', email: channel.email };
-    assertOk(await apiClient.post<Envelope<unknown>>('/api/mentor/v1/auth/generate-login-otp', body));
+    const contact = channel.method === 'whatsapp' ? channel.phone : channel.email;
+    assertOk(await apiClient.post<Envelope<unknown>>(`${BASE}/auth/otp`, { method: channel.method, contact }));
   },
 
-  /** The backend looks the contact up by phone OR email, both sent as `phone`. Sets the session cookie. */
+  /** The backend looks the contact (phone or email) up and sets the session cookie; bad codes fail with 400. */
   async verifyOtp(contact: string, otp: string): Promise<void> {
-    const body = await apiClient.post<Envelope<unknown>>('/api/mentor/v1/auth/verify-login-otp', { phone: contact, otp });
+    const body = await apiClient.post<Envelope<unknown>>(`${BASE}/auth/verify`, { contact, otp });
     if (assertOk(body)?.success !== true) {
       throw new ApiError({ status: 422, code: 'REJECTED', message: 'OTP verification failed. Please try again.' });
     }
   },
 
   async logout(): Promise<void> {
-    await apiClient.post('/api/mentor/v1/auth/parent-logout');
+    await apiClient.post(`${BASE}/auth/logout`);
   },
 
   async me(): Promise<Parent | null> {
-    const body = assertOk(await apiClient.get<Envelope<{ parent_data?: unknown }>>('/api/mentor/v1/auth/get-parent-info'));
+    const body = assertOk(await apiClient.get<Envelope<{ parent_data?: unknown }>>(`${BASE}/auth/me`));
     return toParent(body.data?.parent_data);
   },
 
   async children(): Promise<Child[]> {
-    const body = assertOk(await apiClient.get<Envelope<{ student_data?: unknown }>>('/api/mentor/v1/parents/get-student-list'));
+    const body = assertOk(await apiClient.get<Envelope<{ student_data?: unknown }>>(`${BASE}/students`));
     return toChildren(body.data?.student_data);
   },
 
   async learningHours(query: StudentQuery): Promise<LearningHours> {
-    return toLearningHours(await data('/api/mentor/v1/parents/get-student-learning-hours-info', query));
+    return toLearningHours(await data('learning-hours', query));
   },
 
   async lectures(query: StudentQuery): Promise<LectureCompletion> {
-    const body = await data<{ video_completion?: unknown }>('/api/mentor/v1/parents/get-student-video-completion-info', query);
+    const body = await data<{ video_completion?: unknown }>('videos', query);
     return toLectureCompletion(body?.video_completion);
   },
 
   async doubts(query: StudentQuery): Promise<DoubtsSummary> {
-    const body = await data<{ doubts?: unknown }>('/api/mentor/v1/parents/get-student-doubts-section-info', query);
+    const body = await data<{ doubts?: unknown }>('doubts', query);
     return toDoubts(body?.doubts);
   },
 
   async assessments(query: StudentQuery): Promise<AssessmentsSummary> {
-    const body = await data<{ assessments?: unknown }>('/api/mentor/v1/parents/get-student-assessment-section-info', query);
+    const body = await data<{ assessments?: unknown }>('assessments', query);
     return toAssessments(body?.assessments);
   },
 };

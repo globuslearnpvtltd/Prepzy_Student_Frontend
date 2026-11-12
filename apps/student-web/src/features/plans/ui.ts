@@ -2,4 +2,4 @@
 export { Checkout } from './components/checkout/checkout';
 export { BillingPage, ManagePlans } from './components/manage-plans';
 export { Welcome } from './components/welcome';
-export { PlansChrome } from './components/plans-chrome';
+export { CheckoutChrome } from './components/plans-chrome';

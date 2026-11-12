@@ -73,19 +73,23 @@ describe('plans', () => {
     ...extra,
   });
 
-  it('names plans like the previous app', () => {
+  it('names plans by the server rule, with exam and bundle names from the backend exam list', () => {
     const neet = testExam('neet');
     const cbse = testExam('cbse');
-    expect(planName(plan(), neet)).toBe('Topper NEET 2027 Plan');
-    // The bundled board exam is named from the backend catalog (GET /api/v4/exams), not a hard-coded id.
-    const catalog = [{ examId: 41, name: 'CBSE', category: 'board' }];
-    expect(planName(plan({ relatedExams: [41] }), neet, catalog)).toBe('Topper NEET 2027 + CBSE Plan');
-    expect(planName(plan({ relatedExams: [41] }), neet)).toBe('Topper NEET 2027 Plan');
-    expect(planName(plan({ durationMonths: 1 }), neet)).toBe('Topper NEET Monthly Plan');
-    expect(planName(plan({ durationMonths: 0 }), neet)).toBe('Basic NEET Plan');
-    expect(planName(plan({ durationMonths: 0 }), cbse)).toBe('Basic Plan');
-    expect(planName(plan({ durationMonths: 1 }), cbse)).toBe('Topper Monthly Plan');
-    expect(planName(plan(), cbse)).toBe('Topper Academic Year Plan');
+    // Names come from the backend catalog (GET /api/v4/exams), never from code.
+    const catalog = [
+      { examId: neet.examId, name: 'Exam X', category: 'competitive' },
+      { examId: cbse.examId, name: 'Board Y', category: 'board' },
+    ];
+    expect(planName(plan(), neet, catalog)).toBe('Topper Exam X 2027');
+    expect(planName(plan({ relatedExams: [cbse.examId] }), neet, catalog)).toBe('Topper Exam X 2027 + Board Y');
+    expect(planName(plan({ durationMonths: 1, relatedExams: [cbse.examId] }), neet, catalog)).toBe('Topper Exam X + Board Y Monthly');
+    expect(planName(plan({ durationMonths: 0 }), neet, catalog)).toBe('Basic Exam X');
+    expect(planName(plan({ durationMonths: 0 }), cbse, catalog)).toBe('Basic Board Y');
+    expect(planName(plan({ durationMonths: 1 }), cbse, catalog)).toBe('Topper Board Y Monthly');
+    expect(planName(plan(), cbse, catalog)).toBe('Topper Board Y Academic');
+    // Without the exam list the tier still reads.
+    expect(planName(plan({ durationMonths: 1 }), neet)).toBe('Topper Monthly');
     expect(planTier(plan({ durationMonths: 0 }))).toBe('Basic');
   });
 

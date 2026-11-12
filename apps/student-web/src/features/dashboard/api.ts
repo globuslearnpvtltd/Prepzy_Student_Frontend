@@ -275,7 +275,7 @@ export const dashboardApi = {
   /** Null when there's no referral summary (the teaser card is hidden, as before). */
   async referralSummary(): Promise<ReferralSummary | null> {
     const body = await apiClient.get<Envelope<{ balance?: unknown; friendCount?: unknown; tier?: string }>>(
-      '/api/referral/me',
+      '/api/v4/referral/me',
     );
     if (!body?.success || !body.data || Array.isArray(body.data)) return null;
     return {

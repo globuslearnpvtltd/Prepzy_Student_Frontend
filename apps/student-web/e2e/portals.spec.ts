@@ -65,13 +65,13 @@ test.describe('portal routing', () => {
 test('parents: email code login opens the dashboard', async ({ page, context }) => {
   await mockApi(page, {
     ...asGets(PARENT_MOCKS),
-    'POST /api/mentor/v1/auth/generate-login-otp': (body) => {
-      expect(body).toEqual({ phone: '', email: 'sunita@example.com' });
-      return { success: true };
+    'POST /api/v4/parents/auth/otp': (body) => {
+      expect(body).toEqual({ method: 'email', contact: 'sunita@example.com' });
+      return { success: true, message: 'OTP sent successfully', data: null };
     },
-    'POST /api/mentor/v1/auth/verify-login-otp': (body) => {
-      expect(body).toEqual({ phone: 'sunita@example.com', otp: '123456' });
-      return { success: true, account_id: 501 };
+    'POST /api/v4/parents/auth/verify': (body) => {
+      expect(body).toEqual({ contact: 'sunita@example.com', otp: '123456' });
+      return { success: true, message: 'Logged in successfully', data: { parent_data: { account_id: 501 } } };
     },
   });
 
@@ -91,13 +91,17 @@ test('parents: email code login opens the dashboard', async ({ page, context }) 
 test('schools: login, dashboard and a student page', async ({ page, context }) => {
   await mockApi(page, {
     ...asGets(SCHOOLS_MOCKS),
-    'POST /api/mentor/v1/auth/generate-teacher-login-otp': (body) => {
+    'POST /api/v4/schools/auth/otp': (body) => {
       expect(body).toEqual({ email: 'anita.rao@greenfield.edu' });
-      return { success: true };
+      return { success: true, message: 'OTP sent successfully', data: null };
     },
-    'POST /api/mentor/v1/auth/verify-teacher-login-otp': (body) => {
+    'POST /api/v4/schools/auth/verify': (body) => {
       expect(body).toEqual({ email: 'anita.rao@greenfield.edu', otp: '123456' });
-      return { success: true, account_id: 11, first_name: 'Anita', email: 'anita.rao@greenfield.edu' };
+      return {
+        success: true,
+        message: 'Logged in successfully',
+        data: { teacher_data: { account_id: 11, first_name: 'Anita', email: 'anita.rao@greenfield.edu' } },
+      };
     },
   });
 
@@ -122,11 +126,11 @@ test('schools: login, dashboard and a student page', async ({ page, context }) =
 test('partners: WhatsApp login, dashboard and payouts', async ({ page, context }) => {
   await mockApi(page, {
     ...asGets(PARTNER_MOCKS),
-    'POST /api/partner/v1/auth/generate-login-otp': (body) => {
+    'POST /api/v4/partners/auth/login/otp': (body) => {
       expect(body).toEqual({ phone: '+919876543210' });
       return { success: true };
     },
-    'POST /api/partner/v1/auth/verify-login-otp': { success: true },
+    'POST /api/v4/partners/auth/login/verify': { success: true },
   });
 
   await page.goto('/partners/login');

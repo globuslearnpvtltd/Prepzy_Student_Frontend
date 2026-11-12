@@ -1,8 +1,6 @@
-/** Checkout: full-screen, no header or navigation (the previous app's purchase page). */
+import { CheckoutChrome } from '@/features/plans/ui';
+
+/** Checkout: the Plans page's top navbar, no sidebar, the full width for the purchase flow. */
 export default function CheckoutLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <main id="main" className="bg-surface min-h-dvh">
-      {children}
-    </main>
-  );
+  return <CheckoutChrome>{children}</CheckoutChrome>;
 }

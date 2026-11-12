@@ -1,9 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
-import { API, server } from '@/test/server';
+import { http } from 'msw';
+import { billingError, billingOk, billingUrl } from '@/test/billing';
+import { testExam } from '@/test/exams';
+import { server } from '@/test/server';
 import type { Plan } from './catalog';
 import type { RazorpayFailure, RazorpayOptions } from './razorpay';
-import { usePayment, VERIFY_RETRY_DELAYS } from './use-payment';
+import { loadPending, PENDING_ORDER_KEY, usePayment, VERIFY_RETRY_DELAYS } from './use-payment';
 
 const mocks = vi.hoisted(() => ({ keyId: 'rzp_test_key' as string | undefined, load: vi.fn() }));
 
@@ -16,10 +18,13 @@ vi.mock('@/shared/config/env', async (importOriginal) => {
 
 vi.mock('./razorpay', () => ({ loadRazorpay: mocks.load }));
 
+const cbse = testExam('cbse');
+
 const plan = (extra: Partial<Plan> = {}): Plan => ({
   priceId: 2,
   planId: 10,
   name: 'Topper Monthly',
+  tier: 'monthly',
   durationName: '1 Month',
   badge: null,
   price: 499,
@@ -30,6 +35,7 @@ const plan = (extra: Partial<Plan> = {}): Plan => ({
   perDay: 16,
   durationMonths: 1,
   isCombo: false,
+  bundled: [],
   isFree: false,
   isCurrent: false,
   ...extra,
@@ -51,28 +57,33 @@ class FakeRazorpay {
 
 const success = { razorpay_payment_id: 'pay_1', razorpay_order_id: 'order_1', razorpay_signature: 'sig' };
 
-function setup(category: 'board' | 'competitive' = 'board') {
+function setup() {
   return renderHook(() =>
-    usePayment({ category, coupon: 'SAVE10', describe: (p) => `${p.name} · test`, prefill: { name: 'Ravi', contact: '+91', email: '' } }),
+    usePayment({ exam: cbse, coupon: 'SAVE10', describe: (p) => `${p.name} · test`, prefill: { name: 'Ravi', contact: '+91', email: '' } }),
   );
 }
 
-function orderHandler(data: Record<string, unknown> = { order_id: 'order_1', amount: 58900, currency: 'INR', coupon_id: 3 }) {
-  return http.post(`${API}/api/v1/purchase/purchase-plan-1`, () => HttpResponse.json({ success: true, data }));
+let orders: unknown[] = [];
+function orderHandler(data: Record<string, unknown> = { order_id: 'order_1', status: 'created', amount_paise: 58882, currency: 'INR', key_id: 'rzp_server' }) {
+  return http.post(billingUrl(cbse, '/orders'), async ({ request }) => {
+    orders.push(await request.json());
+    return billingOk(data, 201);
+  });
 }
 
 describe('usePayment', () => {
-  const failures: unknown[] = [];
+  const failures: { url: string; body: unknown }[] = [];
 
   beforeEach(() => {
     sheet = null;
+    orders = [];
     failures.length = 0;
     mocks.keyId = 'rzp_test_key';
     mocks.load.mockResolvedValue(FakeRazorpay);
     server.use(
-      http.put(`${API}/api/v1/purchase/update-failed-purchase-status`, async ({ request }) => {
-        failures.push(await request.json());
-        return HttpResponse.json({ success: true });
+      http.post(billingUrl(cbse, '/orders/:id/fail'), async ({ request, params }) => {
+        failures.push({ url: String(params.id), body: await request.json() });
+        return billingOk({ order_id: params.id, status: 'failed' });
       }),
     );
   });
@@ -81,19 +92,20 @@ describe('usePayment', () => {
     vi.useRealTimers();
   });
 
-  it('opens Razorpay with the backend amount and verifies the signature', async () => {
+  it('creates a server order, opens Razorpay with its amount and key, and verifies the signature', async () => {
     let verified: unknown = null;
     server.use(
       orderHandler(),
-      http.post(`${API}/api/v1/purchase/verify-purchase-plan-1`, async ({ request }) => {
+      http.post(billingUrl(cbse, '/orders/order_1/verify'), async ({ request }) => {
         verified = await request.json();
-        return HttpResponse.json({ success: true });
+        return billingOk({ order_id: 'order_1', status: 'paid', purchase: {} });
       }),
     );
     const { result } = setup();
     await act(() => result.current.pay(plan()));
+    expect(orders).toEqual([{ price_id: 2, coupon_code: 'SAVE10' }]);
     expect(sheet!.opened).toBe(1);
-    expect(sheet!.options).toMatchObject({ amount: 58900, order_id: 'order_1', description: 'Topper Monthly · test', name: 'Prepzy' });
+    expect(sheet!.options).toMatchObject({ key: 'rzp_server', amount: 58882, order_id: 'order_1', description: 'Topper Monthly · test', name: 'Prepzy' });
     expect(result.current.busy).toBe(true);
     // A second tap while the sheet is open does nothing.
     await act(() => result.current.pay(plan()));
@@ -101,14 +113,21 @@ describe('usePayment', () => {
     await act(async () => sheet!.options.handler(success));
     expect(result.current.succeeded?.name).toBe('Topper Monthly');
     expect(result.current.busy).toBe(false);
-    expect(verified).toMatchObject({ payment_id: 'pay_1', order_id: 'order_1', signature: 'sig', coupon_id: 3 });
+    expect(verified).toEqual({ payment_id: 'pay_1', signature: 'sig' });
     // Dismissing after a captured payment is not recorded as a failure.
     act(() => sheet!.options.modal.ondismiss());
     expect(failures).toEqual([]);
   });
 
-  it('skips Razorpay when the backend settles the order', async () => {
-    server.use(orderHandler({ skip_payment: true }));
+  it('falls back to the app key when the order has none', async () => {
+    server.use(orderHandler({ order_id: 'order_1', status: 'created', amount_paise: 100, currency: 'INR' }));
+    const { result } = setup();
+    await act(() => result.current.pay(plan()));
+    expect(sheet!.options.key).toBe('rzp_test_key');
+  });
+
+  it('shows success without Razorpay when a 100% coupon settles the order (status paid)', async () => {
+    server.use(orderHandler({ order_id: 'free-000123', status: 'paid', amount_paise: 0, currency: 'INR', key_id: null, purchase: {} }));
     const { result } = setup();
     await act(() => result.current.pay(plan()));
     expect(result.current.succeeded?.priceId).toBe(2);
@@ -117,7 +136,7 @@ describe('usePayment', () => {
 
   it('warns when online payments are switched off', async () => {
     mocks.keyId = '';
-    server.use(orderHandler());
+    server.use(orderHandler({ order_id: 'order_1', status: 'created', amount_paise: 100, currency: 'INR', key_id: null }));
     const { result } = setup();
     await act(() => result.current.pay(plan()));
     expect(result.current.warning).toBe('Online payments are not available right now. Please try again later.');
@@ -134,16 +153,46 @@ describe('usePayment', () => {
     expect(result.current.warning).toBe("Payment gateway didn't load. Check your connection and retry.");
   });
 
-  it('shows the backend message when a free plan cannot be activated, or a fallback', async () => {
-    server.use(http.post(`${API}/api/v1/purchase/purchase-free-plan`, () => HttpResponse.json({ success: false, message: 'Already on Basic' })));
+  it('activates Basic with /free-plan and a free premium with /free-premium', async () => {
+    const calls: { path: string; body: unknown }[] = [];
+    server.use(
+      http.post(billingUrl(cbse, '/free-plan'), async ({ request }) => {
+        calls.push({ path: 'free-plan', body: await request.json() });
+        return billingOk({ purchase: {} }, 201);
+      }),
+      http.post(billingUrl(cbse, '/free-premium'), async ({ request }) => {
+        calls.push({ path: 'free-premium', body: await request.json() });
+        return billingOk({ purchase: {} }, 201);
+      }),
+    );
     const { result } = setup();
-    await act(() => result.current.pay(plan({ isFree: true, durationMonths: 0, price: 0 })));
-    expect(result.current.warning).toBe('Already on Basic');
+    await act(() => result.current.pay(plan({ isFree: true, durationMonths: 0, price: 0, priceId: 1 })));
+    await act(() => result.current.pay(plan({ isFree: true, durationMonths: 1, price: 0, priceId: 7 })));
+    expect(calls).toEqual([
+      { path: 'free-plan', body: { plan_id: 10 } },
+      { path: 'free-premium', body: { price_id: 7 } },
+    ]);
+    expect(result.current.succeeded).not.toBeNull();
+  });
+
+  it('shows the server message when a free plan or an order is refused, or a fallback', async () => {
+    server.use(http.post(billingUrl(cbse, '/free-premium'), () => billingError(409, 'ALREADY_CLAIMED', 'You already claimed this offer')));
+    const { result } = setup();
+    await act(() => result.current.pay(plan({ isFree: true, durationMonths: 1, price: 0 })));
+    expect(result.current.warning).toBe('You already claimed this offer');
     expect(result.current.succeeded).toBeNull();
 
-    server.use(http.post(`${API}/api/v1/purchase/purchase-plan-1`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(http.post(billingUrl(cbse, '/orders'), () => billingError(409, 'PLAN_ALREADY_ACTIVE', 'This plan is already active')));
     await act(() => result.current.pay(plan()));
-    expect(result.current.warning).toBeTruthy();
+    expect(result.current.warning).toBe('This plan is already active');
+
+    server.use(http.post(billingUrl(cbse, '/orders'), () => billingError(502, 'PAYMENT_PROVIDER_ERROR', 'Razorpay said no')));
+    await act(() => result.current.pay(plan()));
+    expect(result.current.warning).toBe('The payment service is unavailable right now. Please try again in a few minutes.');
+
+    server.use(http.post(billingUrl(cbse, '/orders'), () => billingError(500, 'INTERNAL', 'db exploded')));
+    await act(() => result.current.pay(plan()));
+    expect(result.current.warning).toBe("Couldn't start this payment. Please try again.");
     expect(result.current.busy).toBe(false);
   });
 
@@ -157,7 +206,7 @@ describe('usePayment', () => {
     expect(result.current.failed).toMatchObject({ transactionId: 'pay_9', reason: 'Bank down' });
     act(() => sheet!.options.modal.ondismiss());
     await waitFor(() => expect(failures).toHaveLength(1));
-    expect(failures[0]).toEqual({ order_id: 'order_1', description: null });
+    expect(failures[0]).toEqual({ url: 'order_1', body: {} });
 
     const first = sheet;
     await act(async () => result.current.retry());
@@ -166,57 +215,124 @@ describe('usePayment', () => {
     act(() => result.current.clearFailed());
   });
 
+  it('calls fail exactly once when the sheet is dismissed', async () => {
+    server.use(orderHandler());
+    const { result } = setup();
+    await act(() => result.current.pay(plan()));
+    act(() => sheet!.options.modal.ondismiss());
+    act(() => sheet!.options.modal.ondismiss());
+    await waitFor(() => expect(failures).toHaveLength(1));
+    expect(failures[0]).toEqual({ url: 'order_1', body: { reason: 'Payment cancelled by the student' } });
+    expect(result.current.busy).toBe(false);
+  });
+
   it('retry without a failed payment does nothing', () => {
     const { result } = setup();
     act(() => result.current.retry());
     expect(mocks.load).not.toHaveBeenCalled();
   });
 
-  it('keeps an unconfirmed payment pending and re-checks it automatically', async () => {
-    let calls = 0;
+  it('holds a 202 verify as pending, saves it, and re-checks GET /orders/:id until it is paid', async () => {
+    let verifyCalls = 0;
+    let checks = 0;
     server.use(
-      orderHandler({ order_id: 'order_1', amount: 1, currency: 'INR' }),
-      http.post(`${API}/api/v1/purchase/verify-purchase-plan-1`, () => {
-        calls += 1;
-        return HttpResponse.json({ success: calls >= 3 });
+      orderHandler(),
+      http.post(billingUrl(cbse, '/orders/order_1/verify'), () => {
+        verifyCalls += 1;
+        return billingOk({ order_id: 'order_1', status: 'pending' }, 202);
+      }),
+      http.get(billingUrl(cbse, '/orders/order_1'), () => {
+        checks += 1;
+        return billingOk({ order_id: 'order_1', status: checks >= 2 ? 'paid' : 'pending' });
       }),
     );
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const { result } = setup();
     await act(() => result.current.pay(plan()));
     await act(async () => sheet!.options.handler({ ...success, razorpay_payment_id: '' }));
-    expect(result.current.pending).toMatchObject({ transactionId: 'order_1' });
-    expect(result.current.pending!.payload.coupon_id).toBeNull();
+    expect(result.current.pending).toMatchObject({ transactionId: 'order_1', orderId: 'order_1' });
+    expect(loadPending()).toMatchObject({ orderId: 'order_1', exam: { category: 'board', examId: cbse.examId } });
     await act(() => vi.advanceTimersByTimeAsync(VERIFY_RETRY_DELAYS[0]!));
-    await waitFor(() => expect(calls).toBe(2));
+    await waitFor(() => expect(checks).toBe(1));
     await waitFor(() => expect(result.current.verifying).toBe(false));
     expect(result.current.pending).not.toBeNull();
     await act(() => vi.advanceTimersByTimeAsync(VERIFY_RETRY_DELAYS[1]!));
     await waitFor(() => expect(result.current.succeeded?.name).toBe('Topper Monthly'));
     expect(result.current.pending).toBeNull();
+    // Re-checks never call verify again, and a settled order is forgotten.
+    expect(verifyCalls).toBe(1);
+    expect(sessionStorage.getItem(PENDING_ORDER_KEY)).toBeNull();
   });
 
-  it('parks the automatic checks after a failed manual re-check', async () => {
-    let calls = 0;
+  it('treats a verify error as pending and shows a re-check that failed as a failed payment', async () => {
     server.use(
       orderHandler(),
-      http.post(`${API}/api/v1/purchase/verify-purchase-plan-1`, () => {
-        calls += 1;
-        return HttpResponse.json({ success: false });
+      http.post(billingUrl(cbse, '/orders/order_1/verify'), () => billingError(503, 'PAYMENTS_NOT_CONFIGURED', 'down')),
+      http.get(billingUrl(cbse, '/orders/order_1'), () => billingOk({ order_id: 'order_1', status: 'failed' })),
+    );
+    const { result } = setup();
+    await act(() => result.current.pay(plan()));
+    await act(async () => sheet!.options.handler(success));
+    expect(result.current.pending).not.toBeNull();
+    await act(() => result.current.recheck());
+    expect(result.current.pending).toBeNull();
+    expect(result.current.failed).toMatchObject({ transactionId: 'pay_1', reason: null });
+  });
+
+  it('parks the automatic checks after a manual re-check that is still pending', async () => {
+    let checks = 0;
+    server.use(
+      orderHandler(),
+      http.post(billingUrl(cbse, '/orders/order_1/verify'), () => billingOk({ order_id: 'order_1', status: 'pending' }, 202)),
+      http.get(billingUrl(cbse, '/orders/order_1'), () => {
+        checks += 1;
+        return billingOk({ order_id: 'order_1', status: 'pending' });
       }),
     );
     const { result } = setup();
     await act(() => result.current.pay(plan()));
     await act(async () => sheet!.options.handler(success));
     await act(() => result.current.recheck());
-    expect(calls).toBe(2);
+    expect(checks).toBe(1);
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await act(() => vi.advanceTimersByTimeAsync(VERIFY_RETRY_DELAYS.reduce((a, b) => a + b, 0)));
-    expect(calls).toBe(2);
+    expect(checks).toBe(1);
     act(() => result.current.clearPending());
     expect(result.current.pending).toBeNull();
+    expect(sessionStorage.getItem(PENDING_ORDER_KEY)).toBeNull();
     // Nothing to re-check any more.
     await act(() => result.current.recheck());
-    expect(calls).toBe(2);
+    expect(checks).toBe(1);
+  });
+
+  it('restores a pending order saved before a reload and re-checks it', async () => {
+    sessionStorage.setItem(
+      PENDING_ORDER_KEY,
+      JSON.stringify({
+        plan: { ...plan(), validTill: '2026-07-15T00:00:00.000Z' },
+        exam: { category: cbse.category, examId: cbse.examId },
+        orderId: 'order_r',
+        transactionId: 'pay_r',
+        initiatedAt: '2026-06-15T10:00:00.000Z',
+      }),
+    );
+    server.use(http.get(billingUrl(cbse, '/orders/order_r'), () => billingOk({ order_id: 'order_r', status: 'paid', purchase: {} })));
+    const { result } = setup();
+    await waitFor(() => expect(result.current.pending).toMatchObject({ orderId: 'order_r', transactionId: 'pay_r' }));
+    expect(result.current.pending!.plan.validTill).toBeInstanceOf(Date);
+    await act(() => result.current.recheck());
+    expect(result.current.succeeded?.name).toBe('Topper Monthly');
+  });
+
+  it('ignores unreadable or blocked storage', () => {
+    sessionStorage.setItem(PENDING_ORDER_KEY, '{not json');
+    expect(loadPending()).toBeNull();
+    sessionStorage.setItem(PENDING_ORDER_KEY, JSON.stringify({ orderId: '' }));
+    expect(loadPending()).toBeNull();
+    const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    expect(loadPending()).toBeNull();
+    spy.mockRestore();
   });
 });

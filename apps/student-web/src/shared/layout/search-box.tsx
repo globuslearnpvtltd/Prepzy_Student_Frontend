@@ -2,7 +2,7 @@
 
 import { cx } from '@prepzy/design-system';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 import { useActivePlan } from '@/features/auth';
@@ -24,8 +24,8 @@ export const searchTarget = (exam: ExamConfig) =>
   exam.category === 'competitive' ? routes.notes(exam.slug) : routes.learn(exam.slug);
 
 /**
- * "Start Searching here..." box with topic suggestions from the previous app's endpoints
- * (board: per class, competitive: NEET-wide).
+ * "Search chapters, notes and tests" box with suggestions from GET /api/v4/search/:category/:examId/suggestions
+ * (board: topics of the student's class, competitive: the whole exam).
  */
 export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; onNavigate?: () => void; className?: string }) {
   const router = useRouter();
@@ -60,12 +60,13 @@ export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; o
     >
       <form
         role="search"
-        className="border-line bg-surface flex h-[52px] items-center gap-2 rounded-full border py-1 pr-2 pl-5"
+        className="border-line bg-surface focus-within:border-brand flex h-11 items-center gap-2.5 rounded-full border px-4 transition-colors"
         onSubmit={(event) => {
           event.preventDefault();
           if (text.trim()) go();
         }}
       >
+        <Search aria-hidden className="text-foreground-muted size-[18px] shrink-0" />
         <input
           type="search"
           value={text}
@@ -74,21 +75,14 @@ export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; o
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Start Searching here..."
+          placeholder="Search chapters, notes and tests"
           role="combobox"
           aria-autocomplete="list"
           aria-label="Search topics"
           aria-controls={listId}
           aria-expanded={open && items.length > 0}
-          className="text-foreground-muted h-full w-full bg-transparent text-[15px] font-medium outline-none"
+          className="text-foreground placeholder:text-foreground-muted h-full w-full min-w-0 bg-transparent text-[14px] outline-none"
         />
-        <button
-          type="submit"
-          aria-label="Search"
-          className="bg-brand hover:bg-brand-deep text-on-brand flex size-9 shrink-0 items-center justify-center rounded-full shadow-sm"
-        >
-          <ArrowRight aria-hidden className="size-5" />
-        </button>
       </form>
       {open && items.length > 0 && (
         <ul

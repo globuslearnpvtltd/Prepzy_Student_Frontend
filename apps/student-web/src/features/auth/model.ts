@@ -1,4 +1,5 @@
 import { findExam, type ExamConfig, type ExamSlug } from '@/shared/config/exams';
+import { composePlanName } from '@/shared/lib/plan-name';
 
 /** Normalised student, independent of the backend's field names. */
 export interface Student {
@@ -43,29 +44,50 @@ export function planTier(plan: Pick<ActivePlan, 'durationMonths'>): 'Basic' | 'T
   return plan.durationMonths === 0 ? 'Basic' : 'Topper';
 }
 
-/** The plan's display name, following the previous app's naming (getPlanName). */
+/**
+ * The plan's name by the server's rule (see composePlanName), for screens that only have the active plan. Prefer the
+ * API's `display_name` (purchases) when it is at hand. The exam and bundle names come from the backend exam list.
+ */
 export function planName(
   plan: ActivePlan,
-  exam: Pick<ExamConfig, 'category'>,
-  /** Exams from the backend catalog (GET /api/v4/exams): names the board exam bundled with a plan. */
+  exam: Pick<ExamConfig, 'category' | 'examId'>,
+  /** Exams from the backend catalog (GET /api/v4/exams): names the exam and the exams bundled with a plan. */
   catalog: readonly { examId: number; name: string; category: string }[] = [],
 ): string {
-  const board = catalog.find((e) => e.category === 'board' && plan.relatedExams.includes(e.examId));
-  const bundle = board ? ` + ${board.name}` : '';
-  if (exam.category !== 'competitive') {
-    if (plan.durationMonths === 0) return 'Basic Plan';
-    return plan.durationMonths === 1 ? 'Topper Monthly Plan' : 'Topper Academic Year Plan';
-  }
-  if (plan.durationMonths === 0) return `Basic NEET${bundle} Plan`;
-  if (plan.durationMonths === 1) return `Topper NEET${bundle} Monthly Plan`;
-  return `Topper NEET${plan.year ? ` ${plan.year}` : ''}${bundle} Plan`;
+  return composePlanName({
+    durationMonths: plan.durationMonths,
+    exam: catalog.find((e) => e.examId === exam.examId)?.name,
+    groupKey: exam.category === 'competitive' ? 'target_year' : 'class',
+    targetYear: plan.year,
+    bundles: catalog.filter((e) => e.examId !== exam.examId && plan.relatedExams.includes(e.examId)).map((e) => e.name),
+  });
 }
 
 export interface ExamOption {
   examId: number;
   name: string;
   examSlice: string;
+  /** Active in the backend but the app has no pages for it yet (not in the exam registry). */
   comingSoon: boolean;
+}
+
+/** A preparation length a target-year exam offers at sign-up (from the exam's active plans). */
+export interface PlanLengthOption {
+  planLength: number;
+  /** Exam year it targets; null when the backend has no exam date. */
+  targetYear: number | null;
+  /** Class the free plan is granted for (sent as class_id). */
+  classId: number;
+  /** A combo plan exists for this length (with_bundle may be true). */
+  hasBundle: boolean;
+  /** Names of the exams the combo adds, e.g. ["CBSE"]. */
+  bundleTitles: string[];
+}
+
+/** What sign-up asks for: a class, or a target year (plan length). Decided by the backend per exam category. */
+export interface OnboardingOptions {
+  choose: 'class' | 'target_year';
+  planLengths: PlanLengthOption[];
 }
 
 export interface ClassOption {

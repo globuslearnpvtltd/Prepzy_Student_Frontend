@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -12,7 +11,7 @@ import { userMessage } from '@/shared/lib/errors';
 import { authApi } from '../api';
 import { useOnboardingStore } from '../onboarding-store';
 import { phoneFormSchema } from '../schemas';
-import { AuthSubmit } from './auth-screen';
+import { AuthSubmit, AuthSwitch } from './auth-screen';
 import { PhoneField } from './phone-field';
 
 type Values = z.input<typeof phoneFormSchema>;
@@ -32,11 +31,20 @@ export function SignupForm() {
   // Marketing links: /get-started?class_id=12&exam=NEET-UG&ref=CODE
   useEffect(() => {
     const classId = Number(searchParams.get('class_id'));
+    const ref = searchParams.get('ref')?.trim() || null;
     setPreselection({
       classId: Number.isFinite(classId) && classId > 0 ? classId : null,
       exam: searchParams.get('exam'),
-      referralCode: searchParams.get('ref'),
+      referralCode: ref,
     });
+    // The welcome screen after sign-up applies this code (plans' REFERRAL_CODE_KEY), as the previous app did.
+    if (ref) {
+      try {
+        localStorage.setItem('prepzy_referral_code', ref.slice(0, 64));
+      } catch {
+        // Private mode: the student can still type the code on the welcome screen.
+      }
+    }
   }, [searchParams, setPreselection]);
 
   const register = useMutation({
@@ -61,16 +69,17 @@ export function SignupForm() {
         onCountryChange={(iso) => form.setValue('country', iso)}
         registration={form.register('phone')}
         error={error}
+        labelClassName="text-onboarding-label"
       />
-      <AuthSubmit form={FORM_ID} loading={register.isPending}>
+      <AuthSubmit form={FORM_ID} variant="signup" loading={register.isPending}>
         Get OTP on WhatsApp
       </AuthSubmit>
-      <p className="text-foreground-soft mt-4 py-2 text-center text-[13px] lg:text-sm">
-        Already have an account?{' '}
-        <Link className="font-display text-brand font-bold underline underline-offset-2" href={routes.login()}>
-          Login here
-        </Link>
-      </p>
+      <AuthSwitch prompt="Already have an account?" href={routes.login()} className="py-6 text-[13px] lg:hidden">
+        Login
+      </AuthSwitch>
+      <AuthSwitch prompt="Already have an account?" href={routes.login()} className="mt-6 hidden text-[14px] lg:block">
+        Login here
+      </AuthSwitch>
     </form>
   );
 }

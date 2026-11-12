@@ -3,15 +3,15 @@
 import { cx } from '@prepzy/design-system';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, PiggyBank, Ticket, X, Zap } from 'lucide-react';
 import { useState } from 'react';
-import type { Coupon } from '../../api';
-import { bill, planHighlights, priceCadence, tierPill, type Plan } from '../../catalog';
-import { formatInr, formatPlanDate } from '../../money';
+import type { Coupon, Quote } from '../../api';
+import { bundledTitles, planHighlights, priceCadence, tierPill, type Plan } from '../../catalog';
+import { formatAmount, formatInr, formatPlanDate } from '../../money';
 import { MobileActionBar } from './primitives';
 
 export interface CouponState {
   input: string;
+  /** The code the server accepted in a quote. */
   applied: string | null;
-  discount: number;
   error: string;
   checking: boolean;
 }
@@ -183,6 +183,7 @@ export function ReviewStep({
   chosen,
   plans,
   scope,
+  quote,
   coupon,
   coupons,
   busy,
@@ -196,6 +197,8 @@ export function ReviewStep({
   chosen: Plan;
   plans: Plan[];
   scope: string;
+  /** POST /quote for the chosen price (with the applied coupon); null while it loads. */
+  quote: Quote | null;
   coupon: CouponState;
   coupons: Coupon[];
   busy: boolean;
@@ -208,9 +211,13 @@ export function ReviewStep({
 }) {
   const annual = plans.find((plan) => plan.durationMonths === 12 && !plan.isFree);
   const annualSaving = annual && annual.priceId !== chosen.priceId ? annual.saved : 0;
-  const amounts = bill(chosen.price, coupon.applied ? coupon.discount : 0);
-  const totalSaved = chosen.saved + amounts.discount;
-  const payLabel = busy ? 'Working on it…' : chosen.isFree ? 'Activate free plan' : `Pay ${formatInr(amounts.total)}`;
+  // Amounts are the server's quote; nothing is computed here.
+  const money = (value: number | undefined) => (value === undefined ? '…' : formatAmount(value));
+  const discount = quote?.discountAmount ?? 0;
+  const totalSaved = chosen.saved + discount;
+  const pay = quote ? `Pay ${formatAmount(quote.totalAmount)}` : 'Pay now';
+  const blocked = chosen.isCurrent;
+  const payLabel = busy ? 'Working on it…' : blocked ? 'Current active plan' : chosen.isFree ? 'Activate free plan' : pay;
 
   return (
     <>
@@ -240,10 +247,10 @@ export function ReviewStep({
                   <span className="text-plan-save font-semibold">Plan selected</span>
                   <span className="text-plan-divider">•</span>
                   <span className="text-plan-muted">{chosen.validityLabel}</span>
-                  {chosen.isCombo && (
+                  {chosen.isCombo && chosen.bundled.length > 0 && (
                     <>
                       <span className="text-plan-divider">•</span>
-                      <span className="text-plan-muted">CBSE boards included</span>
+                      <span className="text-plan-muted">Includes {bundledTitles(chosen.bundled).join(' + ')}</span>
                     </>
                   )}
                 </p>
@@ -295,7 +302,7 @@ export function ReviewStep({
           )}
         </div>
 
-        <div className="lg:sticky lg:top-6 lg:h-fit">
+        <div className="lg:sticky lg:top-[100px] lg:h-fit">
           <div className="border-plan-line bg-surface rounded-lg border p-[18px] md:p-5">
             <h3 className="text-plan-ink text-[15px] font-bold">Order summary</h3>
             {chosen.isFree ? (
@@ -305,23 +312,23 @@ export function ReviewStep({
             ) : (
               <>
                 <dl className="mt-4 space-y-[11px] text-[12px]">
-                  <SummaryRow label="Plan price" value={formatInr(amounts.price)} />
-                  {amounts.discount > 0 && <SummaryRow label="Discount" value={`− ${formatInr(amounts.discount)}`} credit />}
-                  <SummaryRow label="Subtotal" value={formatInr(amounts.subtotal)} />
-                  <SummaryRow label="GST (18%)" value={formatInr(amounts.gst)} />
+                  <SummaryRow label="Plan price" value={money(quote?.basePrice)} />
+                  {discount > 0 && <SummaryRow label="Discount" value={`− ${formatAmount(discount)}`} credit />}
+                  <SummaryRow label="Subtotal" value={money(quote?.discountedPrice)} />
+                  <SummaryRow label="GST (18%)" value={money(quote?.gstAmount)} />
                 </dl>
                 <div className="bg-plan-section mt-4 flex items-center justify-between gap-3 rounded-md px-3.5 py-[13px]">
                   <div className="min-w-0">
                     <p className="text-plan-ink m-0 text-[14px] font-bold">Total Amount</p>
                     {totalSaved > 0 && (
                       <p className="text-plan-save m-0 mt-1 flex items-center gap-[3px] text-[9px] font-bold tracking-[0.08em] uppercase">
-                        <Zap aria-hidden size={9} strokeWidth={3} /> You save {formatInr(totalSaved)}!
+                        <Zap aria-hidden size={9} strokeWidth={3} /> You save {formatAmount(totalSaved)}!
                       </p>
                     )}
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-brand m-0 text-[22px] leading-none font-extrabold md:text-2xl" data-testid="order-total">
-                      {formatInr(amounts.total)}
+                      {money(quote?.totalAmount)}
                     </p>
                     <p className="text-plan-strike m-0 mt-[5px] text-[9px] tracking-[0.1em] uppercase">incl. GST</p>
                   </div>
@@ -334,7 +341,7 @@ export function ReviewStep({
             <button
               type="button"
               onClick={onPay}
-              disabled={busy}
+              disabled={busy || blocked}
               className="bg-brand text-on-brand hover:bg-brand-800 flex w-full items-center justify-center gap-2 rounded-[10px] px-5 py-3.5 text-[14px] font-bold disabled:cursor-not-allowed disabled:opacity-60"
             >
               {payLabel}
@@ -350,10 +357,10 @@ export function ReviewStep({
 
       <MobileActionBar
         label={chosen.name}
-        amount={chosen.isFree ? 0 : amounts.total}
+        amount={chosen.isFree ? 0 : (quote?.totalAmount ?? null)}
         strikeAmount={chosen.isFree ? null : chosen.mrp}
-        cta={busy ? 'Working…' : chosen.isFree ? 'Activate' : `Pay ${formatInr(amounts.total)}`}
-        disabled={busy}
+        cta={busy ? 'Working…' : blocked ? 'Current plan' : chosen.isFree ? 'Activate' : pay}
+        disabled={busy || blocked}
         onClick={onPay}
       />
     </>

@@ -1,6 +1,6 @@
 'use client';
 
-import { FieldError, InputGroup, InputGroupInput, InputGroupPrefix } from '@prepzy/design-system';
+import { FieldError } from '@prepzy/design-system';
 import { useMemo } from 'react';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { COUNTRY_DIAL_CODES } from '../countries';
@@ -13,11 +13,14 @@ export function PhoneField({
   onCountryChange,
   registration,
   error,
+  labelClassName = 'text-foreground-subtle',
 }: {
   country: string;
   onCountryChange: (iso: string) => void;
   registration: UseFormRegisterReturn;
   error?: string;
+  /** Label colour (the original sign-up used a darker grey than login). */
+  labelClassName?: string;
 }) {
   const countries = useMemo(() => {
     const names = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames(['en'], { type: 'region' }) : null;
@@ -31,16 +34,20 @@ export function PhoneField({
     <div className="flex flex-col">
       <label
         htmlFor="phone"
-        className="text-foreground-subtle mb-2.5 text-[10px] font-bold tracking-[1.5px] uppercase lg:text-[11px]"
+        className={`mb-2.5 text-[10px] font-bold tracking-[1.5px] uppercase lg:text-[11px] ${labelClassName}`}
       >
         Mobile number
       </label>
-      <InputGroup invalid={!!error}>
-        <InputGroupPrefix className="w-[72px] justify-center">
+      <div
+        className={`bg-surface relative mb-2.5 flex h-[64px] items-stretch rounded-lg border-2 transition-[box-shadow,border-color] focus-within:ring-4 focus-within:ring-brand/10 lg:h-[68px] ${
+          error ? 'border-onboarding-error shadow-onboarding-field-error' : 'border-brand shadow-onboarding-field'
+        }`}
+      >
+        <span className="border-line relative flex w-[72px] shrink-0 items-center justify-center gap-1 border-r-[1.5px]">
           <span aria-hidden className="text-[22px] leading-none">
             {flagOf(country)}
           </span>
-          <svg aria-hidden viewBox="0 0 10 6" width="8" height="5" className="fill-foreground-soft">
+          <svg aria-hidden viewBox="0 0 10 6" width="8" height="5" className="fill-foreground-soft mt-px shrink-0">
             <path d="M0 0l5 6 5-6z" />
           </svg>
           {/* Native select over the flag: accessible, searchable by typing, and tiny. */}
@@ -56,22 +63,25 @@ export function PhoneField({
               </option>
             ))}
           </select>
-        </InputGroupPrefix>
-        <span aria-hidden className="text-ink flex items-center pl-3 text-lg font-bold">
+        </span>
+        <span
+          aria-hidden
+          className="text-ink flex items-center pl-3 text-[18px] font-bold tracking-[0.5px] lg:text-[20px]"
+        >
           +{dial}
         </span>
-        <InputGroupInput
+        <input
           id="phone"
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"
-          placeholder="98765 43210"
           aria-invalid={!!error}
           aria-describedby={error ? 'phone-error' : undefined}
+          className="text-ink min-w-0 flex-1 rounded-r-lg bg-transparent pr-4 pl-1.5 text-[18px] font-bold tracking-[0.5px] outline-none lg:text-[20px]"
           {...registration}
         />
-      </InputGroup>
-      <FieldError id="phone-error" className="mt-2 font-semibold">
+      </div>
+      <FieldError id="phone-error" className="font-plain text-onboarding-error mt-0 mb-2 text-[13px] font-semibold">
         {error}
       </FieldError>
     </div>

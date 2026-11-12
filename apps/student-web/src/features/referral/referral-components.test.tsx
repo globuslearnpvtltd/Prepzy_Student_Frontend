@@ -26,8 +26,8 @@ const plan: PlanOption = {
   examId: 1,
   classId: 12,
   group: 'CBSE Class 12',
-  label: 'CBSE 12 · Topper academic year',
-  phrase: 'the CBSE Class 12 Topper plan',
+  label: 'Topper CBSE Academic',
+  phrase: 'Topper CBSE Academic',
   price: 4000,
   durationMonths: 12,
   isCombo: false,
@@ -156,7 +156,7 @@ describe('MoneyFlowFriend', () => {
 });
 
 describe('SendCreditsDialog', () => {
-  const lookup = (respond: () => Response) => http.get(`${API}/api/referral/transfer/lookup`, respond);
+  const lookup = (respond: () => Response) => http.get(`${API}/api/v4/referral/transfer/lookup`, respond);
 
   it('shows a 200 "not found" body, lets the student change a found number and closes', async () => {
     let calls = 0;
@@ -195,7 +195,7 @@ describe('SendCreditsDialog', () => {
     let attempts = 0;
     server.use(
       lookup(() => HttpResponse.json({ success: true, data: { accountId: 5, name: 'Kabir' } })),
-      http.post(`${API}/api/referral/transfer`, async ({ request }) => {
+      http.post(`${API}/api/v4/referral/transfer`, async ({ request }) => {
         attempts += 1;
         const body = (await request.json()) as Record<string, unknown>;
         expect(body).toEqual({ recipientAccountId: 5, amount: 50 });

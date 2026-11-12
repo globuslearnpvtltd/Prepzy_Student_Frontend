@@ -1,28 +1,33 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, CalendarDays, Check, Stethoscope, Target } from 'lucide-react';
+import { BookOpen, CalendarDays, Check, GraduationCap, Target } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { rememberExam, useCurrentUser } from '@/features/auth';
-import { EXAMS, findExam } from '@/shared/config/exams';
+import { findExam, type ExamCategory } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { StatusScreen } from '@/shared/layout/status-screens';
-import { userMessage } from '@/shared/lib/errors';
-import { isPlanCategory, plansApi } from '../../api';
+import { isApiError, userMessage } from '@/shared/lib/errors';
+import { billingMessage, isPlanCategory } from '../../api';
 import {
   accessLabel,
+  bundledTitles,
+  bundleOptionTitles,
   buildSections,
+  groupKeyOf,
   sortedClassTitles,
   titleCase,
   toPlans,
+  variantLabel,
   variantValidityLabel,
   withGst,
   yearVariants,
   type ApiVariant,
+  type CatalogExam,
 } from '../../catalog';
-import { useCatalog, useCoupons, useFeatureLimits } from '../../hooks';
+import { quoteQuery, useCatalogs, useCoupons, useFeatureLimits, useQuote } from '../../hooks';
 import { formatPlanDate } from '../../money';
 import { usePayment } from '../../use-payment';
 import { WarningDialog } from '../modal';
@@ -31,18 +36,22 @@ import { PaymentFailed, PaymentPending, PaymentSuccess } from './outcome-overlay
 import { BackButton, EmptyPlans, ExamCard, Eyebrow, MobileActionBar, OptionCard, PlanCard, PlanSkeleton, Switch } from './primitives';
 import { ReviewStep, type CouponState } from './review-step';
 
-/** Exam picker cards, in the order the design lays them out. JEE has no catalog yet, so it shows disabled. */
-const EXAM_CARDS: { key: string; label: string; description: string; icon: ReactNode }[] = [
-  { key: EXAMS.neet.examSlice, label: 'NEET', description: 'Medical entrance exam for your dream career.', icon: <Stethoscope size={18} /> },
-  { key: EXAMS.cbse.examSlice, label: 'CBSE', description: 'Build a strong foundation for your board exams.', icon: <BookOpen size={18} /> },
-  { key: 'jee', label: 'JEE', description: 'Crack the exam, get into your dream college.', icon: <Target size={18} /> },
-];
+/** Card text per category, unless the API names one. Never per exam: a new exam's card comes from GET /api/v4/exams. */
+const CATEGORY_CARD: Partial<Record<ExamCategory, { description: string; icon: ReactNode }>> = {
+  board: { description: 'Prepare for your board exams', icon: <BookOpen size={18} /> },
+  competitive: { description: 'Prepare for your entrance exam', icon: <GraduationCap size={18} /> },
+};
 
-const NO_COUPON: CouponState = { input: '', applied: null, discount: 0, error: '', checking: false };
+/** Does a ?exam= value name this exam? It may be the exam id, its slice or its app route. */
+const namesExam = (value: string, exam: { examId: number; examKey: string; slug: string | null }) =>
+  value === String(exam.examId) || value === exam.examKey || value === exam.slug || findExam(value)?.examSlice === exam.examKey;
 
+const NO_COUPON: CouponState = { input: '', applied: null, error: '', checking: false };
+
+/** Fills the space under the app header (the (checkout) layout). */
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="bg-surface text-plan-ink min-h-dvh">
+    <div className="bg-surface text-plan-ink flex-1">
       <div className="mx-auto w-full max-w-[1440px] px-5 pt-6 pb-[120px] md:px-8 md:pt-8 lg:pt-10 lg:pb-[72px]">{children}</div>
     </div>
   );
@@ -55,24 +64,36 @@ export function Checkout() {
   const params = useSearchParams();
   const queryClient = useQueryClient();
   const user = useCurrentUser();
-  const catalog = useCatalog();
-  const limits = useFeatureLimits();
-  const coupons = useCoupons();
+  const catalog = useCatalogs(routeExam);
 
   const examParam = params.get('exam');
-  const [examKey, setExamKey] = useState(() => findExam(examParam)?.examSlice ?? (examParam === 'jee' ? 'jee' : routeExam.examSlice));
+  /** The exam the student picked; null = not picked yet (the ?exam= link, else the page's exam). */
+  const [pickedExamId, setPickedExamId] = useState<number | null>(null);
   const [classTitle, setClassTitle] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<string | null>(null);
-  const [addBoards, setAddBoards] = useState(false);
+  const [addBundle, setAddBundle] = useState(false);
   const [priceId, setPriceId] = useState<number | null>(null);
   const [step, setStep] = useState<'plan' | 'review'>('plan');
   const [allLimits, setAllLimits] = useState(false);
   const [coupon, setCoupon] = useState<CouponState>(NO_COUPON);
 
   const exams = useMemo(() => catalog.data ?? [], [catalog.data]);
-  const activeExam = exams.find((entry) => entry.examKey === examKey) ?? null;
-  const category = activeExam?.category ?? null;
-  const byYear = category === 'competitive';
+  const activeExam: CatalogExam | null =
+    pickedExamId !== null
+      ? (exams.find((entry) => entry.examId === pickedExamId) ?? null)
+      : examParam
+        ? (exams.find((entry) => namesExam(examParam, entry)) ?? null)
+        : (exams.find((entry) => entry.examId === routeExam.examId && entry.category === routeExam.category) ?? null);
+  const examTitle = activeExam?.title ?? '';
+  // Board-style exams pick a class (and stream); competitive-style ones a target year. From the catalog's group_key.
+  const byYear = groupKeyOf(activeExam) === 'target_year';
+  // The exam whose billing routes price and sell the selection.
+  const billingExam = useMemo(
+    () => (activeExam && isPlanCategory(activeExam.category) ? { category: activeExam.category, examId: activeExam.examId } : null),
+    [activeExam],
+  );
+  const limits = useFeatureLimits(billingExam);
+  const coupons = useCoupons(billingExam);
 
   // Preselect the class from ?CLASSID= (old links), else the student's own class, once the catalog lands.
   const [preselected, setPreselected] = useState(false);
@@ -83,22 +104,23 @@ export function Checkout() {
     const streamParam = Number(params.get('stream_id'));
     const targetClass = classParam ? Number(classParam) : user.data?.classId;
     if (!targetClass) return;
-    const ordered = classParam ? catalog.data : catalog.data.filter((entry) => entry.examKey === routeExam.examSlice);
+    const routeFirst = [...catalog.data].sort((a, b) => Number(b.examId === routeExam.examId) - Number(a.examId === routeExam.examId));
+    const ordered = classParam ? routeFirst : routeFirst.filter((entry) => entry.examId === routeExam.examId);
     for (const entry of ordered) {
       const match = entry.variants.find(
         (variant) => variant.class_id === targetClass && (!streamParam || variant.stream_id === streamParam),
       );
       if (match) {
-        setExamKey(entry.examKey);
+        setPickedExamId(entry.examId);
         setClassTitle(match.class_title);
-        setVariantId(match.variant_id);
+        setVariantId(groupKeyOf(entry) === 'target_year' && match.target_year != null ? `year-${match.target_year}` : match.variant_id);
         return;
       }
     }
-  }, [preselected, catalog.data, examParam, params, user.data?.classId, routeExam.examSlice]);
+  }, [preselected, catalog.data, examParam, params, user.data?.classId, routeExam.examId]);
 
   const classTitles = useMemo(() => sortedClassTitles(activeExam?.variants ?? []), [activeExam]);
-  const years = useMemo(() => (byYear ? yearVariants(activeExam?.variants ?? []) : []), [byYear, activeExam]);
+  const years = useMemo(() => (byYear ? yearVariants(activeExam?.variants ?? [], examTitle) : []), [byYear, activeExam, examTitle]);
   const activeClass = byYear ? null : (classTitle ?? classTitles[0] ?? null);
   const classVariants = useMemo(
     () => (activeExam?.variants ?? []).filter((variant) => variant.class_title === activeClass),
@@ -108,25 +130,37 @@ export function Checkout() {
   const options = byYear ? years : (activeExam?.variants ?? []);
   const variant: ApiVariant | null =
     options.find((option) => option.variant_id === variantId) ?? (byYear ? years[0] : classVariants[0]) ?? null;
+  const bundleTitles = useMemo(() => (variant ? bundleOptionTitles(variant) : []), [variant]);
+  const label = variant ? variantLabel(variant, examTitle) : '';
 
   const plans = useMemo(() => {
     if (!variant) return [];
-    const source = variant.has_combo ? variant.plans.filter((plan) => plan.is_combo === addBoards) : variant.plans;
-    return toPlans(source, category, variant.target_year ?? null);
-  }, [variant, addBoards, category]);
-  const sections = useMemo(() => buildSections(category, plans, limits.data?.[examKey] ?? []), [category, plans, limits.data, examKey]);
+    const source = variant.has_combo ? variant.plans.filter((plan) => plan.is_combo === addBundle) : variant.plans;
+    return toPlans(source, {
+      exam: examTitle,
+      groupKey: variant.group_key ?? (byYear ? 'target_year' : 'class'),
+      bundles: bundleTitles,
+      targetYear: variant.target_year ?? null,
+    });
+  }, [variant, addBundle, examTitle, byYear, bundleTitles]);
+  const sections = useMemo(() => buildSections(plans, limits.data ?? []), [plans, limits.data]);
   const chosen = plans.find((plan) => plan.priceId === priceId) ?? plans[0] ?? null;
+  // The server's bill for the chosen paid plan (with the applied coupon): every amount on screen comes from it.
+  const quote = useQuote(billingExam, chosen && !chosen.isFree ? chosen.priceId : null, coupon.applied);
 
-  const contextLabel = variant
-    ? byYear
-      ? `NEET ${variant.target_year}${addBoards ? ' + CBSE' : ''}`
-      : `${titleCase(variant.class_title)}${variant.stream_name ? ` · ${variant.stream_name}` : ''}`
-    : '';
-  const scope = chosen?.isCombo ? 'NEET + CBSE' : byYear ? 'NEET' : 'CBSE';
-  const purchasedExam = findExam(examKey);
+  // What the plan covers: the variant ("Class 11 PCB", "{exam} 2027") plus the bundled exams of a combo.
+  const chosenBundles = chosen?.isCombo ? (chosen.bundled.length ? bundledTitles(chosen.bundled) : bundleTitles) : [];
+  const addOnLabel = bundleTitles.join(' + ');
+  const contextLabel = variant ? [label, ...(addBundle ? (chosenBundles.length ? chosenBundles : bundleTitles) : [])].join(' + ') : '';
+  const scope = contextLabel || examTitle;
+  // Chips of a combo: the variant itself, then each course the combo unlocks.
+  const comboPlan = plans.find((plan) => plan.isCombo && plan.bundled.length > 0) ?? null;
+  const chips = comboPlan
+    ? [label, ...comboPlan.bundled.map((course) => [course.exam_title, titleCase(course.class_title)].filter(Boolean).join(' · '))]
+    : [label, ...bundleTitles];
 
   const payment = usePayment({
-    category: isPlanCategory(category) ? category : 'board',
+    exam: billingExam ?? routeExam,
     coupon: coupon.applied,
     describe: (plan) => `${plan.name} · ${plan.durationName} · ${contextLabel}`,
     prefill: { name: user.data?.firstName ?? '', contact: user.data?.phone ?? '', email: user.data?.email ?? '' },
@@ -140,6 +174,8 @@ export function Checkout() {
   };
 
   const goToReview = (priceIdToReview: number) => {
+    // Renewal is blocked while a plan is active: the server would refuse it (409 PLAN_ALREADY_ACTIVE).
+    if (plans.find((plan) => plan.priceId === priceIdToReview)?.isCurrent) return;
     setPriceId(priceIdToReview);
     setStep('review');
     setAllLimits(false);
@@ -153,21 +189,29 @@ export function Checkout() {
     window.scrollTo?.({ top: 0 });
   };
 
+  /** A coupon is valid when the server quotes the chosen price with it (POST /quote). */
   const applyCoupon = async (code?: string) => {
     const value = (code ?? coupon.input).trim();
-    if (!value) return;
+    if (!value || !billingExam || !chosen) return;
     setCoupon((state) => ({ ...state, input: value, checking: true, error: '' }));
     try {
-      const discount = await plansApi.applyCoupon(value);
-      setCoupon({ input: value, applied: value, discount, error: '', checking: false });
+      await queryClient.fetchQuery(quoteQuery(billingExam, chosen.priceId, value));
+      setCoupon({ input: value, applied: value, error: '', checking: false });
     } catch (error) {
-      setCoupon((state) => ({ ...state, applied: null, discount: 0, checking: false, error: userMessage(error, "Couldn't check that coupon. Try again.") }));
+      setCoupon((state) => ({ ...state, applied: null, checking: false, error: billingMessage(error, "Couldn't check that coupon. Try again.") }));
     }
   };
 
-  /** Fresh subscription state everywhere, then the purchased exam's dashboard. */
+  // Switching plan re-prices with the applied coupon; a coupon that doesn't fit the new price is taken off.
+  const quoteError = quote.error;
+  useEffect(() => {
+    if (!coupon.applied || !isApiError(quoteError) || quoteError.status !== 400) return;
+    setCoupon({ ...NO_COUPON, input: coupon.applied, error: userMessage(quoteError, 'This coupon does not apply to this plan.') });
+  }, [coupon.applied, quoteError]);
+
+  /** Fresh subscription state everywhere, then the purchased exam's dashboard (the page's exam when the app has none). */
   const openDashboard = async () => {
-    const slug = purchasedExam?.slug ?? routeExam.slug;
+    const slug = activeExam?.slug ?? routeExam.slug;
     rememberExam(slug);
     await queryClient.invalidateQueries();
     router.replace(routes.dashboard(slug));
@@ -226,6 +270,7 @@ export function Checkout() {
           chosen={chosen}
           plans={plans}
           scope={scope}
+          quote={quote.data ?? null}
           coupon={coupon}
           coupons={coupons.data ?? []}
           busy={payment.busy}
@@ -252,23 +297,27 @@ export function Checkout() {
           <div className="mt-[22px] md:mt-[26px]">
             <Eyebrow>Choose your exam</Eyebrow>
             <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {EXAM_CARDS.map((card) => (
-                <ExamCard
-                  key={card.key}
-                  icon={card.icon}
-                  label={card.label}
-                  description={card.description}
-                  active={examKey === card.key}
-                  disabled={!exams.some((entry) => entry.examKey === card.key && isPlanCategory(entry.category))}
-                  onClick={() => {
-                    setExamKey(card.key);
-                    setClassTitle(null);
-                    setVariantId(null);
-                    setAddBoards(false);
-                    resetPlan();
-                  }}
-                />
-              ))}
+              {catalog.exams.map((entry) => {
+                const card = CATEGORY_CARD[entry.category];
+                const loaded = exams.find((known) => known.examId === entry.examId);
+                return (
+                  <ExamCard
+                    key={entry.examId}
+                    icon={card?.icon ?? <BookOpen size={18} />}
+                    label={loaded?.title || entry.name}
+                    description={card?.description ?? ''}
+                    active={activeExam?.examId === entry.examId}
+                    disabled={!loaded}
+                    onClick={() => {
+                      setPickedExamId(entry.examId);
+                      setClassTitle(null);
+                      setVariantId(null);
+                      setAddBundle(false);
+                      resetPlan();
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
 
@@ -280,7 +329,7 @@ export function Checkout() {
                   <OptionCard
                     key={option.variant_id}
                     icon={<CalendarDays size={15} />}
-                    title={`NEET ${option.target_year}`}
+                    title={variantLabel(option, examTitle)}
                     subtitle={variantValidityLabel(option)}
                     active={variant?.variant_id === option.variant_id}
                     onClick={() => {
@@ -290,43 +339,6 @@ export function Checkout() {
                   />
                 ))}
               </div>
-              {variant?.has_combo && (
-                <>
-                  <div className="mt-4 flex items-center justify-between gap-4">
-                    <p className="text-plan-ink m-0 text-[13px] font-semibold">Boards preparation added</p>
-                    <div className="flex items-center gap-2.5">
-                      {addBoards && (
-                        <span className="text-plan-save flex items-center gap-1 text-[12px] font-semibold">
-                          <Check aria-hidden size={13} strokeWidth={3} /> CBSE included
-                        </span>
-                      )}
-                      <Switch
-                        checked={addBoards}
-                        label="Add CBSE boards"
-                        onChange={() => {
-                          setAddBoards((value) => !value);
-                          resetPlan();
-                        }}
-                      />
-                    </div>
-                  </div>
-                  {addBoards && (
-                    <div className="border-plan-warm-line bg-plan-warm mt-3.5 rounded-[14px] border p-3.5">
-                      <p className="text-plan-violet m-0 text-[13px] font-bold">Your plan includes</p>
-                      <div className="mt-2.5 flex flex-wrap gap-2">
-                        {['NEET', 'CBSE · Class 11', 'CBSE · Class 12'].map((chip) => (
-                          <span key={chip} className="border-plan-warm-line bg-surface text-plan-warm-text rounded-full border px-3 py-[5px] text-[11px] font-semibold">
-                            {chip}
-                          </span>
-                        ))}
-                      </div>
-                      <p className="text-plan-warm-text m-0 mt-2.5 text-[11px] leading-4">
-                        Both classes are included by default. You&apos;ll land on the NEET dashboard and can switch to either class anytime.
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
             </div>
           ) : (
             <>
@@ -369,9 +381,47 @@ export function Checkout() {
               )}
             </>
           )}
+
+          {variant?.has_combo && (
+            <>
+              <div className="mt-4 flex items-center justify-between gap-4">
+                <p className="text-plan-ink m-0 text-[13px] font-semibold">{addOnLabel ? `Add ${addOnLabel}` : 'Add bundled courses'}</p>
+                <div className="flex items-center gap-2.5">
+                  {addBundle && (
+                    <span className="text-plan-save flex items-center gap-1 text-[12px] font-semibold">
+                      <Check aria-hidden size={13} strokeWidth={3} /> {addOnLabel || 'Bundle'} included
+                    </span>
+                  )}
+                  <Switch
+                    checked={addBundle}
+                    label={addOnLabel ? `Add ${addOnLabel}` : 'Add bundled courses'}
+                    onChange={() => {
+                      setAddBundle((value) => !value);
+                      resetPlan();
+                    }}
+                  />
+                </div>
+              </div>
+              {addBundle && (
+                <div className="border-plan-warm-line bg-plan-warm mt-3.5 rounded-[14px] border p-3.5">
+                  <p className="text-plan-violet m-0 text-[13px] font-bold">Your plan includes</p>
+                  <ul className="mt-2.5 flex flex-wrap gap-2" aria-label="Your plan includes">
+                    {chips.filter(Boolean).map((chip) => (
+                      <li key={chip} className="border-plan-warm-line bg-surface text-plan-warm-text rounded-full border px-3 py-[5px] text-[11px] font-semibold">
+                        {chip}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-plan-warm-text m-0 mt-2.5 text-[11px] leading-4">
+                    Everything listed is included. You&apos;ll land on the {examTitle || 'exam'} dashboard and can switch courses anytime.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
-        <div className="border-plan-line bg-surface h-fit rounded-[18px] border p-3 shadow-[0_24px_60px_-44px_rgba(37,28,81,0.75)] md:p-3.5 lg:sticky lg:top-6">
+        <div className="border-plan-line bg-surface h-fit rounded-[18px] border p-3 shadow-[0_24px_60px_-44px_rgba(37,28,81,0.75)] md:p-3.5 lg:sticky lg:top-[100px]">
           <p className="text-plan-deep px-1 pt-1 pb-2.5 text-[13px] font-semibold">Your plans</p>
           {catalog.isPending ? (
             <PlanSkeleton />
@@ -385,8 +435,8 @@ export function Checkout() {
             />
           ) : plans.length === 0 ? (
             <p className="border-plan-line text-plan-muted rounded-[14px] border px-5 py-6 text-center text-[13px]">
-              {addBoards
-                ? 'No combo plans for this year yet. Turn off boards preparation to see NEET-only plans.'
+              {addBundle
+                ? 'No bundle plans for this selection yet. Turn off the add-on to see the other plans.'
                 : 'No plans are live for this selection yet.'}
             </p>
           ) : (
@@ -416,9 +466,10 @@ export function Checkout() {
       {chosen && (
         <MobileActionBar
           label={chosen.name}
-          amount={chosen.isFree ? 0 : withGst(chosen.price)}
+          amount={chosen.isFree ? 0 : (quote.data?.totalAmount ?? withGst(chosen.price))}
           strikeAmount={chosen.isFree ? null : chosen.mrp}
-          cta="Continue"
+          cta={chosen.isCurrent ? 'Current plan' : 'Continue'}
+          disabled={chosen.isCurrent}
           onClick={() => goToReview(chosen.priceId)}
         />
       )}

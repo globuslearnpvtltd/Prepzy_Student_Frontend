@@ -42,7 +42,7 @@ export function ReferAndEarn() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const hub = useReferralHub();
-  const plans = usePlanOptions();
+  const plans = usePlanOptions(exam);
   const plan = useActivePlan(exam);
   const [sending, setSending] = useState(false);
 

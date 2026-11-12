@@ -1,7 +1,24 @@
-import { findExam, type ExamCategory } from '@/shared/config/exams';
+import type { ExamCategory } from '@/shared/config/exams';
+import { composePlanName, type PlanGroupKey } from '@/shared/lib/plan-name';
 import { formatInr, formatPlanDate } from './money';
 
-/** /api/v2/purchase/purchase-plans, as the backend sends it. */
+export { composePlanName } from '@/shared/lib/plan-name';
+
+/** How long a plan runs: Basic (free, no end), Topper Monthly, the academic or target year, or any other length. */
+export type PlanTier = 'basic' | 'monthly' | 'yearly' | 'custom';
+
+/** How an exam's variants are picked: by class (with streams), or by target year. From the catalog's `group_key`. */
+export type GroupKey = PlanGroupKey;
+
+/** A course a combo plan unlocks (catalog `bundled`). */
+export interface BundledCourse {
+  exam_id: number;
+  exam_title: string;
+  class_id: number;
+  class_title: string;
+}
+
+/** One price row of GET /api/v4/billing/:category/:examId/catalog. */
 export interface ApiPlan {
   price_id: number;
   plan_id: number;
@@ -12,6 +29,11 @@ export interface ApiPlan {
   exam_date: string | null;
   is_combo: boolean;
   is_active_plan: 0 | 1 | boolean;
+  /** Server-composed name ("Topper {exam} 2027 + {bundle}", "Topper {exam} Academic"); null on an older backend. */
+  display_name?: string | null;
+  tier?: PlanTier | null;
+  /** Courses a combo unlocks; empty unless combo. */
+  bundled?: BundledCourse[];
 }
 
 export interface ApiVariant {
@@ -23,20 +45,31 @@ export interface ApiVariant {
   target_year: number | null;
   has_combo: boolean;
   plans: ApiPlan[];
+  /** "Class 11 PCB" or "{exam title} {target year}"; null on an older backend. */
+  variant_label?: string | null;
+  group_key?: GroupKey | null;
+  /** Exams that can be added to this variant as a bundle. */
+  bundle_options?: { exam_id: number; title: string }[];
 }
 
 export interface CatalogExam {
   examId: number;
-  /** exam_table.exam_slice ('cbse', 'neet-ug', 'jee'). */
+  /** exam_table.exam_slice. */
   examKey: string;
+  /** Exam name from the API. */
   title: string;
-  /** Category from the exam registry; null for exams the app doesn't run yet (JEE). */
   category: ExamCategory | null;
+  /** The app route of the exam (its dashboard), when the app has pages for it. */
+  slug: string | null;
   variants: ApiVariant[];
 }
 
 export interface FeatureLimit {
   name: string;
+  /** Display label from the API, when it sends one. */
+  label: string | null;
+  /** Unit from the API ('day', 'total' …), when it sends one. */
+  unit: string | null;
   /** null = unlimited */
   free: number | null;
   premium: number | null;
@@ -49,6 +82,7 @@ export interface Plan {
   priceId: number;
   planId: number;
   name: string;
+  tier: PlanTier;
   durationName: string;
   badge: { label: string; tone: BadgeTone } | null;
   price: number;
@@ -59,6 +93,8 @@ export interface Plan {
   perDay: number | null;
   durationMonths: number;
   isCombo: boolean;
+  /** What a combo unlocks besides the plan's own course. */
+  bundled: BundledCourse[];
   isFree: boolean;
   isCurrent: boolean;
 }
@@ -120,11 +156,6 @@ export function durationLabel(months: number): string {
   return parts.join(' ');
 }
 
-export const yearFromTitle = (title: string): number | null => {
-  const match = /(20\d{2})/.exec(title ?? '');
-  return match ? Number(match[1]) : null;
-};
-
 /** "CLASS 9" → "Class 9"; mixed case stays. */
 export const titleCase = (value: string) =>
   /^[A-Z\s]+\d*$/.test(value) ? value.charAt(0) + value.slice(1).toLowerCase() : value;
@@ -134,21 +165,42 @@ const classNumber = (title: string) => {
   return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
 };
 
-/** Card names follow the plan sheet: "Topper NEET 2027 + CBSE", "Topper Monthly". */
-export function planNameFor(plan: ApiPlan, category: ExamCategory | null, targetYear: number | null): string {
-  const suffix = plan.is_combo ? ' + CBSE' : '';
-  if (category === 'competitive') {
-    if (plan.duration_months === 0) return `Basic NEET${suffix}`;
-    if (plan.duration_months === 1) return `Topper NEET${suffix} Monthly`;
-    if (plan.duration_months === 12) {
-      return `Topper NEET ${yearFromTitle(plan.plan_title) ?? targetYear ?? 'Target Year'}${suffix}`;
-    }
-    return `Topper NEET ${durationLabel(plan.duration_months)}${suffix}`;
+/** The catalog's tier, else the one its length implies (an older backend). */
+export const tierOf = (tier: PlanTier | null | undefined, durationMonths: number): PlanTier =>
+  tier ?? (durationMonths === 0 ? 'basic' : durationMonths === 1 ? 'monthly' : durationMonths === 12 ? 'yearly' : 'custom');
+
+/** The tier word(s) of a plan name: "Basic", "Topper Monthly", "Topper", "Topper n Months". */
+export function tierName(tier: PlanTier, durationMonths: number): string {
+  if (tier === 'basic') return 'Basic';
+  if (tier === 'monthly') return 'Topper Monthly';
+  if (tier === 'yearly') return 'Topper';
+  return `Topper ${durationMonths} Months`;
+}
+
+/** Unique exam titles of a combo's courses, in order. */
+export const bundledTitles = (bundled: BundledCourse[]) => [...new Set(bundled.map((course) => course.exam_title).filter(Boolean))];
+
+/** How the exam's variants are picked: the catalog's `group_key`, else its category's default (an older backend). */
+export function groupKeyOf(exam: Pick<CatalogExam, 'category' | 'variants'> | null): GroupKey {
+  const fromApi = exam?.variants.find((variant) => variant.group_key)?.group_key;
+  if (fromApi) return fromApi;
+  return exam?.category === 'competitive' ? 'target_year' : 'class';
+}
+
+/** "Class 11 PCB" or "{exam} 2027": the catalog's `variant_label`, else composed from the variant's own fields. */
+export function variantLabel(variant: ApiVariant, examTitle: string): string {
+  if (variant.variant_label) return variant.variant_label;
+  if (variant.target_year != null && (variant.group_key ?? 'target_year') === 'target_year' && !variant.stream_name) {
+    return [examTitle, variant.target_year].filter(Boolean).join(' ');
   }
-  if (plan.duration_months === 0) return `Basic${suffix}`;
-  if (plan.duration_months === 1) return `Topper Monthly${suffix}`;
-  if (plan.duration_months === 12) return `Topper Academic${suffix}`;
-  return `Topper ${durationLabel(plan.duration_months)}${suffix}`;
+  return `${titleCase(variant.class_title)}${variant.stream_name ? ` ${variant.stream_name}` : ''}`;
+}
+
+/** Exams that can be added to a variant: `bundle_options`, else the exams its combo plans unlock. */
+export function bundleOptionTitles(variant: ApiVariant): string[] {
+  const options = (variant.bundle_options ?? []).map((option) => option.title).filter(Boolean);
+  if (options.length) return [...new Set(options)];
+  return bundledTitles(variant.plans.flatMap((plan) => plan.bundled ?? []));
 }
 
 /** 0 → no end (free forever); 12 → the exam date when still ahead; n → n months from today. */
@@ -167,20 +219,27 @@ function planSaving(plan: ApiPlan, months: number, monthly: ApiPlan | undefined)
   return Math.max(0, plan.cost_price - plan.price);
 }
 
-export function toPlans(
-  apiPlans: ApiPlan[],
-  category: ExamCategory | null,
-  targetYear: number | null,
-  now: Date = new Date(),
-): Plan[] {
+export interface PlanContext {
+  /** Exam name from the API and how its variants are picked: name the plan when the server sends no display_name. */
+  exam?: string;
+  groupKey?: GroupKey;
+  /** Bundle titles of the variant, for a combo without `bundled`. */
+  bundles?: string[];
+  targetYear?: number | null;
+}
+
+export function toPlans(apiPlans: ApiPlan[], context: PlanContext = {}, now: Date = new Date()): Plan[] {
   const paid = apiPlans.filter((plan) => plan.price > 0);
   const longest = paid.length ? Math.max(...paid.map((plan) => plan.duration_months)) : 0;
   return apiPlans.map((plan) => {
     const isFree = plan.price === 0;
     const isCurrent = Number(plan.is_active_plan) === 1;
     const validTill = planEndDate(plan, now);
-    const months = billingMonths(plan, targetYear, now);
+    const months = billingMonths(plan, context.targetYear ?? null, now);
     const monthly = paid.find((p) => p.duration_months === 1 && p.is_combo === plan.is_combo);
+    const tier = tierOf(plan.tier, plan.duration_months);
+    const bundled = plan.bundled ?? [];
+    const bundles = plan.is_combo ? (bundled.length ? bundledTitles(bundled) : (context.bundles ?? [])) : [];
     const badge: Plan['badge'] = isCurrent
       ? { label: 'Current plan', tone: 'current' }
       : plan.duration_months === 1
@@ -191,7 +250,16 @@ export function toPlans(
     return {
       priceId: plan.price_id,
       planId: plan.plan_id,
-      name: planNameFor(plan, category, targetYear),
+      name:
+        plan.display_name ||
+        composePlanName({
+          durationMonths: plan.duration_months,
+          exam: context.exam,
+          groupKey: context.groupKey ?? 'class',
+          targetYear: context.targetYear,
+          bundles,
+        }),
+      tier,
       durationName: plan.duration_months === 0 ? 'Free' : durationLabel(plan.duration_months),
       badge,
       price: plan.price,
@@ -202,6 +270,7 @@ export function toPlans(
       perDay: perDayRate(plan.price, months),
       durationMonths: plan.duration_months,
       isCombo: plan.is_combo,
+      bundled,
       isFree,
       isCurrent,
     };
@@ -212,27 +281,32 @@ export function toPlans(
 export const sortedClassTitles = (variants: ApiVariant[]) =>
   [...new Set(variants.map((v) => v.class_title))].sort((a, b) => classNumber(a) - classNumber(b) || a.localeCompare(b));
 
-/** The backend returns a competitive exam as one variant; split it by the year in each plan title. */
-export function yearVariants(variants: ApiVariant[]): ApiVariant[] {
-  const byYear = new Map<number, ApiVariant>();
+/**
+ * One card per target year: variants of the same `target_year` are merged (their plans, combo flag and bundle
+ * options). Variants without a year keep a card of their own.
+ */
+export function yearVariants(variants: ApiVariant[], examTitle = ''): ApiVariant[] {
+  const byYear = new Map<string, ApiVariant>();
   for (const variant of variants) {
-    for (const plan of variant.plans) {
-      const year = yearFromTitle(plan.plan_title);
-      if (!year) continue;
-      const entry = byYear.get(year) ?? {
+    const key = variant.target_year != null ? `year-${variant.target_year}` : variant.variant_id;
+    const entry = byYear.get(key);
+    if (!entry) {
+      byYear.set(key, {
         ...variant,
-        variant_id: `year-${year}`,
-        class_title: `NEET ${year}`,
-        target_year: year,
-        has_combo: false,
-        plans: [],
-      };
-      entry.plans.push(plan);
-      if (plan.is_combo) entry.has_combo = true;
-      byYear.set(year, entry);
+        variant_id: key,
+        variant_label: variantLabel(variant, examTitle),
+        plans: [...variant.plans],
+        bundle_options: [...(variant.bundle_options ?? [])],
+      });
+      continue;
+    }
+    entry.plans.push(...variant.plans);
+    entry.has_combo = entry.has_combo || variant.has_combo;
+    for (const option of variant.bundle_options ?? []) {
+      if (!entry.bundle_options!.some((known) => known.exam_id === option.exam_id)) entry.bundle_options!.push(option);
     }
   }
-  return [...byYear.values()].sort((a, b) => (a.target_year ?? 0) - (b.target_year ?? 0));
+  return [...byYear.values()].sort((a, b) => (a.target_year ?? Infinity) - (b.target_year ?? Infinity));
 }
 
 /** Subtitle under a target-year card: the academic plan's end date, else June of the target year. */
@@ -245,108 +319,60 @@ export function variantValidityLabel(variant: ApiVariant, now: Date = new Date()
 
 /* ---- comparison table ---- */
 
-const LIMIT_SECTIONS: Record<'board' | 'competitive', { title: string; rows: { label: string; feature: string; unit?: string }[] }[]> = {
-  competitive: [
-    {
-      title: 'AI & doubt support',
-      rows: [
-        { label: 'Doubt Solver', feature: 'Step by Step Doubt Solver' },
-        { label: 'Atlas Dashboard Chatbot', feature: 'Atlas Dashboard Chat (No. of messages)' },
-        { label: 'Lecture Chatbot', feature: 'Video Lecture Chats (No. of messages)' },
-      ],
-    },
-    {
-      title: 'Learning & study',
-      rows: [
-        { label: 'Video Lectures', feature: 'Video Lecture' },
-        { label: 'Chapter Notes & Summaries', feature: 'Notes' },
-        { label: 'Post Assessment Analysis', feature: 'Post Assessment Analysis' },
-      ],
-    },
-    {
-      title: 'Practice & assessments',
-      rows: [
-        { label: 'Daily Practice DPPs', feature: 'Practice DPPs' },
-        { label: 'Chapter Assessment', feature: 'Chapter Assessment' },
-        { label: 'Chapter PYQ', feature: 'Chapter PYQ' },
-        { label: 'Final Mock Exam', feature: 'Mock Exam' },
-        { label: 'PYQ Exam', feature: 'PYQ Exam' },
-      ],
-    },
-  ],
-  board: [
-    {
-      title: 'AI & doubt support',
-      rows: [
-        { label: 'Atlas Dashboard Chatbot', feature: 'Atlas Dashboard Chatbot' },
-        { label: 'Lecture Chatbot', feature: 'Lecture Chatbot' },
-        { label: 'Post Assessment Chatbot', feature: 'Post Assessment Chatbot' },
-      ],
-    },
-    {
-      title: 'Learning & study',
-      rows: [
-        { label: 'Video Lectures', feature: 'Video Lecture' },
-        { label: 'Chapter Notes & Summaries', feature: 'Notes' },
-        { label: 'Summary Videos', feature: 'Summary Videos' },
-        { label: 'Post Assessment Analysis', feature: 'Post Assessment Analysis' },
-        { label: 'PYQ Trends Viewer', feature: 'PYQ Trends Viewer' },
-      ],
-    },
-    {
-      title: 'Practice & assessments',
-      rows: [
-        { label: 'Quiz', feature: 'Quiz' },
-        { label: 'Unit Test', feature: 'Unit Test' },
-        { label: 'Mid Term', feature: 'Mid Term' },
-        { label: 'Final Exam', feature: 'Final Exam' },
-        { label: 'Final Mock Exam', feature: 'Mock Exam' },
-        { label: 'PYQ Exam', feature: 'PYQ Exam' },
-        { label: 'Custom Exam', feature: 'Custom Exam' },
-        { label: 'Diagnostic Test', feature: 'Diagnostic Test', unit: 'total' },
-      ],
-    },
-  ],
+const GROUPS = ['AI & doubt support', 'Learning & study', 'Practice & assessments', 'More features'] as const;
+type Group = (typeof GROUPS)[number];
+
+/**
+ * Nicer labels and a table group for known feature names (feature_limits.feature_name). Keyed by feature, never by
+ * exam: an unknown feature still shows, under "More features", with the API's label or its own name.
+ */
+const FEATURES: Record<string, { label?: string; group: Group; unit?: string }> = {
+  'step by step doubt solver': { label: 'Doubt Solver', group: 'AI & doubt support' },
+  'atlas dashboard chat (no. of messages)': { label: 'Atlas Dashboard Chatbot', group: 'AI & doubt support' },
+  'video lecture chats (no. of messages)': { label: 'Lecture Chatbot', group: 'AI & doubt support' },
+  'atlas dashboard chatbot': { group: 'AI & doubt support' },
+  'lecture chatbot': { group: 'AI & doubt support' },
+  'post assessment chatbot': { group: 'AI & doubt support' },
+  'video lecture': { label: 'Video Lectures', group: 'Learning & study' },
+  notes: { label: 'Chapter Notes & Summaries', group: 'Learning & study' },
+  'summary videos': { group: 'Learning & study' },
+  'post assessment analysis': { group: 'Learning & study' },
+  'pyq trends viewer': { group: 'Learning & study' },
+  'practice dpps': { label: 'Daily Practice DPPs', group: 'Practice & assessments' },
+  'chapter assessment': { group: 'Practice & assessments' },
+  'chapter pyq': { group: 'Practice & assessments' },
+  quiz: { group: 'Practice & assessments' },
+  'unit test': { group: 'Practice & assessments' },
+  'mid term': { group: 'Practice & assessments' },
+  'final exam': { group: 'Practice & assessments' },
+  'mock exam': { label: 'Final Mock Exam', group: 'Practice & assessments' },
+  'pyq exam': { group: 'Practice & assessments' },
+  'custom exam': { group: 'Practice & assessments' },
+  'diagnostic test': { group: 'Practice & assessments', unit: 'total' },
 };
 
-/** Competitive plans also unlock the board classes — not a counted limit. */
-const BOARD_ACCESS: CompareSection = {
-  title: 'CBSE access',
-  rows: [
-    { label: 'CBSE Class 11 & 12', values: ['Starter limits', 'Topper caps'] },
-    { label: 'CBSE Board Preparation', values: ['Starter tier', 'Topper tier'] },
-  ],
+/** "/ day" by default; the API's unit ("day", "total", "/ week") otherwise. */
+const unitLabel = (unit: string | null | undefined) => {
+  const value = unit?.trim();
+  if (!value) return '/ day';
+  if (value === 'total' || value.startsWith('/')) return value;
+  return `/ ${value}`;
 };
 
 export const formatLimit = (limit: number | null, unit = '/ day') => (limit == null ? 'Unlimited' : `${limit} ${unit}`);
 
-/** One value per plan column: the free plan reads the free limit, paid plans the premium one. */
-export function buildSections(category: ExamCategory | null, plans: Plan[], limits: FeatureLimit[]): CompareSection[] {
-  if (category !== 'board' && category !== 'competitive') return [];
-  const byName = new Map(limits.map((limit) => [limit.name.trim().toLowerCase(), limit]));
-  const sections: CompareSection[] = LIMIT_SECTIONS[category].map((section) => ({
-    title: section.title,
-    rows: section.rows.flatMap((spec) => {
-      const limit = byName.get(spec.feature.toLowerCase());
-      if (!limit) return [];
-      return [
-        {
-          label: spec.label,
-          values: plans.map((plan) => formatLimit(plan.durationMonths === 0 ? limit.free : limit.premium, spec.unit)),
-        },
-      ];
-    }),
-  }));
-  if (category === 'competitive') {
-    sections.push({
-      title: BOARD_ACCESS.title,
-      rows: BOARD_ACCESS.rows.map((row) => ({
-        label: row.label,
-        values: plans.map((plan) => (plan.durationMonths === 0 ? row.values[0]! : row.values[1]!)),
-      })),
+/** One row per /feature-limits row, grouped; the free plan reads the free limit, paid plans the premium one. */
+export function buildSections(plans: Plan[], limits: FeatureLimit[]): CompareSection[] {
+  const sections = new Map<Group, CompareSection>(GROUPS.map((title) => [title, { title, rows: [] }]));
+  for (const limit of limits) {
+    const known = FEATURES[limit.name.trim().toLowerCase()];
+    const unit = unitLabel(limit.unit ?? known?.unit);
+    sections.get(known?.group ?? 'More features')!.rows.push({
+      label: limit.label || known?.label || limit.name.trim(),
+      values: plans.map((plan) => formatLimit(plan.tier === 'basic' ? limit.free : limit.premium, unit)),
     });
   }
-  return sections.filter((section) => section.rows.length > 0);
+  return [...sections.values()].filter((section) => section.rows.length > 0);
 }
 
 /** "Pricing" and "Validity" rows that close the comparison table. */
@@ -371,23 +397,14 @@ export function priceSection(plans: Plan[]): CompareSection {
   };
 }
 
-export const columnName = (plan: Plan) =>
-  plan.durationMonths === 0
-    ? 'Basic'
-    : plan.durationMonths === 1
-      ? 'Topper Monthly'
-      : plan.durationMonths === 12
-        ? 'Topper Annual'
-        : `Topper ${plan.durationName}`;
-
 export const columnEyebrow = (plan: Plan) => plan.badge?.label ?? (plan.isFree ? 'Essential' : 'Topper');
 
 export const tierPill = (plan: Plan) =>
-  plan.durationMonths === 0
+  plan.tier === 'basic'
     ? 'Free plan'
-    : plan.durationMonths === 1
+    : plan.tier === 'monthly'
       ? 'Monthly plan'
-      : plan.durationMonths === 12
+      : plan.tier === 'yearly'
         ? 'Annual plan'
         : `${plan.durationName} plan`;
 
@@ -404,24 +421,3 @@ export const planHighlights = (plan: Plan, scope: string): string[] =>
   plan.isFree
     ? [`Core ${scope} lessons and notes`, 'Daily practice with starter limits', 'Atlas AI support, 10 chats a day', 'Upgrade anytime to unlock Topper']
     : [`Topper access for ${scope}`, 'Full Mock Tests, PYQs & Custom Exams', 'Step-by-step Atlas AI support', '10× higher daily limits'];
-
-/** Display-only bill; the charge itself comes from the backend order. */
-export function bill(price: number, discountPercent: number) {
-  const discount = Math.round((price * discountPercent) / 100);
-  const subtotal = Math.max(0, price - discount);
-  const gst = Math.round(subtotal * GST_RATE);
-  return { price, discount, subtotal, gst, total: subtotal + gst };
-}
-
-/** Normalises the catalog response; drops inactive exams. */
-export function toCatalog(exams: { exam_id: number; exam_key: string; title: string; is_active?: number; variants?: ApiVariant[] }[]): CatalogExam[] {
-  return exams
-    .filter((exam) => exam.is_active !== 0)
-    .map((exam) => ({
-      examId: exam.exam_id,
-      examKey: exam.exam_key,
-      title: exam.title,
-      category: findExam(exam.exam_key)?.category ?? null,
-      variants: exam.variants ?? [],
-    }));
-}

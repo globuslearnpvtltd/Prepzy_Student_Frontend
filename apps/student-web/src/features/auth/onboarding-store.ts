@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
@@ -50,3 +51,16 @@ export const useOnboardingStore = create<OnboardingState>()(
     { name: 'prepzy-onboarding', storage: createJSONStorage(() => sessionStorage) },
   ),
 );
+
+/**
+ * True once the saved progress has been read from sessionStorage. Screens that restart the flow when the
+ * phone number is missing wait for this, so a refresh mid-flow doesn't bounce the student back to the start.
+ */
+export function useOnboardingHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    if (useOnboardingStore.persist.hasHydrated()) setHydrated(true);
+    return useOnboardingStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+  return hydrated;
+}

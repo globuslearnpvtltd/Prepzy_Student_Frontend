@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useActivePlan, useCurrentUser, type ActivePlan } from '@/features/auth';
+import { useActivePlanName } from '@/features/plans';
 import { hasTestType } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { dashboardApi, syllabusCards, type ContinueTest } from './api';
@@ -44,15 +45,15 @@ export function planState(plan: Pick<ActivePlan, 'durationMonths'>, daysLeft: nu
 const formatDay = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'soon';
 
-export function planCopy(plan: ActivePlan, now = new Date()) {
+/** Banner copy; `name` is the plan's name from the API (display_name). */
+export function planCopy(plan: ActivePlan, name: string, now = new Date()) {
   const daysLeft = daysUntil(plan.expiryDate, now);
   const state = planState(plan, daysLeft);
-  const name = plan.durationMonths === 1 ? 'Topper Monthly' : 'Topper Academic Year';
   const ends = formatDay(plan.expiryDate);
   const days = `${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
   const copy: Record<PlanState, { pill: string; strip: string; headline: string; subline: string }> = {
     basic: {
-      pill: 'Basic plan',
+      pill: name,
       strip: 'Lower daily limits, resets 5 AM',
       headline: 'Welcome back! Basic has lower daily limits. Topper gives you much higher limits.',
       subline: 'Daily limit resets at 5 AM',
@@ -97,9 +98,10 @@ const TONE: Record<PlanState, { card: string; ink: string; soft: string; pill: s
 export function PlanBanner() {
   const { exam } = useDashboardContext();
   const plan = useActivePlan(exam);
+  const name = useActivePlanName(exam, plan.data);
   const [expanded, setExpanded] = useState(false);
-  if (!plan.data) return null;
-  const { state, pill, strip, headline, subline } = planCopy(plan.data);
+  if (!plan.data || !name) return null;
+  const { state, pill, strip, headline, subline } = planCopy(plan.data, name);
   const tone = TONE[state];
   const cta = state === 'basic' || state === 'ended';
   return (
@@ -114,7 +116,7 @@ export function PlanBanner() {
         />
       )}
       <div className="relative p-6">
-        <span className={cx('flex w-fit items-center rounded-full border px-3 py-1.5 text-[14px] font-semibold md:h-[34px] md:py-0', tone.pill)}>
+        <span className={cx('flex w-fit items-center rounded-full border px-3 py-1.5 text-[14px] font-semibold md:min-h-[34px] md:py-1', tone.pill)}>
           {pill}
         </span>
         <p className={cx('mt-4 pr-10 text-[18px] leading-6 font-bold', tone.ink)}>{expanded ? headline : strip}</p>

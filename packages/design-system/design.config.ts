@@ -349,6 +349,21 @@ export const designConfig = defineDesignConfig({
         'red-tile': '#FBD8D8',
         'field-line': '#E3DFF3',
       },
+      // Student sign-in / sign-up / onboarding steps (login, get-started, verify-otp, exam-selection, setup).
+      onboarding: {
+        page: '#F7F7FB', // OTP (desktop), exam and setup steps
+        signup: '#FAFBF8', // get-started page
+        warm: '#FBF9F4', // OTP page on mobile
+        box: '#F8F9FA', // empty OTP digit box
+        error: '#EF4444', // phone field error border and message
+        radio: '#D0D5DD', // unselected radio dot
+        label: '#6B6B80', // sign-up field label
+        ink: '#241D52', // class card titles
+        gold: '#C08A0A', // setup section labels, stream count
+        'notice-soft': '#FEF3E7', // info banner
+        'notice-text': '#92400E',
+        'notice-icon': '#B45309', // banner icon, "SOON" badge
+      },
     },
     fonts: {
       sans: "var(--font-poppins), 'Poppins', ui-sans-serif, system-ui, sans-serif",
@@ -424,6 +439,19 @@ export const designConfig = defineDesignConfig({
       'voice-cta': '0 6px 14px -8px rgb(79 70 229 / 0.9)', // Vedica "Talk live"
       'voice-live': '0 4px 12px rgb(61 52 139 / 0.25)', // Atlas "Live chat" pill
       'schools-pop': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', // profile dropdown
+      // Student sign-in / onboarding (ported from the previous app)
+      'onboarding-form': '0 16px 48px rgb(0 0 0 / 0.175)', // floating form card
+      'onboarding-field': '0 4px 24px rgb(61 52 139 / 0.18)', // phone field
+      'onboarding-field-error': '0 4px 24px rgb(239 68 68 / 0.18)',
+      'onboarding-cta': '0 6px 20px rgb(61 52 139 / 0.35)', // mobile submit
+      'onboarding-continue': '0 6px 20px rgb(61 52 139 / 0.3)', // exam / setup continue
+      'onboarding-verify': '0 6px 20px rgb(18 4 120 / 0.28)', // OTP verify
+      'onboarding-card': '0 10px 40px rgb(26 18 64 / 0.05)', // OTP card (desktop)
+      'onboarding-card-float': '0 12px 32px rgb(26 18 64 / 0.14)', // OTP card over the hero (mobile)
+      'onboarding-tile': '0 2px 10px rgb(26 18 64 / 0.05)', // feature rows (mobile)
+      'onboarding-stat': '0 2px 10px rgb(26 18 64 / 0.04)', // stat rows (mobile)
+      'onboarding-bar': '0 -10px 28px rgb(0 0 0 / 0.07)', // pinned bottom bar
+      'onboarding-bar-soft': '0 -8px 24px rgb(0 0 0 / 0.06)',
     },
     breakpoints: {
       sm: '640px',

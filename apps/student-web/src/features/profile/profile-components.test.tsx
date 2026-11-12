@@ -27,7 +27,7 @@ describe('UploadPhoto', () => {
   it('uploads a PNG as multipart form data and confirms it', async () => {
     let contentType: string | null = null;
     server.use(
-      http.put(`${API}/api/accounts/profile_image`, async ({ request }) => {
+      http.put(`${API}/api/v4/student/account/photo`, async ({ request }) => {
         contentType = request.headers.get('content-type');
         return HttpResponse.json({ success: true, data: { profile_picture: 'https://x.test/me.png' } });
       }),
@@ -70,14 +70,14 @@ describe('UploadPhoto', () => {
   });
 
   it('shows the backend message when the upload fails (HTTP 200 with success:false)', async () => {
-    server.use(http.put(`${API}/api/accounts/profile_image`, () => HttpResponse.json({ success: false, message: 'Image too large' })));
+    server.use(http.put(`${API}/api/v4/student/account/photo`, () => HttpResponse.json({ success: false, message: 'Image too large' })));
     renderWithProviders(<UploadPhoto />);
     await userEvent.upload(screen.getByLabelText('Upload New Photo'), png());
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Image too large'));
   });
 
   it('falls back to a generic message on a server error', async () => {
-    server.use(http.put(`${API}/api/accounts/profile_image`, () => HttpResponse.json({}, { status: 500 })));
+    server.use(http.put(`${API}/api/v4/student/account/photo`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<UploadPhoto />);
     await userEvent.upload(screen.getByLabelText('Upload New Photo'), png());
     await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
@@ -124,11 +124,11 @@ describe('AvatarProgress', () => {
 
 describe('ParentLink', () => {
   const mentor = (data: unknown) =>
-    http.get(`${API}/api/mentor/v1/auth/get-mentor-data`, () => HttpResponse.json({ success: true, data: { mentor_data: data } }));
+    http.get(`${API}/api/v4/student/mentor`, () => HttpResponse.json({ success: true, data: { mentor_data: data } }));
 
   it('shows a loading line before the parent arrives', async () => {
     server.use(
-      http.get(`${API}/api/mentor/v1/auth/get-mentor-data`, async () => {
+      http.get(`${API}/api/v4/student/mentor`, async () => {
         await delay(50);
         return HttpResponse.json({ success: true, data: { mentor_data: null } });
       }),
@@ -142,11 +142,11 @@ describe('ParentLink', () => {
     const sent: unknown[] = [];
     server.use(
       mentor(null),
-      http.post(`${API}/api/mentor/v1/auth/generate-signup-otp`, async ({ request }) => {
+      http.post(`${API}/api/v4/student/mentor/otp`, async ({ request }) => {
         sent.push(await request.json());
         return HttpResponse.json({ success: true });
       }),
-      http.post(`${API}/api/mentor/v1/auth/verify-signup-otp`, () => HttpResponse.json({ success: true, data: { mentor_id: 3 } })),
+      http.post(`${API}/api/v4/student/mentor/verify`, () => HttpResponse.json({ success: true, data: { mentor_id: 3 } })),
     );
     renderWithProviders(<ParentLink />);
     await userEvent.click(await screen.findByRole('button', { name: /Add Parent Account/ }));
@@ -188,7 +188,9 @@ describe('ParentLink', () => {
   it('shows a failed OTP request and lets the student cancel', async () => {
     server.use(
       mentor(null),
-      http.post(`${API}/api/mentor/v1/auth/generate-signup-otp`, () => HttpResponse.json({ success: false, message: 'Number already linked' })),
+      http.post(`${API}/api/v4/student/mentor/otp`, () =>
+        HttpResponse.json({ success: false, code: 'TOO_MANY_REQUESTS', message: 'Too many OTP requests for this number.' }, { status: 429 }),
+      ),
     );
     renderWithProviders(<ParentLink />);
     await userEvent.click(await screen.findByRole('button', { name: /Add Parent Account/ }));
@@ -199,7 +201,7 @@ describe('ParentLink', () => {
     expect(await screen.findByText('Enter a valid phone number')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('WhatsApp number'), '4567890');
     await userEvent.click(screen.getByRole('button', { name: 'Send OTP & Continue' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Number already linked');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many OTP requests for this number.');
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByRole('button', { name: /Add Parent Account/ })).toBeInTheDocument();
   });
@@ -208,8 +210,8 @@ describe('ParentLink', () => {
     let verified: Record<string, unknown> | null = null;
     server.use(
       mentor({ account_id: 4, firstName: 'Priya', lastName: 'Menon', contactMethod: 'whatsapp', contactValue: '+919876543210' }),
-      http.post(`${API}/api/mentor/v1/auth/generate-signup-otp`, () => HttpResponse.json({ success: true })),
-      http.post(`${API}/api/mentor/v1/auth/verify-signup-otp`, async ({ request }) => {
+      http.post(`${API}/api/v4/student/mentor/otp`, () => HttpResponse.json({ success: true })),
+      http.post(`${API}/api/v4/student/mentor/verify`, async ({ request }) => {
         verified = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ success: true, data: { mentor_id: 4 } });
       }),

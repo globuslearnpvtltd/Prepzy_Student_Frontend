@@ -1,6 +1,8 @@
-import { findExam, type ExamConfig } from '@/shared/config/exams';
+import type { CatalogExam } from '@/features/plans';
+import type { ExamConfig } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/errors';
+import { composePlanName } from '@/shared/lib/plan-name';
 import { assertOk } from '@/shared/lib/unwrap';
 
 type Envelope<T> = { success?: boolean; message?: string; error?: string; data?: T };
@@ -205,48 +207,47 @@ export function toggleNote(view: Tier, own: Tier, gain: string): { text: string 
   return { text: null, tone: 'muted' };
 }
 
-const EXAM_SHORT: Record<string, string> = { cbse: 'CBSE', 'neet-ug': 'NEET', jee: 'JEE' };
+/** "Class 12" for an all-caps class title; other names stay as sent. */
 const titleCase = (value: string) => (/^[A-Z\s]+\d*$/.test(value) ? value.charAt(0) + value.slice(1).toLowerCase() : value);
-const yearFromTitle = (title: string): number | null => {
-  const match = /(20\d{2})/.exec(title);
-  return match ? Number(match[1]) : null;
-};
-const planKind = (months: number) =>
-  months === 1 ? 'Topper monthly' : months === 12 ? 'Topper academic year' : `Topper ${months} months`;
 
-/** Paid plans from /api/v2/purchase/purchase-plans, labelled for the calculator's picker. */
-export function buildPlanOptions(raw: unknown): PlanOption[] {
+/**
+ * Paid plans of every purchasable exam's v4 catalog, labelled for the calculator's picker. Every name comes from
+ * the catalog (exam title, variant_label, display_name), so a new exam needs no code change.
+ */
+export function buildPlanOptions(catalogs: readonly CatalogExam[]): PlanOption[] {
   const options: PlanOption[] = [];
   const seen = new Set<number>();
-  for (const exam of rows(raw)) {
-    if (exam.is_active === 0) continue;
-    const key = text(exam.exam_key) ?? '';
-    const short = EXAM_SHORT[key] ?? text(exam.title) ?? '';
-    // NEET plans are named by target year rather than class.
-    const byYear = findExam(key)?.onboarding.kind === 'choose-target-year';
-    for (const variant of rows(exam.variants)) {
-      for (const plan of rows(variant.plans)) {
-        const priceId = toNumber(plan.price_id) ?? 0;
-        const price = toNumber(plan.price) ?? 0;
-        if (!(price > 0) || seen.has(priceId)) continue;
-        seen.add(priceId);
-        const months = toNumber(plan.duration_months) ?? 0;
-        const year = byYear ? (yearFromTitle(text(plan.plan_title) ?? '') ?? toNumber(variant.target_year)) : null;
-        const className = titleCase(text(variant.class_title) ?? '');
-        const stream = text(variant.stream_name) ? ` ${text(variant.stream_name)}` : '';
-        const group = byYear ? `${short}${year ? ` ${year}` : ''}` : `${short} ${className}${stream}`;
-        const label = byYear ? group : `${short} ${className.replace(/^class\s+/i, '')}${stream}`;
-        const kind = `${planKind(months)}${plan.is_combo ? ' + CBSE' : ''}`;
+  for (const exam of catalogs) {
+    for (const variant of exam.variants) {
+      const byYear = variant.group_key === 'target_year';
+      const fallback = byYear
+        ? [exam.title, variant.target_year].filter(Boolean).join(' ')
+        : [titleCase(variant.class_title), variant.stream_name].filter(Boolean).join(' ');
+      const variantName = variant.variant_label || fallback;
+      // Target-year labels already carry the exam name ("{exam} 2027"); class labels don't ("Class 12 PCB").
+      const group = (byYear ? variantName : `${exam.title} ${variantName}`).trim();
+      for (const plan of variant.plans) {
+        if (!(plan.price > 0) || seen.has(plan.price_id)) continue;
+        seen.add(plan.price_id);
+        const name =
+          plan.display_name ||
+          composePlanName({
+            durationMonths: plan.duration_months,
+            exam: exam.title,
+            groupKey: byYear ? 'target_year' : 'class',
+            targetYear: variant.target_year,
+            bundles: plan.is_combo ? [...new Set((plan.bundled ?? []).map((course) => course.exam_title))] : [],
+          });
         options.push({
-          priceId,
-          examId: toNumber(exam.exam_id) ?? 0,
-          classId: toNumber(variant.class_id) ?? 0,
+          priceId: plan.price_id,
+          examId: exam.examId,
+          classId: variant.class_id,
           group,
-          label: `${label} · ${kind}`,
-          phrase: `${group}, ${kind}`,
-          price,
-          durationMonths: months,
-          isCombo: !!plan.is_combo,
+          label: name,
+          phrase: name,
+          price: plan.price,
+          durationMonths: plan.duration_months,
+          isCombo: plan.is_combo,
         });
       }
     }
@@ -268,6 +269,8 @@ export function pickExamplePlan(options: PlanOption[], classId?: number | null, 
 
 export function maskPhone(phone: string | null): string | null {
   if (!phone) return null;
+  // The v4 API already masks friends' numbers.
+  if (phone.includes('•')) return phone;
   const digits = phone.replace(/\D/g, '');
   if (digits.length < 6) return phone;
   const local = digits.slice(-10);
@@ -368,10 +371,10 @@ export function shortLink(link: string): string {
 export const referralApi = {
   async hub(): Promise<Hub> {
     const [summary, friends, statement, rates] = await Promise.all([
-      apiClient.get<Envelope<unknown>>('/api/referral/me'),
-      apiClient.get<Envelope<unknown>>('/api/referral/my-friends'),
-      apiClient.get<Envelope<unknown>>('/api/referral/my-statement'),
-      apiClient.get<Envelope<unknown>>('/api/referral/earn-rates'),
+      apiClient.get<Envelope<unknown>>('/api/v4/referral/me'),
+      apiClient.get<Envelope<unknown>>('/api/v4/referral/friends'),
+      apiClient.get<Envelope<unknown>>('/api/v4/referral/statement'),
+      apiClient.get<Envelope<unknown>>('/api/v4/referral/earn-rates'),
     ]);
     if (!summary?.success || !summary.data) {
       throw new ApiError({ status: 500, code: 'EMPTY_RESPONSE', message: "We couldn't load Refer & Earn" });
@@ -384,14 +387,9 @@ export const referralApi = {
     };
   },
 
-  async planOptions(): Promise<PlanOption[]> {
-    const body = await apiClient.get<Envelope<{ exams?: unknown }>>('/api/v2/purchase/purchase-plans');
-    return buildPlanOptions(body?.data?.exams);
-  },
-
   /** The student who'd receive credits, by mobile number. */
   async lookup(phone: string, signal?: AbortSignal): Promise<{ accountId: number; name: string }> {
-    const body = await apiClient.get<Envelope<{ accountId: number; name: string }>>('/api/referral/transfer/lookup', {
+    const body = await apiClient.get<Envelope<{ accountId: number; name: string }>>('/api/v4/referral/transfer/lookup', {
       params: { phone: phone.trim() },
       signal,
     });
@@ -401,6 +399,6 @@ export const referralApi = {
   },
 
   async transfer(input: { recipientAccountId: number; amount: number; note?: string }): Promise<void> {
-    assertOk(await apiClient.post<Envelope<unknown>>('/api/referral/transfer', input));
+    assertOk(await apiClient.post<Envelope<unknown>>('/api/v4/referral/transfer', input));
   },
 };

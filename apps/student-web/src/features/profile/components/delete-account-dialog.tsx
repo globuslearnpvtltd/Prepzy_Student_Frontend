@@ -49,7 +49,7 @@ export function DeleteAccountDialog({ trigger }: { trigger: (open: () => void) =
             <button
               type="button"
               disabled={remove.isPending || !accountId}
-              onClick={() => accountId && remove.mutate(accountId)}
+              onClick={() => remove.mutate()}
               className="bg-danger text-on-brand flex flex-1 items-center justify-center gap-2 rounded-md p-3 text-[14px] font-semibold hover:opacity-90 disabled:opacity-60"
             >
               {remove.isPending && <Loader2 aria-hidden className="size-4 animate-spin" />}

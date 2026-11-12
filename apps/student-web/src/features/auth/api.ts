@@ -1,4 +1,5 @@
-import { learnApiBase, type ExamRef } from '@/shared/config/exams';
+import { findExam, learnApiBase, type ExamRef } from '@/shared/config/exams';
+import { fetchExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk, unwrapData } from '@/shared/lib/unwrap';
 import {
@@ -6,6 +7,7 @@ import {
   type ActivePlan,
   type ClassOption,
   type ExamOption,
+  type OnboardingOptions,
   type PurchasedExam,
   type Student,
 } from './model';
@@ -58,15 +60,19 @@ export const authApi = {
     return toStudent(unwrapData(body));
   },
 
+  /**
+   * Exams a student can sign up for: the active exams of GET /api/v4/exams (reference books are not an exam).
+   * One the app has no pages for yet is listed as coming soon.
+   */
   async examOptions(): Promise<ExamOption[]> {
-    const body =
-      await apiClient.get<Envelope<{ exam_id: number; exam_name: string; exam_slice: string }[]>>('/api/exam-list');
-    return unwrapData(body).map((exam) => ({
-      examId: exam.exam_id,
-      name: exam.exam_name,
-      examSlice: exam.exam_slice,
-      comingSoon: /jee/i.test(exam.exam_name),
-    }));
+    return (await fetchExamCatalog())
+      .filter((exam) => exam.category !== 'reference')
+      .map((exam) => ({
+        examId: exam.examId,
+        name: exam.name,
+        examSlice: exam.examSlice,
+        comingSoon: !findExam(exam.examSlice),
+      }));
   },
 
   /** Classes of the exam being signed up for. */
@@ -77,9 +83,31 @@ export const authApi = {
     return unwrapData(body).classes.map((c) => ({ classId: c.class_id, title: c.title, streamName: c.stream_name ?? '' }));
   },
 
-  /** NEET preparation lengths in years (target year = current session year + length). */
-  async neetPlanLengths(): Promise<number[]> {
-    return unwrapData(await apiClient.get<Envelope<number[]>>('/api/neet-plan-lengths'));
+  /** What sign-up asks for this exam: a class, or a target year from the exam's plan lengths. */
+  async onboardingOptions(exam: ExamRef): Promise<OnboardingOptions> {
+    type Raw = {
+      choose: 'class' | 'target_year';
+      plan_lengths: {
+        plan_length: number;
+        target_year: number | null;
+        class_id: number;
+        has_bundle: boolean;
+        bundle_options?: { exam_id: number; title: string }[];
+      }[];
+    };
+    const data = unwrapData(
+      await apiClient.get<Envelope<Raw>>(`/api/v4/billing/${exam.category}/${exam.examId}/onboarding-options`),
+    );
+    return {
+      choose: data.choose === 'target_year' ? 'target_year' : 'class',
+      planLengths: (data.plan_lengths ?? []).map((p) => ({
+        planLength: p.plan_length,
+        targetYear: typeof p.target_year === 'number' ? p.target_year : null,
+        classId: p.class_id,
+        hasBundle: p.has_bundle === true,
+        bundleTitles: (p.bundle_options ?? []).map((o) => o.title),
+      })),
+    };
   },
 
   /** Activates the account, grants the free plan and sets the session cookies. */
@@ -89,7 +117,7 @@ export const authApi = {
     classId: number;
     fingerprint: string;
     planLength?: number;
-    withCbse?: boolean;
+    withBundle?: boolean;
   }): Promise<Student> {
     const body = await apiClient.post<Envelope<unknown>>(`${AUTH}/complete-onboarding`, {
       phone: input.phone,
@@ -97,7 +125,7 @@ export const authApi = {
       class_id: input.classId,
       fingerprint: input.fingerprint,
       plan_length: input.planLength,
-      with_cbse: input.withCbse,
+      with_bundle: input.withBundle,
     });
     return toStudent(unwrapData(body));
   },

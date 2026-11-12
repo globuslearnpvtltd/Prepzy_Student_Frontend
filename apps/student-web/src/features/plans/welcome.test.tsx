@@ -4,6 +4,8 @@ import { delay, http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
+import { billingError, billingOk, billingUrl } from '@/test/billing';
+import { testExam } from '@/test/exams';
 import { FIRST_VISIT_KEY, REFERRAL_CODE_KEY, Welcome } from './components/welcome';
 
 type Handlers = Parameters<typeof server.use>;
@@ -11,27 +13,52 @@ type Handlers = Parameters<typeof server.use>;
 function base({
   account = { account_id: 1 } as Record<string, unknown>,
   plans = [] as Record<string, unknown>[],
-  signupPlans = [{ plan_id: 44 }] as { plan_id: number }[],
   referred = false,
 } = {}): Handlers {
   return [
     http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: account })),
     http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: true, data: { plans } })),
-    http.get(`${API}/api/v1/student/plans/active-for-signup`, () => HttpResponse.json({ success: true, data: { plans: signupPlans } })),
-    http.get(`${API}/api/referral/status`, () => HttpResponse.json({ success: true, data: { alreadyReferred: referred } })),
+    http.get(`${API}/api/v4/referral/status`, () => HttpResponse.json({ success: true, data: { alreadyReferred: referred } })),
   ];
 }
 
-const limitsHandler = http.get(`${API}/api/v1/purchase/feature-limits`, async () => {
+const cbse = testExam('cbse');
+const neet = testExam('neet');
+
+const limitsHandler = http.get(billingUrl(cbse, '/feature-limits'), async () => {
   await delay(30);
-  return HttpResponse.json({
-    success: true,
-    data: [
-      { id: 1, feature_name: 'Quiz', free_limits: 2, premium_limits: -1 },
-      { id: 2, feature_name: 'Atlas', free_limits: 5, premium_limits: 50 },
+  return billingOk({
+    features: [
+      { id: 1, feature_name: 'Quiz', free_limit: 2, premium_limit: null },
+      { id: 2, feature_name: 'Atlas', free_limit: 5, premium_limit: 50 },
     ],
   });
 });
+
+type Row = { price_id?: number; plan_id: number; plan_title: string; duration_months: number; price: number; cost_price: number | null; is_combo?: boolean; is_active_plan?: boolean };
+/** GET /catalog?class_id= with one variant holding `plans`; asserts the class filter. */
+const catalogFor = (exam: typeof cbse, classId: number, plans: () => Row[] | Response, targetYear: number | null = null) =>
+  http.get(billingUrl(exam, '/catalog'), async ({ request }) => {
+    expect(new URL(request.url).searchParams.get('class_id')).toBe(String(classId));
+    await delay(30);
+    const rows = plans();
+    if (rows instanceof Response) return rows;
+    return billingOk({
+      exam: { exam_id: exam.examId, exam_key: exam.examSlice, title: exam.label, exam_date: null },
+      variants: [
+        {
+          variant_id: 'v',
+          class_id: classId,
+          class_title: 'CLASS',
+          stream_id: null,
+          stream_name: null,
+          target_year: targetYear,
+          has_combo: false,
+          plans: rows.map((row, i) => ({ price_id: i + 1, exam_date: null, is_combo: false, is_active_plan: false, ...row })),
+        },
+      ],
+    });
+  });
 
 describe('Welcome', () => {
   beforeEach(() => {
@@ -86,10 +113,10 @@ describe('Welcome', () => {
     let body: unknown = null;
     server.use(
       ...base({ account: { account_id: 1, target_exam: 'cbse' } }),
-      http.post(`${API}/api/v1/purchase/apply-custom-duration-coupon`, async ({ request }) => {
+      http.post(billingUrl(cbse, '/extensions'), async ({ request }) => {
         body = await request.json();
         await delay(30);
-        return HttpResponse.json({ success: true, data: { months: 1 } });
+        return billingOk({ months: 1, purchase: {} });
       }),
     );
     renderWithProviders(<Welcome />);
@@ -131,33 +158,29 @@ describe('Welcome', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('prices board plans after the free month', async () => {
+  it('prices the active board plan after the free month from the class catalog', async () => {
     server.use(
       ...base(),
-      http.get(`${API}/api/v1/purchase/signup-plan-prices/12/44`, async () => {
-        await delay(30);
-        return HttpResponse.json({
-          success: true,
-          data: {
-            plans: [
-              { plan_id: 44, title: 'CLASS 12', duration_months: 12, price: 3999, cost_price: 9999 },
-              { plan_id: 44, title: 'CLASS 12', duration_months: 1, price: 499, cost_price: 499 },
-            ],
-          },
-        });
-      }),
+      catalogFor(cbse, 12, () => [
+        { plan_id: 43, plan_title: 'CLASS 12 PCM', duration_months: 1, price: 1, cost_price: 1 },
+        { plan_id: 44, plan_title: 'CLASS 12', duration_months: 12, price: 3999, cost_price: 9999, display_name: 'Topper CBSE Academic' },
+        { plan_id: 44, plan_title: 'CLASS 12', duration_months: 0, price: 0, cost_price: 0, display_name: 'Basic CBSE' },
+        { plan_id: 44, plan_title: 'CLASS 12', duration_months: 1, price: 499, cost_price: 499, is_active_plan: true, display_name: 'Topper CBSE Monthly' },
+      ]),
     );
     renderWithProviders(<Welcome />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'See pricing' })).toBeEnabled());
     await userEvent.click(screen.getByRole('button', { name: 'See pricing' }));
     const dialog = screen.getByRole('dialog', { name: 'Pricing' });
     expect(within(dialog).getByText('Loading prices…')).toBeInTheDocument();
-    expect(await within(dialog).findByText('CLASS 12 Topper Academic Year')).toBeInTheDocument();
-    expect(within(dialog).getByText('CLASS 12 Basic')).toBeInTheDocument();
-    expect(within(dialog).getByText('CLASS 12 Topper Monthly')).toBeInTheDocument();
+    // Names are the server's display_name.
+    expect(await within(dialog).findByText('Topper CBSE Academic')).toBeInTheDocument();
+    expect(within(dialog).getByText('Basic CBSE')).toBeInTheDocument();
+    expect(within(dialog).getByText('Topper CBSE Monthly')).toBeInTheDocument();
     expect(within(dialog).getByText('₹9,999')).toBeInTheDocument();
-    // No strike-through when the monthly plan isn't discounted.
+    // No strike-through when the monthly plan isn't discounted; the other plan's ₹1 isn't shown.
     expect(within(dialog).getAllByText('₹499')).toHaveLength(1);
+    expect(within(dialog).queryByText('₹1')).toBeNull();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Got it' }));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -166,56 +189,65 @@ describe('Welcome', () => {
     navigation.searchParams = new URLSearchParams('exam=neet&class_id=20');
     let calls = 0;
     server.use(
-      ...base(),
-      http.get(`${API}/api/v1/purchase/signup-plan-prices/20/44`, () => {
-        calls += 1;
-        if (calls === 1) return HttpResponse.json({ success: false, message: 'down' });
-        return HttpResponse.json({
-          success: true,
-          data: { plans: [{ plan_id: 44, title: 'NEET 2027', related_exams: [1], year: 2027, duration_months: 12, price: 3999, cost_price: null }] },
-        });
-      }),
+      ...base({ plans: [{ plan_id: 44, class_id: 20, class_name: 'NEET', duration_months: 1, expiry_date: '2026-07-01', status: 'active' }] }),
+      catalogFor(
+        neet,
+        20,
+        () => {
+          calls += 1;
+          if (calls === 1) return billingError(404, 'PURCHASE_NOT_AVAILABLE', 'down');
+          return [
+            { plan_id: 45, plan_title: 'NEET', duration_months: 1, price: 1, cost_price: null },
+            {
+              plan_id: 44,
+              plan_title: 'NEET',
+              is_combo: true,
+              duration_months: 12,
+              price: 3999,
+              cost_price: null,
+              bundled: [{ exam_id: 1, exam_title: 'CBSE', class_id: 11, class_title: 'Class 11 PCB' }],
+            },
+          ];
+        },
+        2027,
+      ),
     );
     renderWithProviders(<Welcome />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'See pricing' })).toBeEnabled());
     await userEvent.click(screen.getByRole('button', { name: 'See pricing' }));
     expect(await screen.findByText('Couldn’t load plans')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByText('Topper NEET 2027 + CBSE')).toBeInTheDocument();
-    expect(screen.getByText('Basic NEET + CBSE')).toBeInTheDocument();
+    // An older backend: the name is composed from the exam title, the variant's target_year and the bundle.
+    expect(await screen.findByText(`Topper ${neet.label} 2027 + CBSE`)).toBeInTheDocument();
+    expect(screen.getByText(`Basic ${neet.label}`)).toBeInTheDocument();
     expect(screen.queryByText(/Monthly/)).toBeNull();
     fireEvent.mouseDown(screen.getByRole('dialog', { name: 'Pricing' }).parentElement!);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('names NEET plans without a bundle or year, and says when nothing is priced', async () => {
+  it('names target-year plans by exam, year and bundle, and says when nothing is priced', async () => {
     navigation.searchParams = new URLSearchParams('exam=neet&class_id=20');
     let empty = false;
     server.use(
       ...base(),
-      http.get(`${API}/api/v1/purchase/signup-plan-prices/20/44`, () =>
-        HttpResponse.json({
-          success: true,
-          data: {
-            plans: empty
-              ? []
-              : [
-                  { plan_id: 44, title: 'NEET', duration_months: 1, price: 499, cost_price: 999 },
-                  { plan_id: 44, title: 'NEET', duration_months: 0, price: 0, cost_price: null },
-                ],
-          },
-        }),
+      catalogFor(neet, 20, () =>
+        empty
+          ? []
+          : [
+              { plan_id: 44, plan_title: 'NEET', duration_months: 1, price: 499, cost_price: 999 },
+              { plan_id: 44, plan_title: 'NEET', duration_months: 3, price: 1299, cost_price: null },
+            ],
       ),
     );
     const { queryClient } = renderWithProviders(<Welcome />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'See pricing' })).toBeEnabled());
     await userEvent.click(screen.getByRole('button', { name: 'See pricing' }));
-    expect(await screen.findByText('Topper NEET Monthly')).toBeInTheDocument();
-    expect(screen.getByText('Topper NEET')).toBeInTheDocument();
+    expect(await screen.findByText(`Topper ${neet.label} Monthly`)).toBeInTheDocument();
+    expect(screen.getByText(`Topper ${neet.label} 3 Months`)).toBeInTheDocument();
     expect(screen.getByText('₹999')).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
     empty = true;
-    queryClient.removeQueries({ queryKey: ['plans', 'signup-prices'] });
+    queryClient.removeQueries({ queryKey: ['plans', 'catalog'] });
     await userEvent.click(screen.getByRole('button', { name: 'See pricing' }));
     expect(await screen.findByText('No plans available for this class yet.')).toBeInTheDocument();
   });
@@ -223,7 +255,7 @@ describe('Welcome', () => {
   it('applies a referral code typed by hand, showing invalid codes', async () => {
     server.use(
       ...base(),
-      http.post(`${API}/api/referral/apply`, async ({ request }) => {
+      http.post(`${API}/api/v4/referral/apply`, async ({ request }) => {
         const { code } = (await request.json()) as { code: string };
         return code === 'FRIEND'
           ? HttpResponse.json({ success: true, data: { joiningCredit: 75 } })
@@ -263,8 +295,8 @@ describe('Welcome', () => {
     let applied = false;
     server.use(
       ...base(),
-      http.post(`${API}/api/referral/validate`, () => HttpResponse.json({ success: true, data: { valid: false } })),
-      http.post(`${API}/api/referral/apply`, () => {
+      http.post(`${API}/api/v4/referral/validate`, () => HttpResponse.json({ success: true, data: { valid: false } })),
+      http.post(`${API}/api/v4/referral/apply`, () => {
         applied = true;
         return HttpResponse.json({ success: true, data: {} });
       }),
@@ -279,8 +311,8 @@ describe('Welcome', () => {
     localStorage.setItem(REFERRAL_CODE_KEY, 'ASHA1');
     server.use(
       ...base(),
-      http.post(`${API}/api/referral/validate`, () => HttpResponse.json({ success: true, data: { valid: true, referrerName: 'Asha', joiningCredit: 50 } })),
-      http.post(`${API}/api/referral/apply`, () => HttpResponse.json({ success: false, message: 'Referral window closed' })),
+      http.post(`${API}/api/v4/referral/validate`, () => HttpResponse.json({ success: true, data: { valid: true, referrerName: 'Asha', joiningCredit: 50 } })),
+      http.post(`${API}/api/v4/referral/apply`, () => HttpResponse.json({ success: false, message: 'Referral window closed' })),
     );
     renderWithProviders(<Welcome />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Referral window closed');

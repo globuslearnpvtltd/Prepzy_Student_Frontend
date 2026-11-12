@@ -19,6 +19,8 @@ export interface ExamDesign {
   /** Backend key (exam_table.exam_slice). */
   examSlice: string;
   label: string;
+  /** One line under the exam on the sign-up exam picker. */
+  tagline?: string;
   /** Decides the shell (navigation, header links, sidebar) and the dashboard layout. See navigation.ts. */
   category: ExamCategory;
   testTypes: readonly TestTypeKey[];
@@ -43,6 +45,7 @@ export const EXAMS = {
     slug: 'cbse',
     examSlice: 'cbse',
     label: 'CBSE',
+    tagline: 'Class 6 to 12',
     category: 'board',
     testTypes: ['mock', 'pyq', 'chapter-pyq', 'custom', 'mid', 'final', 'quiz'],
     theme: 'board',
@@ -52,6 +55,7 @@ export const EXAMS = {
     slug: 'neet',
     examSlice: 'neet-ug',
     label: 'NEET UG',
+    tagline: 'Physics, Chemistry, Botany, Zoology',
     category: 'competitive',
     testTypes: ['mock', 'pyq', 'dpp', 'chapter-pyq', 'custom', 'practice'],
     theme: 'competitive',

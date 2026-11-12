@@ -6,11 +6,11 @@ import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { SchoolsHeader } from './schools-header';
 
-const AUTH = `${API}/api/mentor/v1/auth`;
+const AUTH = `${API}/api/v4/schools/auth`;
 
 describe('SchoolsHeader menus', () => {
   it('falls back to "Teacher", closes the account menu on an outside click and the drawer from its controls', async () => {
-    server.use(http.get(`${AUTH}/get-teacher-info`, () => HttpResponse.json({ success: true, data: { teacher_data: null } })));
+    server.use(http.get(`${AUTH}/me`, () => HttpResponse.json({ success: true, data: { teacher_data: null } })));
     const user = userEvent.setup();
     renderWithProviders(<SchoolsHeader />);
 

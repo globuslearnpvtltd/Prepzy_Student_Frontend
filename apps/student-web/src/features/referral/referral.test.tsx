@@ -29,6 +29,7 @@ import { estimate } from './components/calculator';
 import { buildFaqs } from './components/info';
 import { ReferAndEarn } from './components/refer-and-earn';
 import { testExam } from '@/test/exams';
+import { billingOk, billingUrl } from '@/test/billing';
 
 const cbse = testExam('cbse');
 const neet = testExam('neet');
@@ -37,26 +38,59 @@ const rawRates = [
   { exam_id: null, conversion_type: 'percent', signup_credit_free: '25', signup_credit_paid: '50', conversion_rate_free: '10', conversion_rate_paid: '20', conversion_floor: '50', conversion_cap: '500', conversion_flat_amount: null },
   { exam_id: 2, conversion_type: 'flat', signup_credit_free: '30', signup_credit_paid: '60', conversion_rate_free: null, conversion_rate_paid: null, conversion_floor: null, conversion_cap: null, conversion_flat_amount: '300' },
 ];
-const rawPlans = [
+const plan = (priceId: number, price: number, extra: Record<string, unknown> = {}) => ({
+  price_id: priceId,
+  plan_id: priceId,
+  plan_title: 'Plan',
+  duration_months: 12,
+  price,
+  cost_price: 0,
+  exam_date: null,
+  is_combo: false,
+  is_active_plan: 0 as const,
+  display_name: null as string | null,
+  tier: 'yearly' as const,
+  bundled: [],
+  ...extra,
+});
+const cbseVariants = [
   {
-    exam_id: 1,
-    exam_key: 'cbse',
-    title: 'CBSE',
-    is_active: 1,
-    variants: [{ variant_id: 'a', class_id: 12, class_title: 'CLASS 12', stream_name: 'PCB', target_year: null, plans: [{ price_id: 11, plan_title: 'Year', duration_months: 12, price: 4999, is_combo: false }, { price_id: 12, plan_title: 'Free', duration_months: 0, price: 0, is_combo: false }] }],
+    variant_id: 'class-12',
+    class_id: 12,
+    class_title: 'CLASS 12',
+    stream_id: null,
+    stream_name: 'PCB',
+    target_year: null,
+    has_combo: false,
+    variant_label: 'Class 12 PCB',
+    group_key: 'class' as const,
+    bundle_options: [],
+    plans: [plan(11, 4999, { display_name: 'Topper CBSE Academic' }), plan(12, 0, { duration_months: 0, display_name: 'Basic CBSE' })],
   },
+];
+const neetVariants = [
   {
-    exam_id: 2,
-    exam_key: 'neet-ug',
-    title: 'NEET',
-    is_active: 1,
-    variants: [{ variant_id: 'b', class_id: 20, class_title: 'NEET', stream_name: null, target_year: 2027, plans: [{ price_id: 21, plan_title: 'NEET 2028 plan', duration_months: 12, price: 9999, is_combo: true }] }],
+    variant_id: 'neet-ug-2028',
+    class_id: 20,
+    class_title: 'NEET',
+    stream_id: null,
+    stream_name: null,
+    target_year: 2028,
+    has_combo: true,
+    variant_label: 'NEET-UG 2028',
+    group_key: 'target_year' as const,
+    bundle_options: [],
+    plans: [plan(21, 9999, { is_combo: true, display_name: 'Topper NEET-UG 2028 + CBSE' }), plan(11, 4999)],
   },
-  { exam_id: 3, exam_key: 'jee', title: 'JEE', is_active: 0, variants: [] },
+];
+/** What useCatalogs hands the calculator. */
+const catalogs = [
+  { examId: cbse.examId, examKey: 'cbse', title: 'CBSE', category: 'board' as const, slug: 'cbse', variants: cbseVariants },
+  { examId: neet.examId, examKey: 'neet-ug', title: 'NEET-UG', category: 'competitive' as const, slug: 'neet', variants: neetVariants },
 ];
 const friendsRaw = [
-  { id: 1, status: 'paid', paid_at: '2025-03-02', friend_name: 'Riya', friend_phone: '+919876543210', exam_name: 'CBSE', signup_credit_amount: '25', conversion_credit_amount: '500' },
-  { id: 2, status: 'joined', paid_at: null, friend_name: null, friend_phone: '9123456789', exam_name: null, signup_credit_amount: '25', conversion_credit_amount: null },
+  { id: 1, status: 'paid', paid_at: '2025-03-02', friend_name: 'Riya', friend_phone: '+91 98••• ••210', exam_name: 'CBSE', signup_credit_amount: '25', conversion_credit_amount: '500' },
+  { id: 2, status: 'joined', paid_at: null, friend_name: null, friend_phone: '91••• ••789', exam_name: null, signup_credit_amount: '25', conversion_credit_amount: null },
 ];
 const statementRaw = [
   { id: 10, entry_type: 'grant_conversion', amount: '500', balance_after: '550', reason: null, referral_id: 1, exam_id: 1, tier_snapshot: 'free', basis_snapshot: '{"paidAmount":4999}', created_at: '2025-09-05T00:00:00Z' },
@@ -66,15 +100,16 @@ const statementRaw = [
 
 function hub({ friends = friendsRaw, statement = statementRaw, balance = 550, fail = false } = {}) {
   return [
-    http.get(`${API}/api/referral/me`, () =>
+    http.get(`${API}/api/v4/referral/me`, () =>
       fail
         ? HttpResponse.json({ message: 'down' }, { status: 500 })
-        : HttpResponse.json({ success: true, data: { code: 'MEERA1', shareLink: 'https://prepzy.ai/join?ref=MEERA1', tier: 'free', balance, friendCount: friends.length, friendJoinCredit: 100 } }),
+        : HttpResponse.json({ success: true, message: 'OK', data: { code: 'MEERA1', shareLink: 'https://prepzy.ai/join?ref=MEERA1', tier: 'free', balance, friendCount: friends.length, friendJoinCredit: 100 } }),
     ),
-    http.get(`${API}/api/referral/my-friends`, () => HttpResponse.json({ success: true, data: friends })),
-    http.get(`${API}/api/referral/my-statement`, () => HttpResponse.json({ success: true, data: statement })),
-    http.get(`${API}/api/referral/earn-rates`, () => HttpResponse.json({ success: true, data: rawRates })),
-    http.get(`${API}/api/v2/purchase/purchase-plans`, () => HttpResponse.json({ success: true, data: { exams: rawPlans } })),
+    http.get(`${API}/api/v4/referral/friends`, () => HttpResponse.json({ success: true, message: 'OK', data: friends })),
+    http.get(`${API}/api/v4/referral/statement`, () => HttpResponse.json({ success: true, message: 'OK', data: statement })),
+    http.get(`${API}/api/v4/referral/earn-rates`, () => HttpResponse.json({ success: true, message: 'OK', data: rawRates })),
+    http.get(billingUrl(cbse, '/catalog'), () => billingOk({ exam: { exam_key: 'cbse', title: 'CBSE', category: 'board' }, variants: cbseVariants })),
+    http.get(billingUrl(neet, '/catalog'), () => billingOk({ exam: { exam_key: 'neet-ug', title: 'NEET-UG', category: 'competitive' }, variants: neetVariants })),
     http.get(`${API}/api/v4/student/plans/active`, () =>
       HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 0, status: 'active' }] } }),
     ),
@@ -123,19 +158,30 @@ describe('referral maths and normalisers', () => {
   });
 
   it('builds plan options and picks an example plan', () => {
-    const options = buildPlanOptions(rawPlans);
+    const options = buildPlanOptions(catalogs);
+    // Paid plans only, each price once; names straight from the catalog.
     expect(options).toHaveLength(2);
-    expect(options[0]).toMatchObject({ label: 'CBSE 12 PCB · Topper academic year', group: 'CBSE Class 12 PCB' });
-    expect(options[1]).toMatchObject({ group: 'NEET 2028', label: 'NEET 2028 · Topper academic year + CBSE' });
-    expect(pickExamplePlan(options, 12, 1)!.priceId).toBe(11);
-    expect(pickExamplePlan(options, null, 2)!.priceId).toBe(21);
+    expect(options[0]).toMatchObject({ priceId: 11, examId: cbse.examId, group: 'CBSE Class 12 PCB', label: 'Topper CBSE Academic', phrase: 'Topper CBSE Academic' });
+    expect(options[1]).toMatchObject({ priceId: 21, examId: neet.examId, group: 'NEET-UG 2028', label: 'Topper NEET-UG 2028 + CBSE', isCombo: true });
+    // An older catalog without labels or display_name: named by the same rule as the server.
+    const bare = buildPlanOptions([
+      { ...catalogs[0]!, variants: [{ ...cbseVariants[0]!, variant_label: null, plans: [plan(31, 99, { plan_title: 'Monthly' })] }] },
+      { ...catalogs[1]!, variants: [{ ...neetVariants[0]!, variant_label: null, plans: [plan(32, 199, { plan_title: '' })] }] },
+    ]);
+    expect(bare.map((option) => [option.group, option.label])).toEqual([
+      ['CBSE Class 12 PCB', 'Topper CBSE Academic'],
+      ['NEET-UG 2028', 'Topper NEET-UG 2028'],
+    ]);
+    expect(pickExamplePlan(options, 12, cbse.examId)!.priceId).toBe(11);
+    expect(pickExamplePlan(options, null, neet.examId)!.priceId).toBe(21);
     expect(pickExamplePlan([], null, 1)).toBeNull();
-    expect(buildPlanOptions(null)).toEqual([]);
+    expect(buildPlanOptions([])).toEqual([]);
   });
 
   it('formats friends and the statement', () => {
     expect(maskPhone('+919876543210')).toBe('+91 98••• ••210');
     expect(maskPhone('123')).toBe('123');
+    expect(maskPhone('+91 98••• ••210')).toBe('+91 98••• ••210');
     expect(maskPhone(null)).toBeNull();
     expect(shortDate('2025-09-05T00:00:00Z')).toBe('05 Sep 2025');
     expect(shortDate('bad')).toBe('');
@@ -218,15 +264,15 @@ describe('ReferAndEarn', () => {
     let sent: unknown = null;
     server.use(
       ...hub(),
-      http.get(`${API}/api/referral/transfer/lookup`, ({ request }) => {
+      http.get(`${API}/api/v4/referral/transfer/lookup`, ({ request }) => {
         const phone = new URL(request.url).searchParams.get('phone');
         return phone === '9000000000'
           ? HttpResponse.json({ message: 'No student found with that number' }, { status: 404 })
           : HttpResponse.json({ success: true, data: { accountId: 44, name: 'Kabir' } });
       }),
-      http.post(`${API}/api/referral/transfer`, async ({ request }) => {
+      http.post(`${API}/api/v4/referral/transfer`, async ({ request }) => {
         sent = await request.json();
-        return HttpResponse.json({ success: true, data: { newBalance: 450 } });
+        return HttpResponse.json({ success: true, message: 'Credits sent', data: { newBalance: 450, amount: 100 } });
       }),
     );
     renderWithProviders(<ReferAndEarn />, { exam: cbse });

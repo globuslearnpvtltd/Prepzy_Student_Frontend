@@ -25,7 +25,7 @@ import { PartnerSignup } from './components/signup-screen';
 import { arrangement, describeEntry, displayLink, formatDate, formatPhone, inr, initials, toNameChars, toTenDigits } from './format';
 import { bankDetailsSchema, payoutSchema, signupDetailsSchema } from './schemas';
 
-const V1 = `${API}/api/partner/v1`;
+const V4 = `${API}/api/v4/partners`;
 
 const rawProfile = {
   partner_name: 'Anita Sharma',
@@ -58,11 +58,11 @@ const rawPayouts = (payouts: unknown[], minPayoutAmount = 500) => ({ success: tr
 
 function partnerHandlers(overrides: { profile?: unknown; summary?: unknown; payouts?: unknown } = {}) {
   return [
-    http.get(`${V1}/kyc/me`, () => HttpResponse.json({ success: true, data: overrides.profile ?? rawProfile })),
-    http.get(`${V1}/dashboard/me`, () => HttpResponse.json({ success: true, data: overrides.summary ?? rawSummary })),
-    http.get(`${V1}/dashboard/friends`, () => HttpResponse.json({ success: true, data: rawFriends })),
-    http.get(`${V1}/dashboard/statement`, () => HttpResponse.json({ success: true, data: rawStatement })),
-    http.get(`${V1}/payouts`, () => HttpResponse.json(overrides.payouts ?? rawPayouts([]))),
+    http.get(`${V4}/profile`, () => HttpResponse.json({ success: true, data: overrides.profile ?? rawProfile })),
+    http.get(`${V4}/summary`, () => HttpResponse.json({ success: true, data: overrides.summary ?? rawSummary })),
+    http.get(`${V4}/friends`, () => HttpResponse.json({ success: true, data: rawFriends })),
+    http.get(`${V4}/statement`, () => HttpResponse.json({ success: true, data: rawStatement })),
+    http.get(`${V4}/payouts`, () => HttpResponse.json(overrides.payouts ?? rawPayouts([]))),
   ];
 }
 
@@ -175,15 +175,15 @@ describe('partner login', () => {
     const user = userEvent.setup();
     const bodies: unknown[] = [];
     server.use(
-      http.post(`${V1}/auth/generate-login-otp`, async ({ request }) => {
+      http.post(`${V4}/auth/login/otp`, async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json({ success: true });
       }),
-      http.post(`${V1}/auth/verify-login-otp`, async ({ request }) => {
+      http.post(`${V4}/auth/login/verify`, async ({ request }) => {
         const body = (await request.json()) as { otp: string };
         return body.otp === '123456'
           ? HttpResponse.json({ success: true })
-          : HttpResponse.json({ success: false, error: 'Incorrect OTP' }, { status: 400 });
+          : HttpResponse.json({ success: false, message: 'Incorrect OTP', code: 'INVALID_OTP', data: null }, { status: 400 });
       }),
     );
     renderWithProviders(<PartnerLogin />);
@@ -211,8 +211,8 @@ describe('partner login', () => {
   it('shows the server error when the number has no partner account', async () => {
     const user = userEvent.setup();
     server.use(
-      http.post(`${V1}/auth/generate-login-otp`, () =>
-        HttpResponse.json({ success: false, error: 'No partner account found for this phone number' }, { status: 404 }),
+      http.post(`${V4}/auth/login/otp`, () =>
+        HttpResponse.json({ success: false, message: 'No partner account found for this phone number', code: 'PARTNER_NOT_FOUND', data: null }, { status: 404 }),
       ),
     );
     renderWithProviders(<PartnerLogin />);
@@ -228,17 +228,17 @@ describe('partner sign-up', () => {
     const user = userEvent.setup();
     const sent: unknown[] = [];
     server.use(
-      http.post(`${V1}/auth/generate-signup-otp`, async ({ request }) => {
+      http.post(`${V4}/auth/signup/otp`, async ({ request }) => {
         sent.push(await request.json());
         return HttpResponse.json({ success: true, accountId: 9 });
       }),
-      http.post(`${V1}/auth/verify-signup-otp`, () => HttpResponse.json({ success: true })),
-      http.get(`${V1}/kyc/partner-types`, () => HttpResponse.json({ success: true, data: [{ id: 1, name: 'Parent' }, { id: 2, name: 'Teacher' }] })),
-      http.post(`${V1}/kyc/signup-details`, async ({ request }) => {
+      http.post(`${V4}/auth/signup/verify`, () => HttpResponse.json({ success: true })),
+      http.get(`${V4}/partner-types`, () => HttpResponse.json({ success: true, data: [{ id: 1, name: 'Parent' }, { id: 2, name: 'Teacher' }] })),
+      http.post(`${V4}/signup-details`, async ({ request }) => {
         sent.push(await request.json());
         return HttpResponse.json({ success: true, message: 'Details submitted for review' });
       }),
-      http.get(`${V1}/dashboard/me`, () => HttpResponse.json({ success: true, data: rawSummary })),
+      http.get(`${V4}/summary`, () => HttpResponse.json({ success: true, data: rawSummary })),
     );
     renderWithProviders(<PartnerSignup />);
 
@@ -282,10 +282,10 @@ describe('partner sign-up', () => {
   it('city input supports the keyboard and free text', async () => {
     const user = userEvent.setup();
     server.use(
-      http.post(`${V1}/auth/generate-signup-otp`, () => HttpResponse.json({ success: true })),
-      http.post(`${V1}/auth/verify-signup-otp`, () => HttpResponse.json({ success: true })),
-      http.get(`${V1}/kyc/partner-types`, () => HttpResponse.json({ success: false, error: 'boom' }, { status: 500 })),
-      http.post(`${V1}/auth/logout`, () => HttpResponse.json({ success: true })),
+      http.post(`${V4}/auth/signup/otp`, () => HttpResponse.json({ success: true })),
+      http.post(`${V4}/auth/signup/verify`, () => HttpResponse.json({ success: true })),
+      http.get(`${V4}/partner-types`, () => HttpResponse.json({ success: false, message: 'boom', code: 'INTERNAL_ERROR', data: null }, { status: 500 })),
+      http.post(`${V4}/auth/logout`, () => HttpResponse.json({ success: true })),
     );
     renderWithProviders(<PartnerSignup />);
     await user.type(screen.getByLabelText('First name'), 'Anita');
@@ -350,7 +350,7 @@ describe('partner dashboard', () => {
     const user = userEvent.setup();
     let fail = true;
     server.use(
-      http.get(`${V1}/dashboard/me`, () =>
+      http.get(`${V4}/summary`, () =>
         fail ? HttpResponse.json({ message: 'down' }, { status: 500 }) : HttpResponse.json({ success: true, data: rawSummary }),
       ),
       ...partnerHandlers(),
@@ -365,9 +365,9 @@ describe('partner dashboard', () => {
   it('sends an unfinished sign-up (no profile) back to sign-up', async () => {
     let loggedOut = false;
     server.use(
-      http.get(`${V1}/kyc/me`, () => HttpResponse.json({ success: false, error: 'Partner profile not found' }, { status: 404 })),
+      http.get(`${V4}/profile`, () => HttpResponse.json({ success: false, message: 'Partner profile not found', code: 'PARTNER_PROFILE_NOT_FOUND', data: null }, { status: 404 })),
       ...partnerHandlers(),
-      http.post(`${V1}/auth/logout`, () => {
+      http.post(`${V4}/auth/logout`, () => {
         loggedOut = true;
         return HttpResponse.json({ success: true });
       }),
@@ -379,7 +379,7 @@ describe('partner dashboard', () => {
 
   it('logs out, clears the cache and returns to the partner login', async () => {
     const user = userEvent.setup();
-    server.use(...partnerHandlers(), http.post(`${V1}/auth/logout`, () => HttpResponse.json({ success: true })));
+    server.use(...partnerHandlers(), http.post(`${V4}/auth/logout`, () => HttpResponse.json({ success: true })));
     const { queryClient } = renderWithProviders(<PartnerDashboard />);
     await user.click(await screen.findByRole('button', { name: 'Logout' }));
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/partners/login'));
@@ -398,7 +398,7 @@ describe('partner payouts', () => {
     let requested: unknown;
     server.use(
       ...partnerHandlers({ payouts: rawPayouts(payouts) }),
-      http.post(`${V1}/payouts`, async ({ request }) => {
+      http.post(`${V4}/payouts`, async ({ request }) => {
         requested = await request.json();
         return HttpResponse.json({ success: true, message: 'Payout requested', data: { payoutId: 3, newBalance: 650 } });
       }),
@@ -441,7 +441,7 @@ describe('partner payouts', () => {
     const user = userEvent.setup();
     server.use(
       ...partnerHandlers(),
-      http.post(`${V1}/payouts`, () => HttpResponse.json({ success: false, message: 'Insufficient balance' }, { status: 400 })),
+      http.post(`${V4}/payouts`, () => HttpResponse.json({ success: false, message: 'Insufficient balance', code: 'INSUFFICIENT_BALANCE', data: null }, { status: 400 })),
     );
     renderWithProviders(<PartnerPayouts />);
     expect(await screen.findByText('No payout requests yet.')).toBeInTheDocument();
@@ -465,8 +465,8 @@ describe('partner bank details', () => {
     let saved: unknown;
     server.use(
       ...partnerHandlers({ profile: { ...rawProfile, kyc_status: 'rejected' } }),
-      http.get(`${V1}/kyc/bank-details`, () => HttpResponse.json(bank)),
-      http.post(`${V1}/kyc/bank-details`, async ({ request }) => {
+      http.get(`${V4}/bank-details`, () => HttpResponse.json(bank)),
+      http.post(`${V4}/bank-details`, async ({ request }) => {
         saved = await request.json();
         return HttpResponse.json({ success: true, message: 'Bank details submitted for review' });
       }),
@@ -501,8 +501,8 @@ describe('partner bank details', () => {
     const user = userEvent.setup();
     server.use(
       ...partnerHandlers({ profile: { ...rawProfile, kyc_status: 'pending' } }),
-      http.get(`${V1}/kyc/bank-details`, () => HttpResponse.json({ success: true, data: { kycStatus: 'pending', bankDetails: null } })),
-      http.post(`${V1}/kyc/bank-details`, () => HttpResponse.json({ success: false, message: 'IFSC not recognised' }, { status: 400 })),
+      http.get(`${V4}/bank-details`, () => HttpResponse.json({ success: true, data: { kycStatus: 'pending', bankDetails: null } })),
+      http.post(`${V4}/bank-details`, () => HttpResponse.json({ success: false, message: 'IFSC not recognised', code: 'BAD_REQUEST', data: null }, { status: 400 })),
     );
     renderWithProviders(<PartnerBankDetails />);
     expect(await screen.findByText('Add your bank details')).toBeInTheDocument();

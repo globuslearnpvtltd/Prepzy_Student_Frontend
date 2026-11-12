@@ -2,42 +2,93 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { env } from '@/shared/config/env';
-import { userMessage } from '@/shared/lib/errors';
-import { plansApi, type PlanCategory, type VerifyPayload } from './api';
+import type { ExamRef } from '@/shared/config/exams';
+import { billingMessage, plansApi, type OrderStatus } from './api';
 import type { Plan } from './catalog';
 import { loadRazorpay } from './razorpay';
 
 /** Gaps between automatic re-checks of a payment we couldn't confirm, in ms. */
 export const VERIFY_RETRY_DELAYS = [4000, 8000, 15000];
 
+/** sessionStorage key of a payment waiting for confirmation, so a reload can still re-check it. */
+export const PENDING_ORDER_KEY = 'prepzy-pending-order';
+
 export interface PendingPayment {
   plan: Plan;
+  /** The exam the order was placed for (re-checks go to its billing routes). */
+  exam: ExamRef;
+  orderId: string;
   transactionId: string;
   initiatedAt: Date;
-  payload: VerifyPayload;
 }
 
 export interface FailedPayment {
   plan: Plan;
+  exam: ExamRef;
   transactionId: string;
   attemptedAt: Date;
   reason: string | null;
 }
 
 interface Options {
-  category: PlanCategory;
+  exam: ExamRef;
   coupon: string | null;
   /** Line shown in the Razorpay sheet. */
   describe: (plan: Plan) => string;
   prefill: { name: string; contact: string; email: string };
 }
 
+function savePending(payment: PendingPayment) {
+  try {
+    sessionStorage.setItem(
+      PENDING_ORDER_KEY,
+      JSON.stringify({
+        ...payment,
+        initiatedAt: payment.initiatedAt.toISOString(),
+        plan: { ...payment.plan, validTill: payment.plan.validTill?.toISOString() ?? null },
+      }),
+    );
+  } catch {
+    // Storage blocked: the pending sheet still works until a reload.
+  }
+}
+
+function forgetPending() {
+  try {
+    sessionStorage.removeItem(PENDING_ORDER_KEY);
+  } catch {
+    // Storage blocked: nothing was saved.
+  }
+}
+
+/** The saved pending payment, or null when there's none (or it's unreadable). */
+export function loadPending(): PendingPayment | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_ORDER_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as Omit<PendingPayment, 'initiatedAt' | 'plan'> & {
+      initiatedAt: string;
+      plan: Omit<Plan, 'validTill'> & { validTill: string | null };
+    };
+    if (typeof saved?.orderId !== 'string' || !saved.orderId || !saved.plan || !saved.exam?.category || !saved.exam.examId) return null;
+    const initiatedAt = new Date(saved.initiatedAt);
+    return {
+      ...saved,
+      initiatedAt: Number.isNaN(initiatedAt.getTime()) ? new Date() : initiatedAt,
+      plan: { ...saved.plan, validTill: saved.plan.validTill ? new Date(saved.plan.validTill) : null },
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Free plans activate directly; paid plans create an order, open Razorpay and verify the signature on the
- * server. A captured payment we can't confirm yet stays "pending" and is re-checked; a dismissed or failed
- * sheet is recorded with update-failed-purchase-status. Payment details are never logged.
+ * Free plans activate directly; paid plans create a server order (POST /orders), open Razorpay with the server's
+ * amount and verify the signature on the server. A payment the server can't confirm yet stays "pending" (kept in
+ * sessionStorage) and is re-checked with GET /orders/:id; a dismissed or failed sheet calls /orders/:id/fail once.
+ * Payment details are never logged.
  */
-export function usePayment({ category, coupon, describe, prefill }: Options) {
+export function usePayment({ exam, coupon, describe, prefill }: Options) {
   const [busy, setBusy] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [attempts, setAttempts] = useState(0);
@@ -46,23 +97,37 @@ export function usePayment({ category, coupon, describe, prefill }: Options) {
   const [succeeded, setSucceeded] = useState<Plan | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const live = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    live.current = true;
+    return () => {
       live.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
+  // A payment left pending before a reload: show it again and keep re-checking.
+  useEffect(() => {
+    const saved = loadPending();
+    if (!saved) return;
+    setAttempts(0);
+    setPending(saved);
+  }, []);
+
+  const settle = useCallback((payment: PendingPayment, status: OrderStatus) => {
+    if (status === 'pending' || !live.current) return;
+    forgetPending();
+    setPending(null);
+    if (status === 'paid') setSucceeded(payment.plan);
+    else setFailed({ plan: payment.plan, exam: payment.exam, transactionId: payment.transactionId, attemptedAt: new Date(), reason: null });
+  }, []);
+
+  /** Asks the server, which reconciles the order with Razorpay. Errors count as "still pending". */
   const confirm = useCallback(
-    async (payment: PendingPayment) => {
-      const ok = await plansApi.verify(category, payment.payload);
-      if (ok && live.current) {
-        setPending(null);
-        setSucceeded(payment.plan);
-      }
-      return ok;
+    async (payment: PendingPayment): Promise<OrderStatus> => {
+      const status = await plansApi.orderStatus(payment.exam, payment.orderId).catch((): OrderStatus => 'pending');
+      settle(payment, status);
+      return status;
     },
-    [category],
+    [settle],
   );
 
   // Automatic re-checks while the pending sheet is up.
@@ -80,13 +145,13 @@ export function usePayment({ category, coupon, describe, prefill }: Options) {
   const recheck = async () => {
     if (!pending || verifying) return;
     setVerifying(true);
-    const ok = await confirm(pending);
+    const status = await confirm(pending);
     setVerifying(false);
-    // A failed manual check parks the automatic loop.
-    if (!ok) setAttempts(VERIFY_RETRY_DELAYS.length);
+    // A manual check that is still pending parks the automatic loop.
+    if (status === 'pending') setAttempts(VERIFY_RETRY_DELAYS.length);
   };
 
-  const pay = async (plan: Plan) => {
+  const pay = async (plan: Plan, forExam: ExamRef = exam) => {
     if (busy) return;
     setBusy(true);
     setFailed(null);
@@ -94,16 +159,18 @@ export function usePayment({ category, coupon, describe, prefill }: Options) {
     let opened = false;
     try {
       if (plan.isFree) {
-        await plansApi.activateFree(category, plan);
+        await plansApi.activateFree(forExam, plan);
         setSucceeded(plan);
         return;
       }
-      const order = await plansApi.createOrder(category, { planId: plan.planId, priceId: plan.priceId, coupon });
-      if (order.skipPayment) {
+      const order = await plansApi.createOrder(forExam, { priceId: plan.priceId, coupon });
+      // A 100% coupon: the server fulfilled the order already.
+      if (order.status === 'paid') {
         setSucceeded(plan);
         return;
       }
-      if (!env.razorpayKeyId) {
+      const key = order.keyId || env.razorpayKeyId;
+      if (!key) {
         setWarning('Online payments are not available right now. Please try again later.');
         return;
       }
@@ -113,15 +180,15 @@ export function usePayment({ category, coupon, describe, prefill }: Options) {
         return;
       }
       let recorded = false;
-      const recordFailure = (description: string | null) => {
+      const recordFailure = (reason: string | null) => {
         if (recorded) return;
         recorded = true;
-        void plansApi.markFailed(category, order.orderId, description);
+        void plansApi.markFailed(forExam, order.orderId, reason);
       };
       const checkout = new Razorpay({
-        key: env.razorpayKeyId,
-        // Authoritative amount from the backend order, never local maths.
-        amount: order.amount,
+        key,
+        // Authoritative amount from the server order, never local maths.
+        amount: order.amountPaise,
         currency: order.currency,
         name: 'Prepzy',
         description: describe(plan),
@@ -132,22 +199,23 @@ export function usePayment({ category, coupon, describe, prefill }: Options) {
           recorded = true;
           const pendingPayment: PendingPayment = {
             plan,
+            exam: forExam,
+            orderId: order.orderId,
             transactionId: payment.razorpay_payment_id || order.orderId,
             initiatedAt: new Date(),
-            payload: {
-              payment_id: payment.razorpay_payment_id,
-              order_id: payment.razorpay_order_id,
-              signature: payment.razorpay_signature,
-              coupon_id: order.couponId,
-              userTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            },
           };
           setVerifying(true);
-          const ok = await confirm(pendingPayment);
+          const status = await plansApi
+            .verify(forExam, order.orderId, { payment_id: payment.razorpay_payment_id, signature: payment.razorpay_signature })
+            // Razorpay has the money; only our confirmation is missing. The server can still reconcile it.
+            .catch((): OrderStatus => 'pending');
           setVerifying(false);
           setBusy(false);
-          // Razorpay has the money; only our confirmation is missing. Keep re-checking.
-          if (!ok) {
+          if (!live.current) return;
+          if (status === 'paid') {
+            setSucceeded(plan);
+          } else {
+            savePending(pendingPayment);
             setAttempts(0);
             setPending(pendingPayment);
           }
@@ -163,6 +231,7 @@ export function usePayment({ category, coupon, describe, prefill }: Options) {
         setBusy(false);
         setFailed({
           plan,
+          exam: forExam,
           transactionId: failure.error?.metadata?.payment_id ?? order.orderId,
           attemptedAt: new Date(),
           reason: failure.error?.description ?? null,
@@ -172,7 +241,7 @@ export function usePayment({ category, coupon, describe, prefill }: Options) {
       checkout.open();
       opened = true;
     } catch (error) {
-      setWarning(userMessage(error, plan.isFree ? "Couldn't activate this plan. Please try again." : "Couldn't start this payment. Please try again."));
+      setWarning(billingMessage(error, plan.isFree ? "Couldn't activate this plan. Please try again." : "Couldn't start this payment. Please try again."));
     } finally {
       if (!opened) setBusy(false);
     }
@@ -188,12 +257,15 @@ export function usePayment({ category, coupon, describe, prefill }: Options) {
     pay,
     recheck,
     retry: () => {
-      const plan = failed?.plan;
+      const last = failed;
       setFailed(null);
-      if (plan) void pay(plan);
+      if (last) void pay(last.plan, last.exam);
     },
     clearFailed: () => setFailed(null),
-    clearPending: () => setPending(null),
+    clearPending: () => {
+      forgetPending();
+      setPending(null);
+    },
     dismissWarning: () => setWarning(null),
   };
 }

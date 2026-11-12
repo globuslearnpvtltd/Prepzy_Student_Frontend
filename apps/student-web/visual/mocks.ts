@@ -153,7 +153,7 @@ export const MOCKS: Record<string, unknown> = {
   '/api/v4/dashboard/competitive/2/weekly-activity': { success: true, data: week },
   '/api/neet/v1/purchase/plan-summary': {
     success: true,
-    data: { planName: 'NEET Topper', planType: 'topper', status: 'active', expiryDate: '2027-05-01', daysLeft: 170 },
+    data: { planName: 'Topper Plan', planType: 'topper', status: 'active', expiryDate: '2027-05-01', daysLeft: 170 },
   },
   // NEET tests
   '/api/neet/mock-exam/fetch-mock-exams': {
@@ -228,6 +228,22 @@ MOCKS['/api/v4/exams'] = {
     { exam_id: 1, exam_name: 'CBSE', exam_slice: 'cbse', category: 'board' },
     { exam_id: 2, exam_name: 'NEET-UG', exam_slice: 'neet-ug', category: 'competitive' },
   ],
+};
+
+// Sign-up's last step (v4 billing): board asks for a class, competitive for a target year (plan length).
+MOCKS['/api/v4/billing/board/1/onboarding-options'] = { success: true, data: { choose: 'class', plan_lengths: [] } };
+MOCKS['/api/v4/billing/competitive/2/onboarding-options'] = {
+  success: true,
+  data: {
+    choose: 'target_year',
+    plan_lengths: [1, 2].map((length) => ({
+      plan_length: length,
+      target_year: 2026 + length,
+      class_id: 20,
+      has_bundle: true,
+      bundle_options: [{ exam_id: 1, title: 'CBSE' }],
+    })),
+  },
 };
 
 // The new app reads the learn pages from the v4 backend (`learn` module). Same data as the old keys above

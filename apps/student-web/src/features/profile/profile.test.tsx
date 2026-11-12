@@ -36,7 +36,7 @@ function handlers(parent: unknown = null) {
     http.get(`${API}/api/v4/learn/board/${cbse.examId}/classes`, () =>
       HttpResponse.json({ success: true, data: { classes: [{ class_id: 12, title: 'CLASS 12' }, { class_id: 11, title: 'CLASS 11' }] } }),
     ),
-    http.get(`${API}/api/mentor/v1/auth/get-mentor-data`, () =>
+    http.get(`${API}/api/v4/student/mentor`, () =>
       HttpResponse.json({ success: true, data: { mentor_data: parent } }),
     ),
   ];
@@ -137,10 +137,11 @@ describe('ProfileScreen', () => {
     let verified: Record<string, unknown> | null = null;
     server.use(
       ...handlers(),
-      http.post(`${API}/api/mentor/v1/auth/generate-signup-otp`, () => HttpResponse.json({ success: true })),
-      http.post(`${API}/api/mentor/v1/auth/verify-signup-otp`, async ({ request }) => {
+      http.post(`${API}/api/v4/student/mentor/otp`, () => HttpResponse.json({ success: true })),
+      http.post(`${API}/api/v4/student/mentor/verify`, async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
-        if (body.otp !== '123456') return HttpResponse.json({ success: false, message: 'Invalid Otp' });
+        if (body.otp !== '123456')
+          return HttpResponse.json({ success: false, code: 'INVALID_OTP', message: 'The OTP entered is incorrect. Please try again.' }, { status: 400 });
         verified = body;
         return HttpResponse.json({ success: true, data: { mentor_id: 9 } });
       }),
@@ -158,7 +159,7 @@ describe('ProfileScreen', () => {
     expect(screen.getByText('+919876543210')).toBeInTheDocument();
     await userEvent.type(code, '111111');
     await userEvent.click(screen.getByRole('button', { name: 'Verify & Create Account' }));
-    expect(await screen.findByText('Invalid Otp')).toBeInTheDocument();
+    expect(await screen.findByText('The OTP entered is incorrect. Please try again.')).toBeInTheDocument();
     await userEvent.clear(code);
     await userEvent.type(code, '123456');
     await userEvent.click(screen.getByRole('button', { name: 'Verify & Create Account' }));
@@ -170,7 +171,7 @@ describe('ProfileScreen', () => {
     let renamed: Record<string, unknown> | null = null;
     server.use(
       ...handlers({ account_id: 4, firstName: 'Priya', lastName: 'Menon', contactMethod: 'email', contactValue: 'p@x.in' }),
-      http.put(`${API}/api/mentor/v1/auth/edit-mentor-datas`, async ({ request }) => {
+      http.put(`${API}/api/v4/student/mentor`, async ({ request }) => {
         renamed = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ success: true, data: null });
       }),
@@ -183,7 +184,8 @@ describe('ProfileScreen', () => {
     await userEvent.type(first, 'Priyanka');
     await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
     expect(await screen.findByText('Changes Saved!')).toBeInTheDocument();
-    expect(renamed).toMatchObject({ mentor_id: 4, first_name: 'Priyanka' });
+    // Only the names: the backend renames the student's own parent, never an id the client sends.
+    expect(renamed).toEqual({ first_name: 'Priyanka', last_name: 'Menon' });
   });
 });
 
@@ -191,7 +193,7 @@ describe('ChangePasswordScreen', () => {
   it('requires matching passwords, then saves', async () => {
     let body: Record<string, unknown> | null = null;
     server.use(
-      http.put(`${API}/api/changePassword`, async ({ request }) => {
+      http.put(`${API}/api/v4/student/account/password`, async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ success: true });
       }),
@@ -210,7 +212,7 @@ describe('ChangePasswordScreen', () => {
 
   it('shows the backend error', async () => {
     server.use(
-      http.put(`${API}/api/changePassword`, () => HttpResponse.json({ message: 'Password Not Matching' }, { status: 404 })),
+      http.put(`${API}/api/v4/student/account/password`, () => HttpResponse.json({ success: false, code: 'PASSWORD_MISMATCH', message: 'Password Not Matching' }, { status: 400 })),
     );
     renderWithProviders(<ChangePasswordScreen />);
     for (const label of ['Old Password', 'New Password', 'Confirm password']) {
@@ -226,9 +228,9 @@ describe('DeleteAccountDialog', () => {
     let deleted = false;
     server.use(
       http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({ success: true, data: accountRow })),
-      http.delete(`${API}/api/accounts/7`, () => {
+      http.delete(`${API}/api/v4/student/account`, () => {
         deleted = true;
-        return HttpResponse.json({ success: true, message: 'Successfully deleted' });
+        return HttpResponse.json({ success: true, message: 'Successfully deleted', data: null });
       }),
     );
     renderWithProviders(<DeleteAccountDialog trigger={(open) => <button onClick={open}>Delete Account</button>} />);

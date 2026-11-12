@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
@@ -12,7 +11,7 @@ import { authApi } from '../api';
 import { getDeviceFingerprint } from '../device';
 import { useOnboardingStore } from '../onboarding-store';
 import { phoneFormSchema } from '../schemas';
-import { AuthSubmit } from './auth-screen';
+import { AuthSubmit, AuthSwitch } from './auth-screen';
 import { PhoneField } from './phone-field';
 
 type Values = z.input<typeof phoneFormSchema>;
@@ -54,15 +53,24 @@ export function LoginForm() {
         registration={form.register('phone')}
         error={error}
       />
+      <AuthSwitch
+        prompt="New to Prepzy?"
+        href={routes.getStarted()}
+        className="font-display py-6 text-[13px] lg:hidden"
+      >
+        Sign up for free
+      </AuthSwitch>
       <AuthSubmit form={FORM_ID} loading={requestOtp.isPending}>
         Send OTP
       </AuthSubmit>
-      <p className="text-foreground-soft mt-4 py-2 text-center text-[13px] lg:text-sm">
-        New to Prepzy?{' '}
-        <Link className="font-display text-brand font-bold underline underline-offset-2" href={routes.getStarted()}>
-          Sign up for free
-        </Link>
-      </p>
+      <AuthSwitch
+        prompt="New to Prepzy?"
+        href={routes.getStarted()}
+        className="mt-6 hidden text-[14px] lg:block"
+        linkClassName="font-display"
+      >
+        Sign up for free
+      </AuthSwitch>
     </form>
   );
 }

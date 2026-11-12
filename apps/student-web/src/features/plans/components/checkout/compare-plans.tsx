@@ -3,7 +3,7 @@
 import { cx } from '@prepzy/design-system';
 import { Check, ChevronDown } from 'lucide-react';
 import { Fragment } from 'react';
-import { columnEyebrow, columnName, priceSection, type Cell, type CompareSection, type Plan } from '../../catalog';
+import { columnEyebrow, priceSection, type Cell, type CompareSection, type Plan } from '../../catalog';
 
 function CellValue({ value, strong }: { value: Cell; strong: boolean }) {
   if (value === true) return <Check aria-label="Included" size={16} strokeWidth={3} className="text-success mx-auto" />;
@@ -74,7 +74,7 @@ export function ComparePlans({
                     >
                       {columnEyebrow(plan)}
                     </span>
-                    <span className="text-plan-ink mt-1 block text-[14px] font-bold md:text-[17px]">{columnName(plan)}</span>
+                    <span className="text-plan-ink mt-1 block text-[14px] leading-snug font-bold break-words md:text-[17px]">{plan.name}</span>
                   </th>
                 ))}
               </tr>

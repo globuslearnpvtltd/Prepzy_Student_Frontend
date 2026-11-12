@@ -52,6 +52,13 @@ function boardHandlers(overrides: { courses?: unknown[]; exams?: unknown[]; subj
     plan(12),
     account(),
     graph(12),
+    // The banner names the plan by the purchase's display_name.
+    http.get(`${API}/api/v4/billing/board/1/purchases`, () =>
+      HttpResponse.json({
+        success: true,
+        data: { purchases: [{ purchase_id: 7, plan_id: 1, duration_months: 12, status: 'active', display_name: 'Topper CBSE Academic' }] },
+      }),
+    ),
     http.get(`${API}/api/v4/dashboard/board/1/overview`, () =>
       HttpResponse.json({
         success: true,
@@ -94,7 +101,7 @@ function boardHandlers(overrides: { courses?: unknown[]; exams?: unknown[]; subj
             },
           }),
     ),
-    http.get(`${API}/api/referral/me`, () =>
+    http.get(`${API}/api/v4/referral/me`, () =>
       HttpResponse.json(overrides.referral ?? { success: true, data: { balance: 120, friendCount: 0, tier: 'free' } }),
     ),
   ];
@@ -106,7 +113,7 @@ describe('board dashboard (CBSE)', () => {
     renderWithProviders(<Dashboard />, { exam: cbse });
 
     expect(await screen.findByText('High daily limits, valid till 31 Mar 2099')).toBeInTheDocument();
-    expect(screen.getByText('Topper Academic Year')).toBeInTheDocument();
+    expect(await screen.findByText('Topper CBSE Academic')).toBeInTheDocument();
 
     const learning = await screen.findByRole('region', { name: 'Continue Learning' });
     // No resume point yet, so the card opens the course (its first chapter).
@@ -150,7 +157,7 @@ describe('board dashboard (CBSE)', () => {
     server.use(...boardHandlers());
     renderWithProviders(<Dashboard />, { exam: cbse });
     await userEvent.click(await screen.findByRole('button', { name: 'Show plan details' }));
-    expect(screen.getByText('Welcome back! Topper Academic Year is active, with high daily limits.')).toBeInTheDocument();
+    expect(screen.getByText('Welcome back! Topper CBSE Academic is active, with high daily limits.')).toBeInTheDocument();
     expect(screen.getByText('Plan valid till 31 Mar 2099')).toBeInTheDocument();
   });
 
@@ -173,7 +180,7 @@ describe('board dashboard (CBSE)', () => {
   it('offers an upgrade on the Basic plan', async () => {
     server.use(plan(12, { duration_months: 0 }), ...boardHandlers());
     renderWithProviders(<Dashboard />, { exam: cbse });
-    expect(await screen.findByText('Basic plan')).toBeInTheDocument();
+    expect(await screen.findByText('Basic CBSE')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Upgrade Plan' })).toHaveAttribute('href', '/cbse/plans');
   });
 });
@@ -329,15 +336,15 @@ describe('dashboard logic', () => {
     expect(planState({ durationMonths: 12 }, -1)).toBe('ended');
     expect(planState({ durationMonths: 12 }, 0)).toBe('lastday');
     expect(planState({ durationMonths: 1 }, 10)).toBe('expiring');
-    expect(planCopy({ ...base, durationMonths: 1, expiryDate: '2026-11-10' }, now)).toMatchObject({
+    expect(planCopy({ ...base, durationMonths: 1, expiryDate: '2026-11-10' }, 'Topper Board Y Monthly', now)).toMatchObject({
       state: 'expiring',
       pill: '6 days left',
     });
-    expect(planCopy({ ...base, durationMonths: 12, expiryDate: '2026-11-01' }, now)).toMatchObject({
+    expect(planCopy({ ...base, durationMonths: 12, expiryDate: '2026-11-01' }, 'Topper Board Y Academic', now)).toMatchObject({
       state: 'ended',
       pill: 'Academic year plan ended',
     });
-    expect(planCopy({ ...base, durationMonths: 1, expiryDate: '2026-11-04' }, now).pill).toBe('Topper Monthly · Last day');
+    expect(planCopy({ ...base, durationMonths: 1, expiryDate: '2026-11-04' }, 'Topper Board Y Monthly', now).pill).toBe('Topper Board Y Monthly · Last day');
   });
 
   it('counts down to midnight', () => {

@@ -4,7 +4,7 @@ import { cx } from '@prepzy/design-system';
 import { ArrowLeft, ArrowRight, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { BadgeTone, Plan } from '../../catalog';
-import { formatInr } from '../../money';
+import { formatAmount, formatInr } from '../../money';
 import { perDayLabel } from '../../catalog';
 
 export const PRIMARY_BUTTON =
@@ -165,7 +165,8 @@ export function MobileActionBar({
   onClick,
 }: {
   label: string;
-  amount: number;
+  /** Rupees incl. GST; 0 = free, null = still being priced. */
+  amount: number | null;
   strikeAmount?: number | null;
   cta: string;
   disabled?: boolean;
@@ -177,10 +178,10 @@ export function MobileActionBar({
         <div className="min-w-0">
           <p className="text-plan-muted truncate text-[12px]">
             {label}
-            {amount > 0 ? ' · incl. GST' : ''}
+            {amount !== 0 ? ' · incl. GST' : ''}
           </p>
           <p className="mt-0.5 flex items-baseline gap-2">
-            <span className="text-plan-deep text-[22px] leading-none font-bold">{amount > 0 ? formatInr(amount) : 'Free'}</span>
+            <span className="text-plan-deep text-[22px] leading-none font-bold">{amount === null ? '…' : amount > 0 ? formatAmount(amount) : 'Free'}</span>
             {strikeAmount ? <span className="text-plan-strike text-[13px] line-through">{formatInr(strikeAmount)}</span> : null}
           </p>
         </div>
@@ -295,19 +296,25 @@ export function PlanCard({
           ) : null}
         </div>
       </div>
-      {active && (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onContinue();
-          }}
-          className="bg-surface text-plan-violet-deep hover:bg-brand-soft mt-4 hidden w-full items-center justify-center gap-2 rounded-[10px] px-[18px] py-3 text-[14px] font-bold lg:flex"
-        >
-          {plan.isCurrent ? 'Renew this plan' : 'Continue with this plan'}
-          <ArrowRight aria-hidden size={15} strokeWidth={2.4} />
-        </button>
-      )}
+      {active &&
+        (plan.isCurrent ? (
+          // Renewal is blocked while the plan is active (the server answers 409 PLAN_ALREADY_ACTIVE).
+          <p className="bg-surface/15 text-on-brand mt-4 hidden w-full items-center justify-center gap-2 rounded-[10px] px-[18px] py-3 text-[14px] font-bold lg:flex">
+            Your current active plan
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onContinue();
+            }}
+            className="bg-surface text-plan-violet-deep hover:bg-brand-soft mt-4 hidden w-full items-center justify-center gap-2 rounded-[10px] px-[18px] py-3 text-[14px] font-bold lg:flex"
+          >
+            Continue with this plan
+            <ArrowRight aria-hidden size={15} strokeWidth={2.4} />
+          </button>
+        ))}
     </div>
   );
 }

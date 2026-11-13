@@ -62,17 +62,20 @@ export function WeekChart({ days }: { days: WeekDay[] }) {
         <span className="bg-schools-bar inline-block h-[12px] w-[14px]" />
         time
       </figcaption>
-      <table className="sr-only">
-        <caption>Minutes on Prepzy this week</caption>
-        <tbody>
-          {days.map((d) => (
-            <tr key={d.label}>
-              <th scope="row">{d.label}</th>
-              <td>{d.minutes} minutes</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* sr-only on the wrapper: a table never shrinks to 1px, so on its own it would widen the page. */}
+      <div className="sr-only">
+        <table>
+          <caption>Minutes on Prepzy this week</caption>
+          <tbody>
+            {days.map((d) => (
+              <tr key={d.label}>
+                <th scope="row">{d.label}</th>
+                <td>{d.minutes} minutes</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

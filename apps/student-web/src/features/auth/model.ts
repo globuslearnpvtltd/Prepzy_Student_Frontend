@@ -16,6 +16,23 @@ export interface Student {
   gender: 'male' | 'female' | null;
   /** Exam the student is enrolled in, when the backend tells us. */
   targetExam: ExamSlug | null;
+  /** Content medium (languages row): every subject / course / paper list follows it. Null when unknown. */
+  language: StudentLanguage | null;
+}
+
+/** A content medium as the backend names it (`languages.language_name`, e.g. "hindi"). */
+export interface StudentLanguage {
+  id: number;
+  name: string;
+}
+
+/** The `{ id, name }` the backend sends for a language, or null. */
+export function toStudentLanguage(raw: unknown): StudentLanguage | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as Record<string, unknown>;
+  const id = typeof row.id === 'string' ? Number(row.id) : row.id;
+  const name = typeof row.name === 'string' ? row.name.trim() : '';
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 && name ? { id, name } : null;
 }
 
 export interface PurchasedExam {
@@ -121,7 +138,9 @@ export function toStudent(raw: unknown): Student {
     classTitle: text(row.class_title),
     userType: text(row.user_type),
     gender: row.gender === 'male' || row.gender === 'female' ? row.gender : null,
-    targetExam: (findExam(text(row.target_exam))?.slug as ExamSlug | undefined) ?? null,
+    // exam_slice ('jac') identifies any exam; the name ('NEET-UG', 'CBSE') is the fallback for older responses.
+    targetExam: ((findExam(text(row.target_exam_slice)) ?? findExam(text(row.target_exam)))?.slug as ExamSlug | undefined) ?? null,
+    language: toStudentLanguage(row.language),
   };
 }
 

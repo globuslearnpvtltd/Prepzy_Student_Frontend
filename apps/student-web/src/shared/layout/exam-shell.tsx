@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Suspense, useEffect, useMemo } from 'react';
 import { AtlasHost } from '@/features/assistant/ui';
 import { rememberExam, usePurchasedExams } from '@/features/auth';
+import { ExamLanguageSync } from '@/features/language/ui';
 import { findExam, getExam, REFERENCE, type ExamConfig } from '@/shared/config/exams';
 import { competitiveChrome } from '@/shared/config/navigation';
 import { routes } from '@/shared/config/routes';
@@ -162,5 +163,10 @@ function AccessGate({ exam, children }: { exam: ExamConfig; children: React.Reac
       />
     );
   }
-  return children;
+  return (
+    <>
+      <ExamLanguageSync exam={exam} />
+      {children}
+    </>
+  );
 }

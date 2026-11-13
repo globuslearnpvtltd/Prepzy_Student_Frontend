@@ -20,7 +20,9 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "check": "npm run lint && npm run typecheck && npm run test"
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "verify": "npm run generate -w @prepzy/design-system -- --check && npm run lint && npm run typecheck && npm test -w @prepzy/design-system && npm run test:coverage -w @prepzy/student-web",
+    "verify:full": "npm run verify && npm run e2e -w @prepzy/student-web"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

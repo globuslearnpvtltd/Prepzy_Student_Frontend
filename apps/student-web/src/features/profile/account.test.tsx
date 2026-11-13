@@ -6,6 +6,7 @@ import { testExam } from '@/test/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
+import { useMediumDialog } from '@/features/language';
 import { toDateInput, toHelpRequest, toParent, toProfile } from './api';
 import { AccountScreen } from './components/account/account-screen';
 import { DeleteAccountPage } from './components/delete/delete-page';
@@ -112,7 +113,15 @@ describe('My Account', () => {
     expect(screen.getAllByText('12 Months plan · Class 12 (PCB) & 1+ Plans').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Valid till 30 Apr 2027').length).toBeGreaterThan(0);
     expect(screen.getByText('Add your photo and email to finish.')).toBeInTheDocument();
-    expect(screen.queryByText('Medium')).not.toBeInTheDocument();
+    // LEARNING: the course (exam · class) opens the goals with the plans; Medium opens the change-medium dialog.
+    expect(screen.getByText('LEARNING')).toBeInTheDocument();
+    expect(await screen.findByText('हिन्दी')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Course CBSE · Class 12 \(PCB\)/ }));
+    expect(navigation.push).toHaveBeenCalledWith('/manage-plans');
+    useMediumDialog.getState().hide();
+    await userEvent.click(screen.getByRole('button', { name: 'Change medium' }));
+    expect(useMediumDialog.getState().open).toBe(true);
+    useMediumDialog.getState().hide();
 
     await userEvent.click(screen.getByRole('button', { name: 'Manage plans' }));
     expect(navigation.push).toHaveBeenCalledWith('/manage-plans');

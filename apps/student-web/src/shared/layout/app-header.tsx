@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useCurrentUser } from '@/features/auth';
+import { MediumDialogHost } from '@/features/language/ui';
 import type { ExamCategory, ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { isNavLocked, navigationFor } from '@/shared/config/navigation';
@@ -215,6 +216,7 @@ export function AppHeader({
         {panel === 'menu' && (drawerMenu ? <BoardDrawer exam={exam} onClose={close} /> : <AccountPanel exam={exam} onClose={close} />)}
       </header>
       <HeaderSpacer />
+      <MediumDialogHost />
     </>
   );
 }

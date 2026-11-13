@@ -9,11 +9,14 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? 'github' : 'list',
+  // HTML report with a screenshot of every test (playwright-report/): `npm run e2e:report` locally,
+  // the "playwright-report" download on each GitHub Actions run in CI.
+  reporter: [[process.env.CI ? 'github' : 'list'], ['html', { open: 'never' }], ['json', { outputFile: 'playwright-report/results.json' }]],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`,
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
+    screenshot: 'on',
+    video: 'retain-on-failure',
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },

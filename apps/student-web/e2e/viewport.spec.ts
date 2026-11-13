@@ -85,7 +85,8 @@ test.describe('viewport', () => {
   });
 
   for (const route of ROUTES) {
-    test(`${route.path} fits 390 / 768 / 1440 px`, async ({ page, context }) => {
+    test(`${route.slug ?? 'signed out'} ${route.path} fits 390 / 768 / 1440 px`, async ({ page, context }) => {
+      test.setTimeout(90_000); // three page loads
       if (route.exam) {
         await signIn(context, route.slug);
         await mockStudentApi(page, route.exam);
@@ -96,7 +97,8 @@ test.describe('viewport', () => {
       for (const size of WIDTHS) {
         await page.setViewportSize(size);
         await page.goto(route.path);
-        await page.waitForLoadState('networkidle').catch(() => undefined);
+        // Some pages poll; don't wait for a quiet network forever.
+        await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
         // Let client-side data and layout settle (skeletons → content).
         await page.waitForTimeout(500);
 

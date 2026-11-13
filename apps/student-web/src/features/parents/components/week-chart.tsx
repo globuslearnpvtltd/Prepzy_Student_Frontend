@@ -51,17 +51,20 @@ export function WeekChart({ graph, now }: { graph: Record<string, number>; now?:
         <span aria-hidden className="bg-schools-bar inline-block h-[10px] w-[14px]" />
         time
       </figcaption>
-      <table className="sr-only">
-        <caption>Minutes on Prepzy per day this week</caption>
-        <tbody>
-          {bars.map((bar) => (
-            <tr key={bar.name}>
-              <th scope="row">{bar.name}</th>
-              <td>{bar.minutes} min</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* sr-only on the wrapper: a table never shrinks to 1px, so on its own it would widen the page. */}
+      <div className="sr-only">
+        <table>
+          <caption>Minutes on Prepzy per day this week</caption>
+          <tbody>
+            {bars.map((bar) => (
+              <tr key={bar.name}>
+                <th scope="row">{bar.name}</th>
+                <td>{bar.minutes} min</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

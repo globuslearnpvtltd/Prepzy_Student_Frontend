@@ -93,32 +93,35 @@ export function LineChart({
           </span>
         ))}
       </figcaption>
-      <table className="sr-only">
-        <caption>{caption}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Subject</th>
-            {series.map((s) => (
-              <th key={s.name} scope="col">
-                {s.name}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {categories.map((c, i) => (
-            <tr key={c}>
-              <th scope="row">{c}</th>
+      {/* sr-only on the wrapper: a table never shrinks to 1px, so on its own it would widen the page. */}
+      <div className="sr-only">
+        <table>
+          <caption>{caption}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Subject</th>
               {series.map((s) => (
-                <td key={s.name}>
-                  {Math.round(s.values[i] ?? 0)}
-                  {unit}
-                </td>
+                <th key={s.name} scope="col">
+                  {s.name}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {categories.map((c, i) => (
+              <tr key={c}>
+                <th scope="row">{c}</th>
+                {series.map((s) => (
+                  <td key={s.name}>
+                    {Math.round(s.values[i] ?? 0)}
+                    {unit}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

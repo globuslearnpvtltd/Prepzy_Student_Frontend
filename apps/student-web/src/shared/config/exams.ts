@@ -51,6 +51,17 @@ export const EXAMS = {
     theme: 'board',
     onboarding: { kind: 'choose-class' },
   },
+  // Jharkhand Academic Council: a board exam with the same structure, dashboard and design as CBSE.
+  jac: {
+    slug: 'jac',
+    examSlice: 'jac',
+    label: 'Jharkhand Board',
+    tagline: 'Class 6 to 12',
+    category: 'board',
+    testTypes: ['mock', 'pyq', 'chapter-pyq', 'custom', 'mid', 'final', 'quiz'],
+    theme: 'board',
+    onboarding: { kind: 'choose-class' },
+  },
   neet: {
     slug: 'neet',
     examSlice: 'neet-ug',

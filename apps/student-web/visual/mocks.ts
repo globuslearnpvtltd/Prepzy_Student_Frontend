@@ -218,7 +218,19 @@ MOCKS['/api/v4/dashboard/board/1/classes/12/continue-courses'] = MOCKS['/api/v1/
 MOCKS['/api/v4/dashboard/board/1/classes/12/continue-exams'] = MOCKS['/api/v1/student/continue-dashboard-exams/12'];
 MOCKS['/api/v4/dashboard/board/1/classes/12/subject-scores'] = MOCKS['/api/v1/student/getsubjectGraphData/12'];
 MOCKS['/api/v4/dashboard/competitive/2/classes/20/subject-scores'] = MOCKS['/api/v1/student/getsubjectGraphData/20'];
-MOCKS['/api/v4/student/account'] = MOCKS['/api/accounts'];
+MOCKS['/api/v4/student/account'] = { success: true, data: { ...student, language: { id: 1, name: 'english' } } };
+// Content mediums (the change-medium dialog).
+MOCKS['/api/v4/languages'] = {
+  success: true,
+  message: 'Languages fetched',
+  data: [
+    { id: 1, name: 'english' },
+    { id: 2, name: 'hindi' },
+  ],
+};
+// Mediums each exam offers (from its class_subject_mapping rows): the dialog lists these.
+MOCKS['/api/v4/languages/board/1'] = MOCKS['/api/v4/languages'];
+MOCKS['/api/v4/languages/competitive/2'] = { success: true, message: 'Exam languages fetched', data: [{ id: 1, name: 'english' }] };
 MOCKS['/api/v4/student/exams/purchased'] = MOCKS['/api/v1/student/exams/purchased'];
 MOCKS['/api/v4/student/plans/2/summary'] = MOCKS['/api/neet/v1/purchase/plan-summary'];
 MOCKS['/api/v4/exams'] = {

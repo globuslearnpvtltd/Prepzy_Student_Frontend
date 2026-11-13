@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { usePlans, useActivePlan, useLogout } from '@/features/auth';
+import { mediumLabel, useCurrentLanguage, useMediumDialog } from '@/features/language';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
@@ -91,7 +92,7 @@ function usePlanDetails() {
     };
   }
 
-  return { chips, classLabel, plan };
+  return { chips, course: [examName, classLabel].filter(Boolean).join(' · '), classLabel, plan };
 }
 
 /** My Account: profile card (or the edit column at ?edit=1), plan, more, log out and delete. */
@@ -101,7 +102,9 @@ export function AccountScreen() {
   const profileQuery = useProfile();
   const logout = useLogout();
   const offline = useOffline();
-  const { chips, classLabel, plan } = usePlanDetails();
+  const { chips, course, classLabel, plan } = usePlanDetails();
+  const language = useCurrentLanguage();
+  const showMediumDialog = useMediumDialog((state) => state.show);
 
   const isEditing = useSearchParams().get('edit') === '1';
   const [confirmLogout, setConfirmLogout] = useState(false);
@@ -224,6 +227,11 @@ export function AccountScreen() {
           )}
           <div className={`${isEditing ? 'hidden lg:flex' : 'flex'} w-full min-w-0 flex-1`}>
             <AccountSettings
+              course={course}
+              medium={language ? mediumLabel(language.name).native : null}
+              // The goals (exam + class) are managed with the plans.
+              onOpenCourse={() => router.push(routes.managePlans())}
+              onChangeMedium={showMediumDialog}
               plan={plan}
               offline={offline}
               onManagePlans={() => router.push(routes.managePlans())}

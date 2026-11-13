@@ -155,7 +155,9 @@ describe('PhotoPicker', () => {
     await user().upload(screen.getByLabelText('Choose a photo'), jpeg('small.jpg'));
 
     const sheet = await screen.findByRole('dialog', { name: 'This photo can’t be used' });
-    expect(within(sheet).getByText('It’s 600 × 600. Pick a JPG or PNG under 5 MB, at least 800 × 800.')).toBeInTheDocument();
+    expect(
+      within(sheet).getByText('It’s 600 × 600. Pick a JPG or PNG under 5 MB, at least 800 × 800.'),
+    ).toBeInTheDocument();
     expect(
       within(sheet).getByText('small.jpg is 600 × 600. Pick a JPG or PNG under 5 MB, at least 800 × 800.'),
     ).toBeInTheDocument();
@@ -202,9 +204,7 @@ describe('PhotoPicker', () => {
 
   it('Undo re-uploads the previous photo', async () => {
     const { names: uploads } = stubUpload(async () => ({ picture: PHOTO_URL, completion: 70 }));
-    server.use(
-      http.get(PHOTO_URL, () => new HttpResponse(new Blob(['png'], { type: 'image/png' }))),
-    );
+    server.use(http.get(PHOTO_URL, () => new HttpResponse(new Blob(['png'], { type: 'image/png' }))));
     renderWithProviders(<PhotoPicker profile={withPhoto} checkFile={fine} />);
     await user().upload(screen.getByLabelText('Choose a photo'), jpeg('new.jpg'));
     await waitFor(() => expect(uploads).toEqual(['new.jpg']));

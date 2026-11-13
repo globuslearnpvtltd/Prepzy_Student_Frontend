@@ -17,6 +17,7 @@ export const accountRow = {
   profile_picture: null,
   completion_percentage: 60,
   updated_at: '2024-10-12T10:00:00.000Z',
+  language: { id: 2, name: 'hindi' },
 };
 
 export const ok = <T>(data: T) => HttpResponse.json({ success: true, message: 'OK', data });

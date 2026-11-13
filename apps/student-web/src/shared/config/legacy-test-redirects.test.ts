@@ -28,12 +28,12 @@ describe('legacy test redirects', () => {
 
   it('gives Next permanent redirects restricted to registered exams', () => {
     expect(legacyTestRedirects).toContainEqual({
-      source: '/:exam(cbse|neet)/mock-exam/:id',
+      source: '/:exam(cbse|jac|neet)/mock-exam/:id',
       destination: '/:exam/tests/mock/:id',
       permanent: true,
     });
     expect(legacyTestRedirects).toContainEqual({
-      source: '/:exam(cbse|neet)/practice-result/:id',
+      source: '/:exam(cbse|jac|neet)/practice-result/:id',
       destination: '/:exam/tests/practice/result/:id',
       permanent: true,
     });

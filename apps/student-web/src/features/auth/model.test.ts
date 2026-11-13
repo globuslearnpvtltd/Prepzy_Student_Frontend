@@ -24,8 +24,22 @@ describe('toStudent', () => {
     });
   });
 
+  it('picks the target exam by its slice, so exams named differently from their slug resolve (JHARKHAND BOARD → jac)', () => {
+    expect(toStudent({ account_id: 1, target_exam: 'JHARKHAND BOARD', target_exam_slice: 'jac' })).toMatchObject({ targetExam: 'jac' });
+    expect(toStudent({ account_id: 1, target_exam: 'NEET-UG', target_exam_slice: 'neet-ug' })).toMatchObject({ targetExam: 'neet' });
+  });
+
   it('falls back to a generic name and unknown exam', () => {
     expect(toStudent({ account_id: 1, target_exam: 'JEE' })).toMatchObject({ fullName: 'Student', targetExam: null });
+  });
+
+  it('maps the content medium ({ id, name }) and ignores anything else', () => {
+    expect(toStudent({ account_id: 1, language: { id: 2, name: 'hindi' } }).language).toEqual({ id: 2, name: 'hindi' });
+    expect(toStudent({ account_id: 1, language: { id: '1', name: ' english ' } }).language).toEqual({ id: 1, name: 'english' });
+    expect(toStudent({ account_id: 1, language: 2 }).language).toBeNull();
+    expect(toStudent({ account_id: 1, language: { id: 0, name: 'x' } }).language).toBeNull();
+    expect(toStudent({ account_id: 1, language: { id: 3, name: '' } }).language).toBeNull();
+    expect(toStudent({ account_id: 1 }).language).toBeNull();
   });
 
   it('rejects responses without an account id', () => {

@@ -50,17 +50,20 @@ export function BarChart({ data, caption, className }: { data: BarDatum[]; capti
           </span>
         ))}
       </div>
-      <table className="sr-only">
-        <caption>{caption}</caption>
-        <tbody>
-          {data.map((d) => (
-            <tr key={d.name}>
-              <th scope="row">{d.name}</th>
-              <td>{d.display}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* sr-only on the wrapper: a table never shrinks to 1px, so on its own it would widen the page. */}
+      <div className="sr-only">
+        <table>
+          <caption>{caption}</caption>
+          <tbody>
+            {data.map((d) => (
+              <tr key={d.name}>
+                <th scope="row">{d.name}</th>
+                <td>{d.display}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

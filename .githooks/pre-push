@@ -1,0 +1,6 @@
+#!/bin/sh
+# Runs the regression checks before every push; the push is cancelled if any check fails.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Skip in an emergency:   git push --no-verify
+echo "pre-push: running npm run verify (type-check, lint, tests, coverage)..."
+npm run verify || { echo "pre-push: checks failed, push cancelled."; exit 1; }

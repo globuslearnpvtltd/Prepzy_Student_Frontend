@@ -170,8 +170,12 @@ export function GetAppModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Right column of My Account: plan, more (parent, app, notifications, refer, help), log out, delete. */
+/** Right column of My Account: learning (course, medium), plan, more (parent, app, notifications, refer, help), log out, delete. */
 export function AccountSettings({
+  course,
+  medium,
+  onOpenCourse,
+  onChangeMedium,
   plan,
   offline,
   onManagePlans,
@@ -182,6 +186,12 @@ export function AccountSettings({
   onLogout,
   loggingOut,
 }: {
+  /** "CBSE · Class 12 (PCM)": the exam and class of the page. */
+  course: string;
+  /** The medium in its own script ("हिन्दी"); null until known. */
+  medium: string | null;
+  onOpenCourse: () => void;
+  onChangeMedium: () => void;
   plan: PlanInfo | null;
   offline: boolean;
   onManagePlans: () => void;
@@ -196,6 +206,31 @@ export function AccountSettings({
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col gap-[16px] lg:gap-[20px]">
       {showGetApp && <GetAppModal onClose={() => setShowGetApp(false)} />}
+
+      <SettingsGroup title="LEARNING">
+        <SettingsRow name="course.svg" title="Course" subtitle={course} onClick={onOpenCourse} />
+        <SettingsRow
+          name="medium.svg"
+          title="Medium"
+          subtitle={medium ?? '—'}
+          last
+          action={
+            <button
+              type="button"
+              onClick={onChangeMedium}
+              disabled={offline}
+              aria-label="Change medium"
+              aria-haspopup="dialog"
+              className={cx(
+                'border-account-outline bg-surface text-account-ink hover:bg-account-soft shrink-0 rounded-full border px-[16px] py-[7px] text-[12px] font-semibold transition-colors',
+                dimmed,
+              )}
+            >
+              Change
+            </button>
+          }
+        />
+      </SettingsGroup>
 
       <SettingsGroup title="PLAN">
         <SettingsRow

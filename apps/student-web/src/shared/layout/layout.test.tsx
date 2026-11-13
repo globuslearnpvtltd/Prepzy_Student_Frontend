@@ -28,8 +28,15 @@ const purchased = (...exams: [string, string][]) =>
 const account = http.get(`${API}/api/v4/student/account`, () =>
   HttpResponse.json({
     success: true,
-    data: { account_id: 1, first_name: 'Asha', last_name: 'Rao', phone: '+919876543210' },
+    data: { account_id: 1, first_name: 'Asha', last_name: 'Rao', phone: '+919876543210', language: { id: 1, name: 'english' } },
   }),
+);
+const languages = http.get(`${API}/api/v4/languages`, () =>
+  HttpResponse.json({ success: true, data: [{ id: 1, name: 'english' }, { id: 2, name: 'hindi' }] }),
+);
+// The mediums CBSE (exam 1) offers: both.
+const examLanguages = http.get(`${API}/api/v4/languages/board/1`, () =>
+  HttpResponse.json({ success: true, data: [{ id: 1, name: 'english' }, { id: 2, name: 'hindi' }] }),
 );
 
 type RawPlan = Record<string, unknown>;
@@ -257,10 +264,6 @@ describe('board shell', () => {
     const more = within(drawer).getByRole('navigation', { name: 'More' });
     expect(within(more).getByRole('link', { name: /Refer & Earn/ })).toHaveAttribute('href', '/cbse/refer-and-earn');
     expect(within(more).getByText('Study Plan').closest('[aria-disabled]')).not.toBeNull();
-    // Medium: English only, nothing to save.
-    await userEvent.click(within(drawer).getByRole('button', { name: 'Medium: English' }));
-    expect(within(drawer).getByRole('radio', { name: 'English' })).toHaveAttribute('aria-checked', 'true');
-    expect(within(drawer).getByText('More languages are coming soon.')).toBeInTheDocument();
     expect(within(drawer).getByRole('button', { name: 'Logout' })).toBeInTheDocument();
     expect(within(drawer).queryByText('Delete Account')).not.toBeInTheDocument();
     // Classes and exams switch from the goals pill now.
@@ -268,6 +271,16 @@ describe('board shell', () => {
 
     await userEvent.click(within(drawer).getByRole('button', { name: 'Close menu' }));
     expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
+
+    // Medium: the drawer closes and the change-medium sheet opens.
+    server.use(languages, examLanguages);
+    await userEvent.click(screen.getByRole('button', { name: 'Open account menu' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Menu' })).getByRole('button', { name: 'Medium: English' }));
+    expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
+    const sheet = screen.getByRole('dialog', { name: 'Change course medium' });
+    expect(await within(sheet).findByRole('radio', { name: 'English (current medium)' })).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Change course medium' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open account menu' })).toBeInTheDocument();
   });
 
@@ -390,7 +403,7 @@ describe('competitive shell', () => {
     expect(screen.queryByTestId('account-menu-dot')).not.toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: 'My profile: Asha Rao' })).toHaveAttribute('href', '/neet/profile');
     expect(within(menu).getByText('+91 98765 43210')).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: 'Medium: English' })).toHaveAttribute('aria-haspopup', 'menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Medium: English' })).toHaveAttribute('aria-haspopup', 'dialog');
     expect(within(menu).getByText('New')).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /Manage Plans/ })).toHaveAttribute('href', '/manage-plans');
     expect(within(menu).queryByText(/Delete Account|My Plans|Free forever/)).not.toBeInTheDocument();
@@ -439,21 +452,44 @@ describe('account menu', () => {
     expect(formatPhone('')).toBe('');
   });
 
-  it('shows the Medium choice on desktop: English only, checked; no dot once the menu was opened before', async () => {
+  it('changes the medium from the desktop menu: shows the current one, switches, refetches content; no dot once opened before', async () => {
     localStorage.setItem('prepzy:account-menu-seen', '1');
     navigation.pathname = '/cbse/dashboard';
-    server.use(purchased(['cbse', 'CBSE']), account, plans(boardPlan()), studyPlan(false));
-    renderShell('cbse');
+    let saved: unknown = null;
+    server.use(
+      purchased(['cbse', 'CBSE']),
+      account,
+      plans(boardPlan()),
+      studyPlan(false),
+      languages,
+      examLanguages,
+      http.put(`${API}/api/v4/student/account/language`, async ({ request }) => {
+        saved = await request.json();
+        return HttpResponse.json({ success: true, data: { language: { id: 2, name: 'hindi' } } });
+      }),
+    );
+    const { queryClient } = renderShell('cbse');
     await screen.findByText('Page');
     expect(screen.queryByTestId('account-menu-dot')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
     const menu = await screen.findByRole('menu', { name: 'Account menu' });
-    within(menu).getByRole('menuitem', { name: 'Medium: English' }).focus();
-    await userEvent.keyboard('{ArrowRight}');
-    const medium = await screen.findByRole('menu', { name: 'Medium: English' });
-    expect(within(medium).getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true');
-    expect(within(medium).getAllByRole('menuitemradio')).toHaveLength(1);
-    expect(within(medium).getByText('More languages are coming soon.')).toBeInTheDocument();
+    const row = await within(menu).findByRole('menuitem', { name: 'Medium: English' });
+    expect(within(row).getByText('New')).toBeInTheDocument();
+    expect(within(row).getByText('English')).toBeInTheDocument();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await userEvent.click(row);
+    expect(screen.queryByRole('menu', { name: 'Account menu' })).not.toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Change course medium' });
+    await userEvent.click(await within(dialog).findByRole('radio', { name: 'हिन्दी' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Switch to हिन्दी' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Change course medium' })).not.toBeInTheDocument());
+    // Saved with the exam on screen, so the backend checks CBSE offers it.
+    expect(saved).toEqual({ language_id: 2, exam_id: 1 });
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) });
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    expect(await screen.findByRole('menuitem', { name: 'Medium: हिन्दी' })).toBeInTheDocument();
   });
 });
 

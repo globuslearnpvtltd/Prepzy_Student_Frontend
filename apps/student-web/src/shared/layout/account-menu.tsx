@@ -2,11 +2,12 @@
 
 import { cx } from '@prepzy/design-system';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronRight, CreditCard, Languages, LogOut } from 'lucide-react';
+import { ChevronRight, CreditCard, Languages, LogOut } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { create } from 'zustand';
 import { useCurrentUser, useLogout, type Student } from '@/features/auth';
+import { mediumLabel, useCurrentLanguage, useMediumDialog } from '@/features/language';
 import type { ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { useOwnedExams } from './goal-switcher';
@@ -179,85 +180,49 @@ function ProfileRow({ home, asMenuItem, onNavigate }: { home: ExamConfig | null;
   );
 }
 
-/** Only English exists today (the backend has no medium setting yet), so the choice shows English, checked. */
-const MEDIUM_OPTIONS = ['English'] as const;
-const MEDIUM_NOTE = 'More languages are coming soon.';
-
 function MediumBody() {
+  const language = useCurrentLanguage();
   return (
     <>
       <Languages aria-hidden className="size-5 shrink-0 text-account-body" />
       <span>Medium</span>
       <span className="rounded-full bg-account-gold-soft px-2 py-0.5 text-[10px] leading-4 font-bold tracking-wide text-account-gold uppercase">New</span>
-      <span className="ml-auto text-[15px] font-normal text-neutral-550">English</span>
+      <span className="ml-auto truncate text-[15px] font-normal text-neutral-550">{language ? mediumLabel(language.name).native : ''}</span>
       <ChevronRight aria-hidden className="size-4 shrink-0 text-neutral-550" />
     </>
   );
 }
 
-/** Desktop: a submenu listing English (checked). There is nothing else to pick and nothing is saved. */
-function MediumSubmenu() {
+/**
+ * Medium row: opens the change-medium dialog (rendered by the header, so it outlives the menu). The desktop
+ * dropdown closes on select; the mobile panels close through onNavigate.
+ */
+function MediumRow({ asMenuItem, onNavigate }: { asMenuItem: boolean; onNavigate?: () => void }) {
+  const language = useCurrentLanguage();
+  const show = useMediumDialog((state) => state.show);
+  const label = language ? `Medium: ${mediumLabel(language.name).native}` : 'Medium';
+  if (asMenuItem) {
+    return (
+      <DropdownMenu.Item asChild onSelect={show}>
+        <button type="button" aria-label={label} aria-haspopup="dialog" className={rowClass}>
+          <MediumBody />
+        </button>
+      </DropdownMenu.Item>
+    );
+  }
   return (
-    <DropdownMenu.Sub>
-      <DropdownMenu.SubTrigger aria-label="Medium: English" className={cx(rowClass, 'cursor-default')}>
-        <MediumBody />
-      </DropdownMenu.SubTrigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.SubContent
-          sideOffset={8}
-          alignOffset={-6}
-          className="bg-surface z-[61] w-[220px] rounded-[16px] border border-account-line p-2 shadow-[0px_16px_44px_0px_rgba(26,23,51,0.12)]"
-        >
-          <DropdownMenu.Label className="px-3 pt-1 pb-1.5 text-[11px] font-semibold tracking-wide text-neutral-550 uppercase">
-            Study medium
-          </DropdownMenu.Label>
-          <DropdownMenu.RadioGroup value="English">
-            {MEDIUM_OPTIONS.map((option) => (
-              <DropdownMenu.RadioItem key={option} value={option} className={cx(rowClass, 'py-2.5 text-[14px]')}>
-                {option}
-                <DropdownMenu.ItemIndicator className="ml-auto">
-                  <Check aria-hidden className="text-brand-700 size-4" strokeWidth={2.5} />
-                </DropdownMenu.ItemIndicator>
-              </DropdownMenu.RadioItem>
-            ))}
-          </DropdownMenu.RadioGroup>
-          <p className="m-0 px-3 pt-1 pb-1.5 text-[12px] text-neutral-550">{MEDIUM_NOTE}</p>
-        </DropdownMenu.SubContent>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Sub>
-  );
-}
-
-/** Mobile panels: the same (single) choice as a disclosure under the row. */
-function MediumDisclosure() {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-  return (
-    <div>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={id}
-        aria-label="Medium: English"
-        onClick={() => setOpen((value) => !value)}
-        className={rowClass}
-      >
-        <MediumBody />
-      </button>
-      {open && (
-        <div id={id} className="mx-3 mb-2 rounded-[12px] bg-account-soft p-2">
-          <div role="radiogroup" aria-label="Study medium">
-            {MEDIUM_OPTIONS.map((option) => (
-              <span key={option} role="radio" aria-checked="true" className="flex items-center px-2 py-1.5 text-[14px] font-medium text-account-ink">
-                {option}
-                <Check aria-hidden className="text-brand-700 ml-auto size-4" strokeWidth={2.5} />
-              </span>
-            ))}
-          </div>
-          <p className="m-0 px-2 pb-1 text-[12px] text-neutral-550">{MEDIUM_NOTE}</p>
-        </div>
-      )}
-    </div>
+    <button
+      type="button"
+      aria-label={label}
+      aria-haspopup="dialog"
+      onClick={() => {
+        onNavigate?.();
+        show();
+      }}
+      className={rowClass}
+    >
+      <MediumBody />
+    </button>
   );
 }
 
@@ -297,7 +262,9 @@ export function AccountMenuBody({
   return (
     <div className="flex flex-col">
       <ProfileRow home={home} asMenuItem={asMenuItems} onNavigate={onNavigate} />
-      <div className="pt-2">{asMenuItems ? <MediumSubmenu /> : <MediumDisclosure />}</div>
+      <div className="pt-2">
+        <MediumRow asMenuItem={asMenuItems} onNavigate={onNavigate} />
+      </div>
       <div className={divider} />
       <Row asMenuItem={asMenuItems} href={routes.managePlans()} onSelect={onNavigate}>
         <CreditCard aria-hidden className="size-5 shrink-0 text-account-body" />
@@ -324,6 +291,8 @@ export function AccountMenu({ exam }: { exam: ExamConfig | null }) {
         <DropdownMenu.Content
           align="end"
           sideOffset={12}
+          // Opening the medium dialog closes the menu: focus stays with the dialog instead of returning to the avatar.
+          onCloseAutoFocus={(event) => useMediumDialog.getState().open && event.preventDefault()}
           className="bg-surface z-[60] w-[300px] rounded-[20px] border border-account-line p-3 shadow-[0px_16px_44px_0px_rgba(26,23,51,0.12)]"
         >
           <AccountMenuBody exam={exam} asMenuItems />

@@ -14,6 +14,6 @@ export {
   usePurchasedExams,
   useSessionExpiryRedirect,
 } from './hooks';
-export type { ActivePlan, ClassOption, ExamOption, PurchasedExam, Student } from './model';
-export { isValidPhone, normalizePhone, planName, planTier } from './model';
+export type { ActivePlan, ClassOption, ExamOption, PurchasedExam, Student, StudentLanguage } from './model';
+export { isValidPhone, normalizePhone, planName, planTier, toStudentLanguage } from './model';
 export { useOnboardingStore } from './onboarding-store';

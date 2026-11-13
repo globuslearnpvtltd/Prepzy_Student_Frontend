@@ -6,7 +6,7 @@ import { testExam } from '@/test/exams';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { profileApi } from '../../api';
-import { fail, ok } from '../../test-fixtures';
+import { accountRow, fail, ok } from '../../test-fixtures';
 import { FAQS, SUPPORT_EMAIL, SUPPORT_PHONE } from './help-data';
 import { CallModal, EmailModal, FaqModal, ReportModal, ReportSentModal, RequestModal } from './help-modals';
 import { HelpScreen } from './help-screen';
@@ -180,7 +180,10 @@ describe('sent and request sheets', () => {
 
 describe('Help screen contact options', () => {
   beforeEach(() => {
-    server.use(http.get(`${API}/api/v4/student/help/requests`, () => ok({ requests: [] })));
+    server.use(
+      http.get(`${API}/api/v4/student/help/requests`, () => ok({ requests: [] })),
+      http.get(`${API}/api/v4/student/account`, () => ok(accountRow)),
+    );
   });
 
   it('opens call and email sheets from Talk to us', async () => {
@@ -198,14 +201,17 @@ describe('Help screen contact options', () => {
     const scroll = vi.fn();
     Element.prototype.scrollIntoView = scroll;
     renderWithProviders(<HelpScreen />, { exam: cbse });
-    await userEvent.type(await screen.findByLabelText('Search help'), 'refund');
+    await userEvent.type(await screen.findByLabelText('Search help'), 'xyz');
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(screen.getByLabelText('Search help')).toHaveValue('');
+
+    await userEvent.type(screen.getByLabelText('Search help'), 'refund');
     await userEvent.click(screen.getByRole('button', { name: /Can I get a refund\?/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Talk to us' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    await waitFor(() => expect(scroll).toHaveBeenCalled());
-
-    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    // Phones clear the search so the contact card shows.
     expect(screen.getByLabelText('Search help')).toHaveValue('');
+    await waitFor(() => expect(scroll).toHaveBeenCalled());
   });
 
   it('shows the offline banner and retries when back online', async () => {

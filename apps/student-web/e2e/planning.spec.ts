@@ -106,9 +106,10 @@ test('notes: board notes library opens a chapter\'s notes', async ({ page }) => 
   await page.getByRole('link', { name: 'View Notes: Physics Part 1' }).click();
   await expect(page).toHaveURL(/\/cbse\/notes\/5/);
   await expect(page.getByRole('heading', { name: 'Electric Charges and Fields', level: 1 })).toBeVisible();
-  await page.getByRole('complementary', { name: 'Chapters' }).getByRole('button', { name: /Chapter 2/ }).click();
+  // Next chapter from the Previous / Next bar (fixed at the bottom on phones, under the notes on desktop).
+  await page.getByRole('navigation', { name: 'Chapter navigation' }).getByRole('button', { name: /Next/ }).click();
   await expect(page.getByRole('heading', { name: 'Electrostatic Potential', level: 1 })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toContainText('Electrostatic Potential');
+  await expect(page).toHaveURL(/\/cbse\/notes\/5\?module_id=3$/);
 });
 
 test('notes: NEET notes library opens a chapter in the study-notes step', async ({ page, context }) => {

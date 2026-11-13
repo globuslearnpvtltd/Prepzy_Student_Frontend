@@ -89,14 +89,25 @@ export const routes = {
   doubtSolverStep: (exam: string, step: 'start' | 'ask' | 'question-bank' | 'chat') => `/${exam}/doubt-solver?step=${step}`,
   /** Dashboard with the Atlas chat open (previous app's `?atlas=1`). */
   atlas: (exam: string) => `/${exam}/dashboard?atlas=1`,
+  /** My Account. `?edit=1` is the edit view, so the browser's back button returns to the account view. */
   profile: section('profile'),
+  profileEdit: (exam: string) => `/${exam}/profile?edit=1`,
+  profileParent: (exam: string) => `/${exam}/profile/parent`,
+  profileHelp: (exam: string) => `/${exam}/profile/help`,
   changePassword: (exam: string) => `/${exam}/profile/change-password`,
   requestAccountDelete: (exam: string) => `/${exam}/profile/request-account-delete`,
-  plans: section('plans'),
-  /** Checkout. `query` keeps the previous app's preselection params (CLASSID, stream_id, exam). */
-  plansPurchase: (exam: string, query?: Record<string, string | number>) =>
-    `/${exam}/plans/purchase${query ? `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]))}` : ''}`,
-  plansBilling: (exam: string) => `/${exam}/plans/billing`,
+  /** Every plan of the student across exams (exam-independent). /[exam]/plans and /[exam]/plans/billing redirect here. */
+  managePlans: () => '/manage-plans',
+  /**
+   * The common checkout of every exam (exam-independent, like /manage-plans): `?exam=` preselects the exam (the
+   * page's own choice when omitted), `query` keeps the previous app's preselection params (CLASSID, stream_id).
+   */
+  plansPurchase: (exam?: string | null, query?: Record<string, string | number>) => {
+    const params = new URLSearchParams(exam ? { exam } : {});
+    for (const [key, value] of Object.entries(query ?? {})) params.set(key, String(value));
+    const search = params.toString();
+    return `/purchase${search ? `?${search}` : ''}`;
+  },
 
   referenceBooks: () => '/reference-books',
 } as const;

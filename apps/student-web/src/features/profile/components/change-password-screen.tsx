@@ -2,13 +2,23 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { cx } from '@prepzy/design-system';
+import { Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { userMessage } from '@/shared/lib/errors';
 import { useChangePassword } from '../hooks';
-import { changePasswordSchema } from '../schemas';
-import { SolidButton } from './kit';
+
+const changePasswordSchema = z
+  .object({
+    oldPassword: z.string().min(1, 'Enter your old password'),
+    newPassword: z.string().min(1, 'Enter a new password'),
+    confirmPassword: z.string().min(1, 'Confirm your new password'),
+  })
+  .refine((v) => v.newPassword.trim() === v.confirmPassword.trim(), {
+    message: 'Password Should Be Same',
+    path: ['confirmPassword'],
+  });
 
 type Values = z.input<typeof changePasswordSchema>;
 
@@ -18,6 +28,7 @@ const FIELDS = [
   { name: 'confirmPassword', id: 'confirm_password', label: 'Confirm password' },
 ] as const;
 
+/** Change password (unchanged from the previous app's page; not linked from My Account, reachable by URL). */
 export function ChangePasswordScreen() {
   const change = useChangePassword();
   const form = useForm<Values>({
@@ -36,7 +47,7 @@ export function ChangePasswordScreen() {
   );
 
   return (
-    <div className="flex flex-col md:px-10">
+    <div className="flex flex-col px-[20px] pt-[16px] pb-[32px] md:px-10 lg:pt-[28px]">
       <h1 className="text-[20px] font-bold text-neutral-900">Change Password</h1>
       <section className="bg-surface mt-2 w-full rounded-xl p-6 shadow-sm sm:p-8">
         <form noValidate onSubmit={submit} className="mt-2 flex flex-col gap-4 md:gap-5 lg:mt-5">
@@ -52,7 +63,7 @@ export function ChangePasswordScreen() {
                   type="password"
                   placeholder={field.label === 'Confirm password' ? 'Confirm Password' : field.label}
                   className={cx(
-                    'block w-full rounded-sm border bg-neutral-50 p-2.5 text-sm text-neutral-900 outline-none focus:border-info-600',
+                    'focus:border-info-600 block w-full rounded-sm border bg-neutral-50 p-2.5 text-sm text-neutral-900 outline-none',
                     error ? 'border-danger' : 'border-neutral-300',
                   )}
                   {...form.register(field.name)}
@@ -70,9 +81,13 @@ export function ChangePasswordScreen() {
               {userMessage(change.error, 'Your old password is not correct.')}
             </p>
           )}
-          <SolidButton type="submit" busy={change.isPending} className="mt-6 h-auto p-3">
-            Update
-          </SolidButton>
+          <button
+            type="submit"
+            disabled={change.isPending}
+            className="bg-info-700 border-info-700 text-on-brand mt-6 flex w-full items-center justify-center gap-2 rounded-md border-[1.5px] p-3 text-[16px] leading-[22.4px] font-bold transition-colors hover:opacity-90 disabled:opacity-60"
+          >
+            {change.isPending ? <Loader2 aria-label="Saving" className="size-5 animate-spin" /> : 'Update'}
+          </button>
         </form>
       </section>
     </div>

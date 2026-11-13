@@ -139,9 +139,10 @@ describe('board dashboard (CBSE)', () => {
     expect(await screen.findByText('72%')).toBeInTheDocument();
     expect(screen.getByRole('table', { name: /last and current attempt/ })).toHaveTextContent('Biology70%80%');
 
-    // Right column
-    expect(await screen.findByText('Hey Meera Shah')).toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: 'Profile completion' })).toHaveAttribute('aria-valuenow', '40');
+    // Right column: no profile card ("Hey … / Complete Profile") above the Socrates card.
+    expect(screen.queryByText(/Hey Meera/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('progressbar', { name: 'Profile completion' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Complete Profile')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start Solving' })).toHaveAttribute('href', '/cbse/doubt-solver');
     expect(screen.getByRole('link', { name: 'Use Atlas.' })).toHaveAttribute('href', '/cbse/dashboard?atlas=1');
     expect(screen.getByRole('link', { name: 'Add parent details' })).toHaveAttribute('href', '/cbse/profile');
@@ -181,7 +182,7 @@ describe('board dashboard (CBSE)', () => {
     server.use(plan(12, { duration_months: 0 }), ...boardHandlers());
     renderWithProviders(<Dashboard />, { exam: cbse });
     expect(await screen.findByText('Basic CBSE')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Upgrade Plan' })).toHaveAttribute('href', '/cbse/plans');
+    expect(screen.getByRole('link', { name: 'Upgrade Plan' })).toHaveAttribute('href', '/manage-plans');
   });
 });
 
@@ -236,11 +237,11 @@ describe('board dashboard without a plan', () => {
     const ready = await screen.findByRole('region', { name: 'Get Ready For Your Exams' });
     expect(await within(ready).findByText('SOCIAL SCIENCE...')).toBeInTheDocument();
     const banner = screen.getByRole('region', { name: 'Choose your plan' });
-    expect(within(banner).getByRole('link', { name: 'Upgrade Now' })).toHaveAttribute('href', '/cbse/plans');
+    expect(within(banner).getByRole('link', { name: 'Upgrade Now' })).toHaveAttribute('href', '/manage-plans');
     expect(screen.getAllByText('Your Data will appear here!')).toHaveLength(2);
     await user.click(within(ready).getByRole('button', { name: /Start Now/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Upgrade your Plan' });
-    expect(within(dialog).getByRole('link', { name: /Upgrade Now/ })).toHaveAttribute('href', '/cbse/plans');
+    expect(within(dialog).getByRole('link', { name: /Upgrade Now/ })).toHaveAttribute('href', '/manage-plans');
   });
 
   it('hides the free-plan widgets for a student with a plan', async () => {
@@ -276,6 +277,9 @@ describe('competitive dashboard (NEET)', () => {
     expect(screen.getByRole('link', { name: 'Start Solving' })).toHaveAttribute('href', '/neet/doubt-solver');
     expect(await screen.findByText('1h 20m')).toBeInTheDocument();
     expect(screen.getByText('All scores shown are rounded off.')).toBeInTheDocument();
+    // No profile-completion card on the competitive dashboard either.
+    expect(screen.queryByText('Complete Profile')).not.toBeInTheDocument();
+    expect(screen.queryByRole('progressbar', { name: 'Profile completion' })).not.toBeInTheDocument();
   });
 
   it('links to the result once today’s DPP is submitted', async () => {
@@ -301,6 +305,7 @@ describe('competitive dashboard (NEET)', () => {
 describe('dashboard logic', () => {
   it('has a layout per category', () => {
     expect(DASHBOARD_WIDGETS.board.columns).toHaveLength(2);
+    expect(DASHBOARD_WIDGETS.board.columns[1]!.widgets.map((w) => w.name)).not.toContain('ProfileCard');
     expect(DASHBOARD_WIDGETS.competitive.columns).toHaveLength(2);
     expect(DASHBOARD_WIDGETS.reference.columns).toHaveLength(0);
   });

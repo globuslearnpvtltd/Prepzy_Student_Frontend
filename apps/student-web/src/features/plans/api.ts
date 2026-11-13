@@ -15,6 +15,7 @@ import {
   type GroupKey,
   type PlanTier,
 } from './catalog';
+import { toOverview, toRefundDetails, toRefundPreview, type Overview, type RefundDetails, type RefundPreview } from './manage-data';
 
 type Envelope<T> = { success?: boolean; message?: string; error?: unknown; data?: T };
 
@@ -117,36 +118,11 @@ export interface Purchase {
   courses: { classId: number; className: string; examTitle: string }[];
 }
 
-export type InvoiceStatus = 'paid' | 'refunded' | 'failed' | 'pending';
-
-/** PaymentDto: one billing history row. */
-export interface Transaction {
-  id: number;
-  planId: number | null;
-  invoiceNo: string;
-  description: string;
-  date: string;
-  amount: number;
-  status: InvoiceStatus;
-  invoiceUrl: string | null;
-}
-
-export interface TransactionPage {
-  payments: Transaction[];
-  page: number;
-  totalPages: number;
-}
-
 const PURCHASE_STATUSES: readonly PurchaseStatus[] = ['active', 'pending', 'expired', 'cancelled', 'refunded'];
 
 const toPurchaseStatus = (value: unknown): PurchaseStatus => {
   const lower = text(value).toLowerCase();
   return (PURCHASE_STATUSES as readonly string[]).includes(lower) ? (lower as PurchaseStatus) : 'active';
-};
-
-const toInvoiceStatus = (value: unknown): InvoiceStatus => {
-  const lower = text(value).toLowerCase();
-  return lower === 'refunded' || lower === 'failed' || lower === 'pending' ? lower : 'paid';
 };
 
 const toCategory = (value: unknown): ExamCategory | null => {
@@ -209,20 +185,6 @@ export function toPurchase(raw: Record<string, unknown>): Purchase {
     hasPendingPlan: flag(raw.has_pending_plan),
     pendingStartDate: text(raw.pending_start_date) || null,
     courses,
-  };
-}
-
-/** PaymentDto → billing history row; the server's display_name names the plan when it sends one. */
-export function toTransaction(raw: Record<string, unknown>): Transaction {
-  return {
-    id: num(raw.id),
-    planId: numOrNull(raw.plan_id),
-    invoiceNo: text(raw.invoice_number),
-    description: text(raw.display_name) || text(raw.description),
-    date: text(raw.created_at),
-    amount: num(raw.amount),
-    status: toInvoiceStatus(raw.status),
-    invoiceUrl: url(raw.invoice_url),
   };
 }
 
@@ -298,14 +260,6 @@ function toVariant(raw: Record<string, unknown>): ApiVariant {
     bundle_options: options.map((o) => ({ exam_id: num(o.exam_id), title: text(o.title) })).filter((o) => o.title),
   };
 }
-
-type Page<K extends string> = { [key in K]?: Record<string, unknown>[] } & { pagination?: { page?: number; total_pages?: number } };
-
-const toPage = (result: Partial<Page<'payments'>>, page: number): TransactionPage => ({
-  payments: (result.payments ?? []).map(toTransaction),
-  page: result.pagination?.page ?? page,
-  totalPages: Math.max(1, result.pagination?.total_pages ?? 1),
-});
 
 export const plansApi = {
   /** Plans on sale for an exam; `classId` narrows it to one class (the welcome pricing sheet). */
@@ -426,18 +380,26 @@ export const plansApi = {
     return (data(body).purchases ?? []).map(toPurchase);
   },
 
-  /** One page of a plan's payments (pending and failed included). */
-  async planPayments(exam: ExamRef, planId: number, page: number): Promise<TransactionPage> {
-    const body = await apiClient.get<Envelope<Page<'payments'>>>(`${billingApiBase(exam)}/purchases/${planId}/payments`, {
-      params: { page },
-    });
-    return toPage(data(body), page);
+  /* ---- Manage Plans: every exam of the student (/api/v4/billing/overview …) ---- */
+
+  /** Active plans of every exam with their invoices, plus the invoices of ended plans. */
+  async overview(): Promise<Overview> {
+    const body = await apiClient.get<Envelope<{ active?: Record<string, unknown>[]; expired?: Record<string, unknown>[] }>>(
+      '/api/v4/billing/overview',
+    );
+    return toOverview(data(body));
   },
 
-  /** One page of every payment of the exam (paid, pending, failed, refunded). */
-  async payments(exam: ExamRef, page: number): Promise<TransactionPage> {
-    const body = await apiClient.get<Envelope<Page<'payments'>>>(`${billingApiBase(exam)}/payments`, { params: { page } });
-    return toPage(data(body), page);
+  /** What cancelling would do (read only); the exam's cancel endpoint still decides. */
+  async refundPreview(purchaseId: number): Promise<RefundPreview> {
+    const body = await apiClient.get<Envelope<Record<string, unknown>>>(`/api/v4/billing/purchases/${purchaseId}/refund-preview`);
+    return toRefundPreview(data(body));
+  },
+
+  /** The stored refund of the purchase's plan; null when there is none. */
+  async refundDetails(purchaseId: number): Promise<RefundDetails | null> {
+    const body = await apiClient.get<Envelope<Record<string, unknown> | null>>(`/api/v4/billing/purchases/${purchaseId}/refund`);
+    return toRefundDetails(assertOk(body ?? {}).data ?? null);
   },
 
   /* ---- referral (welcome flow): /api/v4/referral ---- */

@@ -1,15 +1,13 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
-import { billingError, billingOk, billingUrl, paymentDto, purchaseDto, quoteData } from '@/test/billing';
-import { billingApiBase, toPurchase, toTransaction } from './api';
+import { billingError, billingOk, billingUrl, purchaseDto, quoteData } from '@/test/billing';
+import { billingApiBase, toPurchase } from './api';
 import { buildSections, durationLabel, toPlans, yearVariants, type ApiPlan } from './catalog';
 import { Checkout } from './components/checkout/checkout';
-import { BillingHistory } from './components/billing-history';
-import { BillingPage, ManagePlans } from './components/manage-plans';
 import { Welcome } from './components/welcome';
 import { formatAmount, formatInr, formatInrExact } from './money';
 import type { RazorpayOptions } from './razorpay';
@@ -111,7 +109,7 @@ describe('plan normalisers', () => {
     expect(formatAmount(588.82)).toBe('₹588.82');
   });
 
-  it('normalises manage-page and billing rows defensively', () => {
+  it('normalises purchase rows defensively', () => {
     const combo = toPurchase(
       purchaseDto({
         purchase_id: '3',
@@ -143,7 +141,6 @@ describe('plan normalisers', () => {
       isFree: true,
       courses: [],
     });
-    expect(toTransaction(paymentDto({ amount: '590', status: 'REFUNDED', invoice_url: '' }))).toMatchObject({ amount: 590, status: 'refunded', invoiceUrl: null });
     expect(toPurchase(purchaseDto({ has_pending_plan: true, pending_start_date: '2026-01-01', status: 'ACTIVE' }))).toMatchObject({
       purchaseId: 100,
       status: 'active',
@@ -172,7 +169,7 @@ describe('checkout', () => {
   });
 
   async function openReview(planName: RegExp) {
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     await userEvent.click(await screen.findByRole('button', { name: planName }));
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     return screen.findByText("You're almost there! 🌟");
@@ -272,131 +269,6 @@ describe('checkout', () => {
   });
 });
 
-describe('manage plans', () => {
-  const payments = (exam: typeof cbse) => http.get(billingUrl(exam, '/payments'), () => billingOk({ payments: [], pagination: { page: 1, limit: 10, total: 0, total_pages: 1 } }));
-
-  it('cancels a paid plan after confirmation, sending the reason', async () => {
-    let body: unknown = null;
-    let cancelled: unknown = null;
-    server.use(
-      payments(neet),
-      http.get(billingUrl(neet, '/purchases'), () =>
-        billingOk({
-          purchases: [
-            purchaseDto({
-              purchase_id: 70,
-              plan_id: 7,
-              display_name: 'Topper NEET-UG 2027 + CBSE',
-              exam_title: 'NEET-UG',
-              courses: [{ class_id: 11, class_name: 'CLASS 11', exam_title: 'CBSE' }],
-            }),
-          ],
-        }),
-      ),
-      http.post(billingUrl(neet, '/purchases/:id/cancel'), async ({ request, params }) => {
-        cancelled = params.id;
-        body = await request.json();
-        return billingOk({ purchase: purchaseDto({ status: 'cancelled' }), refund: null });
-      }),
-    );
-    renderWithProviders(<ManagePlans />, { exam: neet });
-    expect(await screen.findByRole('heading', { name: 'Topper NEET-UG 2027 + CBSE' })).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'Included courses' })).toHaveTextContent('CBSE · Class 11');
-    // Backing out keeps the plan.
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Keep my plan' }));
-    expect(cancelled).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    const dialog = screen.getByRole('dialog', { name: 'Cancel plan' });
-    await userEvent.selectOptions(within(dialog).getByLabelText('Please tell us why you are leaving'), 'Too expensive');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Yes, cancel plan' }));
-    expect(await screen.findByText('Cancellation confirmed')).toBeInTheDocument();
-    expect(cancelled).toBe('70');
-    expect(body).toEqual({ reason: 'Too expensive' });
-  });
-
-  it('shows the server message when a cancellation is refused', async () => {
-    server.use(
-      payments(cbse),
-      http.get(billingUrl(cbse, '/purchases'), () => billingOk({ purchases: [purchaseDto({ purchase_id: 55 })] })),
-      http.post(billingUrl(cbse, '/purchases/:id/cancel'), () => billingError(409, 'REFUND_LIMIT_REACHED', 'Refund already used for this plan')),
-    );
-    renderWithProviders(<ManagePlans />, { exam: cbse });
-    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel plan' }));
-    expect(await screen.findByRole('alertdialog')).toHaveTextContent('Refund already used for this plan');
-  });
-
-  it('extends a plan with a coupon (POST /extensions with the purchase)', async () => {
-    let body: unknown = null;
-    server.use(
-      payments(cbse),
-      http.get(billingUrl(cbse, '/purchases'), () => billingOk({ purchases: [purchaseDto({ purchase_id: 56, duration_months: 1, display_name: 'Topper CBSE Monthly' })] })),
-      http.post(billingUrl(cbse, '/extensions'), async ({ request }) => {
-        body = await request.json();
-        return billingOk({ months: 2, expiry_date: '2026-09-01', purchase: purchaseDto() });
-      }),
-    );
-    renderWithProviders(<ManagePlans />, { exam: cbse });
-    await userEvent.click(await screen.findByRole('button', { name: 'Extend with coupon' }));
-    await userEvent.type(screen.getByRole('textbox', { name: 'Coupon code' }), 'MORE');
-    await userEvent.click(screen.getByRole('button', { name: 'Extend' }));
-    expect(await screen.findByText('2 months added to Topper CBSE Monthly')).toBeInTheDocument();
-    expect(body).toEqual({ coupon_code: 'MORE', purchase_id: 56 });
-  });
-
-  it('offers no Renew: an active paid plan shows Upgrade, an expired one Buy plan with its class', async () => {
-    server.use(
-      payments(cbse),
-      http.get(billingUrl(cbse, '/purchases'), () =>
-        billingOk({
-          purchases: [
-            purchaseDto({ purchase_id: 1, plan_id: 5, class_id: 12, class_name: 'CLASS 12', status: 'active' }),
-            purchaseDto({ purchase_id: 2, plan_id: 6, class_id: 11, class_name: 'CLASS 11', status: 'expired', duration_months: 1 }),
-          ],
-        }),
-      ),
-    );
-    renderWithProviders(<ManagePlans />, { exam: cbse });
-    expect(await screen.findByRole('heading', { name: 'Topper CBSE Academic' })).toBeInTheDocument();
-    expect(screen.queryByText(/Renew/)).toBeNull();
-    expect(screen.getByRole('link', { name: 'Upgrade' })).toHaveAttribute('href', '/cbse/plans/purchase?CLASSID=12');
-    expect(screen.getByRole('link', { name: 'Buy plan' })).toHaveAttribute('href', '/cbse/plans/purchase?CLASSID=11');
-    // Only the active paid plan can be cancelled.
-    expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(1);
-  });
-});
-
-describe('billing history', () => {
-  it('lists the exam\'s payments a page at a time, with status chips and invoices', async () => {
-    const pages: string[] = [];
-    server.use(
-      http.get(billingUrl(neet, '/payments'), ({ request }) => {
-        const page = new URL(request.url).searchParams.get('page')!;
-        pages.push(page);
-        return billingOk({
-          payments:
-            page === '1'
-              ? [paymentDto({ id: 1, invoice_number: 'INV-1', display_name: 'Topper NEET-UG Monthly', amount: 589, invoice_url: 'https://x.test/inv.pdf' })]
-              : [paymentDto({ id: 2, invoice_number: null, description: 'old text', display_name: 'Topper NEET-UG 2027', status: 'failed' })],
-          pagination: { page: Number(page), limit: 10, total: 11, total_pages: 2 },
-        });
-      }),
-    );
-    renderWithProviders(<BillingHistory exam={neet} />, { exam: neet });
-    const table = await screen.findByRole('table', { name: 'Billing history' });
-    expect(within(table).getByText('INV-1')).toBeInTheDocument();
-    expect(within(table).getByText('₹589.00')).toBeInTheDocument();
-    expect(within(table).getByRole('link', { name: 'Invoice' })).toHaveAttribute('href', 'https://x.test/inv.pdf');
-    expect(within(table).getByText('Paid')).toBeInTheDocument();
-    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Next/ }));
-    expect(await within(screen.getByRole('table', { name: 'Billing history' })).findByText('Topper NEET-UG 2027')).toBeInTheDocument();
-    expect(within(screen.getByRole('table', { name: 'Billing history' })).getByText('Failed')).toBeInTheDocument();
-    expect(pages).toEqual(['1', '2']);
-  });
-});
-
 describe('welcome', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -465,58 +337,6 @@ describe('welcome', () => {
 });
 
 describe('plan pages', () => {
-  it('shows the same empty state for every exam, and the billing page for every exam', async () => {
-    server.use(
-      http.get(billingUrl(neet, '/purchases'), () => billingOk({ purchases: [] })),
-      http.get(billingUrl(neet, '/payments'), () => billingOk({ payments: [] })),
-      http.get(billingUrl(cbse, '/payments'), () => billingOk({ payments: [paymentDto({ status: 'pending' })] })),
-    );
-    renderWithProviders(<ManagePlans />, { exam: neet });
-    expect(await screen.findByText('No plans yet')).toBeInTheDocument();
-    expect(await screen.findByText('No payments yet')).toBeInTheDocument();
-    renderWithProviders(<BillingPage />, { exam: cbse });
-    expect(await screen.findByRole('heading', { level: 1, name: 'Billing history' })).toBeInTheDocument();
-    expect((await screen.findAllByText('Pending')).length).toBeGreaterThan(0);
-    expect(navigation.replace).not.toHaveBeenCalled();
-  });
-
-  it('expands a plan to its paginated payments, pending and failed rows included', async () => {
-    let asked = '';
-    server.use(
-      http.get(billingUrl(cbse, '/payments'), () => billingOk({ payments: [] })),
-      http.get(billingUrl(cbse, '/purchases'), () =>
-        billingOk({ purchases: [purchaseDto({ plan_id: 5, class_id: 12, class_name: 'CLASS 12', stream_name: 'PCM', duration_months: 0, price: 0, status: 'expired', expiry_date: null })] }),
-      ),
-      http.get(billingUrl(cbse, '/purchases/:planId/payments'), ({ request, params }) => {
-        asked = `${params.planId}?${new URL(request.url).searchParams}`;
-        return billingOk({
-          payments: [
-            paymentDto({ id: 1, amount: 499, status: 'paid', invoice_url: 'https://x.test/i.pdf' }),
-            paymentDto({ id: 2, amount: 499, status: 'refunded' }),
-            paymentDto({ id: 3, amount: 588.82, status: 'pending' }),
-            paymentDto({ id: 4, amount: 588.82, status: 'failed' }),
-          ],
-          pagination: { page: 1, limit: 10, total: 14, total_pages: 2 },
-        });
-      }),
-    );
-    renderWithProviders(<ManagePlans />, { exam: cbse });
-    expect(await screen.findByRole('heading', { name: 'Basic CBSE' })).toBeInTheDocument();
-    expect(screen.getByText(/Free forever/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Extend with coupon' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: /View payments/ }));
-    const table = await screen.findByRole('table', { name: 'Plan payments' });
-    expect(asked).toBe('5?page=1');
-    expect(within(table).getAllByText('− ₹499.00').length).toBeGreaterThan(0);
-    expect(within(table).getByText('Pending')).toBeInTheDocument();
-    expect(within(table).getByText('Failed')).toBeInTheDocument();
-    expect(within(table).getAllByText('₹588.82').length).toBeGreaterThan(0);
-    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Next/ }));
-    await waitFor(() => expect(asked).toBe('5?page=2'));
-  });
-
   it('re-checks a pending payment with GET /orders/:id until the server confirms it', async () => {
     let verifyCalls = 0;
     let checks = 0;
@@ -541,7 +361,7 @@ describe('plan pages', () => {
         return billingOk({ order_id: 'o3', status: 'paid' });
       }),
     );
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     await userEvent.click(await screen.findByRole('button', { name: /^Topper CBSE Monthly$/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await userEvent.click((await screen.findAllByRole('button', { name: /Pay ₹588.82/ }))[0]!);

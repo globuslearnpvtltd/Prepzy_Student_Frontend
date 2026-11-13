@@ -15,6 +15,7 @@ import { AppHeader } from './app-header';
 import { BoardBottomBar, BoardSidebar } from './board-navigation';
 import { CompetitiveSidebar } from './competitive-navigation';
 import { PageSpinner, StatusScreen } from './status-screens';
+import { useAccountExam } from './use-account-exam';
 
 /** Wraps every /[exam]/… page: exam context, the exam's theme and the access check. */
 export function ExamFrame({ examSlug, children }: { examSlug: string; children: React.ReactNode }) {
@@ -62,8 +63,10 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
         <AppHeader exam={exam} category={exam.category} />
         <div className="flex">
           <CompetitiveSidebar exam={exam} rail={chrome.rail} />
-          <main id="main" className={cx('bg-canvas min-w-0 flex-1', chrome.padded && 'p-2.5 lg:p-10')}>
-            {children}
+          <main id="main" className={cx('bg-canvas min-w-0 flex-1', chrome.padded && 'p-2.5 md:p-6 lg:p-10')}>
+            {/* The one page width for padded competitive pages: they fill the space next to the rail (as in the
+                previous app), capped and left-aligned on very wide screens. Pages don't add their own max width. */}
+            {chrome.padded ? <div className="w-full max-w-[1760px]">{children}</div> : children}
           </main>
         </div>
         <Suspense fallback={null}>
@@ -86,6 +89,39 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
         <AtlasHost />
       </Suspense>
     </div>
+  );
+}
+
+/**
+ * Account pages outside any exam (/manage-plans): the header of the student's current exam (the remembered one if the
+ * student owns it, else their first exam) and no section navigation, as in the previous app. Competitive mobile keeps
+ * its navigation drawer (the header's menu button). Without any owned exam: the header alone.
+ */
+export function AccountFrame({ children }: { children: React.ReactNode }) {
+  const { exam, isPending, isError, error } = useAccountExam();
+
+  if (isPending) return <PageSpinner />;
+  if (isError) {
+    return <StatusScreen title="We couldn't load your account" description={userMessage(error)} />;
+  }
+  if (!exam) {
+    return (
+      <div className="bg-canvas min-h-dvh">
+        <AppHeader exam={null} category={REFERENCE.category} />
+        <main id="main">{children}</main>
+      </div>
+    );
+  }
+  return (
+    <ExamProvider value={exam}>
+      <div data-theme={exam.theme} className="bg-canvas min-h-dvh">
+        <AppHeader exam={exam} category={exam.category} navigation={exam.category === 'competitive'} />
+        {exam.category === 'competitive' && <CompetitiveSidebar exam={exam} rail={false} />}
+        <main id="main" className="mx-auto w-full max-w-[1440px]">
+          {children}
+        </main>
+      </div>
+    </ExamProvider>
   );
 }
 

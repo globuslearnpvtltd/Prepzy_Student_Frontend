@@ -62,22 +62,51 @@ export const purchaseDto = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-/** A PaymentDto with sensible defaults. */
-export const paymentDto = (extra: Record<string, unknown> = {}) => ({
-  id: 1,
+/** GET /api/v4/billing/overview: one invoice row with sensible defaults. */
+export const overviewHistoryDto = (extra: Record<string, unknown> = {}) => ({
+  payment_history_id: 501,
   order_id: 'order_x',
-  invoice_number: null,
-  invoice_url: null,
-  description: 'Topper CBSE Monthly',
-  display_name: 'Topper CBSE Monthly',
   plan_id: 5,
-  class_name: 'CLASS 12',
-  duration_months: 1,
+  invoice_number: 'INV-501',
+  invoice_url: 'https://cdn.test/inv-501.pdf',
   amount: 588.82,
   currency: 'INR',
-  status: 'paid',
-  payment_method: 'upi',
-  created_at: '2026-01-02T10:00:00.000Z',
-  updated_at: '2026-01-02T10:00:00.000Z',
+  paid_on: '2026-06-10T06:00:00.000Z',
+  plan_name: 'Topper CBSE Monthly',
+  duration_months: 1,
+  purchase_status: 'active',
+  ended_on: null,
   ...extra,
 });
+
+/** GET /api/v4/billing/overview: one active plan (a board monthly plan by default). */
+export const overviewPlanDto = (extra: Record<string, unknown> = {}) => ({
+  exam_id: 1,
+  exam_name: 'CBSE',
+  exam_slice: 'cbse',
+  category: 'board',
+  group_key: 'class',
+  class_id: 12,
+  class_title: 'Class 12',
+  stream_name: null,
+  target_year: null,
+  scope_label: 'Class 12',
+  purchase_id: 100,
+  plan_id: 5,
+  order_id: 'order_x',
+  plan_name: 'Topper CBSE Monthly',
+  tier: 'monthly',
+  duration_months: 1,
+  paid_amount: 588.82,
+  is_free: false,
+  purchase_start_date: '2026-06-10T06:00:00.000Z',
+  expiry_date: '2026-07-10T06:00:00.000Z',
+  has_pending_plan: false,
+  pending_purchase_date: null,
+  pending_start_date: null,
+  cancel_falls_back_to_basic: false,
+  history: [overviewHistoryDto()],
+  ...extra,
+});
+
+export const overviewUrl = `${API}/api/v4/billing/overview`;

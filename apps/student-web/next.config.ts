@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 import { legacyLearnRedirects } from './src/shared/config/legacy-learn-redirects';
 import { legacyPortalRedirects } from './src/shared/config/legacy-portal-redirects';
+import { legacyProfileRedirects } from './src/shared/config/legacy-profile-redirects';
 import { legacyPlanRedirects } from './src/shared/config/legacy-plan-redirects';
 import { legacySolverRedirects } from './src/shared/config/legacy-solver-redirects';
 import { legacyTestRedirects } from './src/shared/config/legacy-test-redirects';
@@ -28,7 +29,7 @@ const nextConfig: NextConfig = {
   },
   // Old test player / result and plan / checkout URLs keep working (see legacy-*-redirects.ts).
   async redirects() {
-    return [...legacyTestRedirects, ...legacyLearnRedirects, ...legacyPlanRedirects, ...legacySolverRedirects, ...legacyPortalRedirects];
+    return [...legacyTestRedirects, ...legacyLearnRedirects, ...legacyPlanRedirects, ...legacySolverRedirects, ...legacyPortalRedirects, ...legacyProfileRedirects];
   },
   async headers() {
     return [

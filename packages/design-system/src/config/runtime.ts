@@ -40,3 +40,34 @@ export function splitVariantProps<N extends ComponentName, P extends object>(
   }
   return [attributes, rest as Omit<P, keyof VariantProps<N>>];
 }
+
+type Colors = (typeof designConfig)['tokens']['colors'];
+type PaletteColor = { [Scale in keyof Colors & string]: `${Scale}.${keyof Colors[Scale] & (string | number)}` }[keyof Colors &
+  string];
+export type ColorName = (keyof (typeof designConfig)['semantic'] & string) | PaletteColor;
+
+/**
+ * Raw value of a colour token, for the few places that need a colour string in JavaScript instead of a class or
+ * `var(--color-…)` (the browser `theme-color` meta tag, third-party widgets such as Razorpay's checkout).
+ * `colorValue('brand')` → '#3D348B', `colorValue('warning.700')` → '#B54708'.
+ */
+export function colorValue(name: ColorName): string {
+  const seen = new Set<string>();
+  let value: string = name;
+  const semantic = designConfig.semantic as Record<string, string>;
+  const colors = designConfig.tokens.colors as Record<string, Record<string, string>>;
+  for (;;) {
+    if (seen.has(value)) throw new Error(`colorValue: circular colour "${name}"`);
+    seen.add(value);
+    const alias = semantic[value];
+    if (alias !== undefined) {
+      value = alias;
+      continue;
+    }
+    const [scale, step] = value.split('.');
+    const raw = scale && step ? colors[scale]?.[step] : undefined;
+    if (raw !== undefined) return raw;
+    if (/^(#|rgb|hsl|transparent$)/.test(value)) return value;
+    throw new Error(`colorValue: unknown colour "${name}"`);
+  }
+}

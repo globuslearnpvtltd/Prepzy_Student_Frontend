@@ -126,6 +126,14 @@ describe('routes', () => {
     expect(routes.verifyOtp('signup')).toBe('/verify-otp?flow=signup');
   });
 
+  it('builds the common checkout URL, with no exam in the path', () => {
+    expect(routes.plansPurchase('cbse')).toBe('/purchase?exam=cbse');
+    expect(routes.plansPurchase('neet', { CLASSID: 20, stream_id: 2 })).toBe('/purchase?exam=neet&CLASSID=20&stream_id=2');
+    expect(routes.plansPurchase('icse-board')).toBe('/purchase?exam=icse-board');
+    expect(routes.plansPurchase()).toBe('/purchase');
+    expect(routes.plansPurchase(null, { CLASSID: 12 })).toBe('/purchase?CLASSID=12');
+  });
+
   it('lists the pages that need no session', () => {
     expect(isPublicPath('/login')).toBe(true);
     expect(isPublicPath('/setup')).toBe(true);

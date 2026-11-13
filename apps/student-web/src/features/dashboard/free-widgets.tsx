@@ -75,7 +75,6 @@ export function GetReadyExam() {
 }
 
 function UpgradeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { exam } = useDashboardContext();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[420px] gap-0 overflow-hidden p-0">
@@ -90,7 +89,7 @@ function UpgradeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
             Upgrade to the Comprehensive Plan to access both learning and exam prep in one go.
           </DialogDescription>
           <Link
-            href={routes.plans(exam.slug)}
+            href={routes.managePlans()}
             className="bg-info-600 text-on-brand flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 font-medium"
           >
             Upgrade Now <ChevronRight aria-hidden className="size-4" />
@@ -103,7 +102,7 @@ function UpgradeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
 
 /** "Dear Student … BUY Plan Now" banner at the bottom of the free dashboard. */
 export function ChooseYourPlan() {
-  const { exam, noPlan } = useDashboardContext();
+  const { noPlan } = useDashboardContext();
   if (!noPlan) return null;
   return (
     <section aria-label="Choose your plan" className="mt-8 md:mt-[50px]">
@@ -119,7 +118,7 @@ export function ChooseYourPlan() {
         <div className="relative z-10 mt-0 inline-block md:mt-[18px]">
           <span aria-hidden className="border-on-brand absolute inset-0 translate-x-1 translate-y-1 rounded-[14px] border-2" />
           <Link
-            href={routes.plans(exam.slug)}
+            href={routes.managePlans()}
             className="border-on-brand bg-brand text-on-brand relative flex w-[198px] items-center justify-center rounded-[14px] border-2 px-6 py-2 font-semibold md:h-[54px]"
           >
             Upgrade Now

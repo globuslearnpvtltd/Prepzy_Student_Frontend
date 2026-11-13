@@ -1,8 +1,9 @@
 'use client';
 
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
-import { planName, type ActivePlan } from '@/features/auth';
+import { planName, rememberedExam, type ActivePlan } from '@/features/auth';
 import { findExam, type ExamConfig, type ExamRef } from '@/shared/config/exams';
 import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { isPlanCategory, plansApi, type PlanCategory } from './api';
@@ -18,10 +19,8 @@ export const planKeys = {
   quote: (exam: ExamRef, priceId: number, coupon: string | null) =>
     ['plans', 'quote', exam.category, exam.examId, priceId, coupon] as const,
   purchases: (exam: ExamRef) => ['plans', 'purchases', exam.category, exam.examId] as const,
-  planPayments: (exam: ExamRef, planId: number, page: number) =>
-    ['plans', 'plan-payments', exam.category, exam.examId, planId, page] as const,
-  billing: (exam: ExamRef, page?: number) =>
-    (page === undefined ? ['plans', 'billing', exam.category, exam.examId] : ['plans', 'billing', exam.category, exam.examId, page]) as readonly unknown[],
+  /** Manage Plans: every exam of the student. */
+  overview: () => ['plans', 'overview'] as const,
 };
 
 /** An exam that can be bought: its category, slice, name and exam_id from GET /api/v4/exams. */
@@ -39,13 +38,8 @@ const combineCatalogs = (results: UseQueryResult<CatalogExam>[]) => ({
   errors: results.map((result) => result.error ?? null),
 });
 
-/**
- * Catalogs of every purchasable exam (the checkout lets the student switch exam). Exams, ids and names come from
- * GET /api/v4/exams, filtered to the plan categories, so a new exam in the DB shows up without a code change. It
- * errors when the exam list or the `primary` exam's catalog fails; another exam's failure just leaves that exam out
- * (its card is disabled).
- */
-export function useCatalogs(primary: ExamRef) {
+/** The purchasable exams of GET /api/v4/exams (plan categories only), with the app's route of each when it has one. */
+export function usePlanExams() {
   const examList = useExamCatalog();
   const exams = useMemo<PlanExam[]>(
     () =>
@@ -56,11 +50,47 @@ export function useCatalogs(primary: ExamRef) {
       }),
     [examList.data],
   );
+  return { exams, query: examList };
+}
+
+/** Does an ?exam= value name this exam? It may be the exam id, its slice or its app route. */
+export const namesExam = (value: string, exam: Pick<PlanExam, 'examId' | 'examSlice' | 'slug'>) =>
+  value === String(exam.examId) || value === exam.examSlice || value === exam.slug || findExam(value)?.examSlice === exam.examSlice;
+
+/** The ?exam= value that names an exam on the purchase page: its app route, else its slice. */
+export const examParamOf = (exam: Pick<PlanExam, 'examSlice' | 'slug'>) => exam.slug ?? exam.examSlice;
+
+/**
+ * The exam the common purchase page (/purchase) sells: the one ?exam= names (none when it names no purchasable
+ * exam, so the student picks one), else the remembered exam, else the first purchasable exam.
+ */
+export function pickPlanExam(exams: readonly PlanExam[], param: string | null, remembered: string | null): PlanExam | null {
+  if (param) return exams.find((exam) => namesExam(param, exam)) ?? null;
+  return exams.find((exam) => remembered !== null && exam.slug === remembered) ?? exams[0] ?? null;
+}
+
+/** The purchase page's exam, from its URL (shared by the page's header and the checkout). */
+export function useCheckoutExam() {
+  const examParam = useSearchParams().get('exam');
+  const { exams, query } = usePlanExams();
+  const remembered = useMemo(() => rememberedExam(), []);
+  const exam = useMemo(() => pickPlanExam(exams, examParam, remembered), [exams, examParam, remembered]);
+  return { exam, examParam, exams, isPending: query.isPending, isError: query.isError };
+}
+
+/**
+ * Catalogs of every purchasable exam (the checkout lets the student switch exam). Exams, ids and names come from
+ * GET /api/v4/exams, filtered to the plan categories, so a new exam in the DB shows up without a code change. It
+ * errors when the exam list or the `primary` exam's catalog fails; another exam's failure just leaves that exam out
+ * (its card is disabled).
+ */
+export function useCatalogs(primary: ExamRef | null) {
+  const { exams, query: examList } = usePlanExams();
   const catalogs = useQueries({
     queries: exams.map((exam) => ({ queryKey: planKeys.catalog(exam), queryFn: () => plansApi.catalog(exam), staleTime: STALE })),
     combine: combineCatalogs,
   });
-  const primaryIndex = exams.findIndex((exam) => exam.examId === primary.examId && exam.category === primary.category);
+  const primaryIndex = primary ? exams.findIndex((exam) => exam.examId === primary.examId && exam.category === primary.category) : -1;
   const error = examList.error ?? (primaryIndex >= 0 ? catalogs.errors[primaryIndex] : null) ?? null;
   const settled = examList.isSuccess && !catalogs.pending;
   const data = useMemo<CatalogExam[] | undefined>(
@@ -117,12 +147,8 @@ export function useQuote(exam: ExamRef | null, priceId: number | null, coupon: s
   });
 }
 
-/** GET /purchases: per plan of the exam, the active purchase, else the latest one. */
-export const usePurchases = (exam: ExamRef) => useQuery({ queryKey: planKeys.purchases(exam), queryFn: () => plansApi.purchases(exam) });
-
 /**
- * The name of the student's active plan: the API's `display_name` of its purchase (GET /purchases, shared with the
- * Manage Plans page), else the name composed by the same rule from the active plan and the backend exam list.
+ * The name of the student's active plan: the API's `display_name` of its purchase (GET /purchases), else the name composed by the same rule from the active plan and the backend exam list.
  */
 export function useActivePlanName(exam: ExamConfig, plan: ActivePlan | null | undefined): string | null {
   const catalog = useExamCatalog();
@@ -140,15 +166,3 @@ export function useActivePlanName(exam: ExamConfig, plan: ActivePlan | null | un
   const purchase = own.find((p) => p.status === 'active') ?? own.find((p) => p.status === 'pending') ?? own[0];
   return purchase?.displayName ?? planName(plan, exam, catalog.data);
 }
-
-/** One page of a plan's payments; idle until a plan is opened. */
-export const usePlanPayments = (exam: ExamRef, planId: number | null, page: number) =>
-  useQuery({
-    queryKey: planKeys.planPayments(exam, planId ?? 0, page),
-    queryFn: () => plansApi.planPayments(exam, planId!, page),
-    enabled: planId !== null,
-  });
-
-/** One page of the exam's billing history (GET /payments?page=). */
-export const useBillingHistory = (exam: ExamRef, page: number) =>
-  useQuery({ queryKey: planKeys.billing(exam, page), queryFn: () => plansApi.payments(exam, page), placeholderData: (previous) => previous });

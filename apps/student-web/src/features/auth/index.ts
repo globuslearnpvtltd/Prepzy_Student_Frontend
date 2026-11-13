@@ -1,7 +1,7 @@
 /** Session, account and onboarding logic. The sign-in screens live in ./ui. */
 export { authApi } from './api';
 export { COUNTRY_DIAL_CODES } from './countries';
-export { forgetExam, getDeviceFingerprint, rememberExam } from './device';
+export { forgetExam, getDeviceFingerprint, rememberedExam, rememberExam } from './device';
 export {
   authKeys,
   homeFor,

@@ -8,8 +8,9 @@ import { useExam } from '@/shared/hooks/use-exam';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
+import { formatPhone, resetMenuDot } from './account-menu';
 import { remainingPercent, resolveDailyPractice } from './competitive-navigation';
-import { AppChrome, ExamFrame, ReferenceFrame } from './exam-shell';
+import { AccountFrame, AppChrome, ExamFrame, ReferenceFrame } from './exam-shell';
 import { LimitDialog } from './limit-dialog';
 import { useMobileNav } from './mobile-nav-store';
 import { SectionPlaceholder } from './section-placeholder';
@@ -64,6 +65,7 @@ function renderShell(slug: 'cbse' | 'neet') {
 
 beforeEach(() => {
   localStorage.clear();
+  resetMenuDot();
   usePlanSelection.setState({ planId: null });
   useMobileNav.setState({ open: false });
 });
@@ -125,7 +127,9 @@ describe('board shell', () => {
     expect(screen.queryByRole('navigation', { name: 'Header' })).not.toBeInTheDocument();
     const header = screen.getByRole('banner');
     expect(within(header).queryByRole('link', { name: 'Courses' })).not.toBeInTheDocument();
-    expect(within(header).queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
+    // The Dashboard pill right of the goals pill, current on the dashboard.
+    expect(within(header).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/cbse/dashboard');
+    expect(within(header).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
     const [pill] = await within(header).findAllByRole('button', { name: 'My goals: CBSE · Class 12 PCB' });
     expect(pill).toBeInTheDocument();
     // The class is picked from the pill, not the sidebar.
@@ -134,7 +138,7 @@ describe('board shell', () => {
 
     expect(await screen.findByRole('link', { name: 'Active plan: CLASS 12 (PCB) Topper. Manage' })).toHaveAttribute(
       'href',
-      '/cbse/plans',
+      '/manage-plans',
     );
     expect(screen.getByText('Expires 1 May 2027')).toBeInTheDocument();
 
@@ -191,8 +195,8 @@ describe('board shell', () => {
     const neet = within(menu).getByRole('group', { name: 'NEET-UG' });
     expect(within(neet).getByRole('menuitem', { name: 'NEET-UG Class 12, Free plan' })).toBeInTheDocument();
 
-    expect(within(menu).getByRole('menuitem', { name: 'Manage plans' })).toHaveAttribute('href', '/cbse/plans');
-    expect(within(menu).getByRole('menuitem', { name: 'Add another goal' })).toHaveAttribute('href', '/cbse/plans/purchase');
+    expect(within(menu).getByRole('menuitem', { name: 'Manage plans' })).toHaveAttribute('href', '/manage-plans');
+    expect(within(menu).getByRole('menuitem', { name: 'Add another goal' })).toHaveAttribute('href', '/purchase?exam=cbse');
 
     await userEvent.click(within(cbse).getByRole('menuitem', { name: /Class 11/ }));
     expect(localStorage.getItem('selectedPlanId')).toBe('2');
@@ -222,8 +226,8 @@ describe('board shell', () => {
     expect(within(sheet).getAllByRole('heading').map((h) => h.textContent)).toEqual(['My goals', 'CBSE', 'NEET-UG']);
     expect(within(sheet).getByRole('button', { name: /Class 12 PCB/ })).toHaveAttribute('aria-current', 'true');
     expect(within(sheet).getByRole('button', { name: /Class 10/ })).toBeDisabled();
-    expect(within(sheet).getByRole('link', { name: 'Manage plans' })).toHaveAttribute('href', '/cbse/plans');
-    expect(within(sheet).getByRole('link', { name: 'Add another goal' })).toHaveAttribute('href', '/cbse/plans/purchase');
+    expect(within(sheet).getByRole('link', { name: 'Manage plans' })).toHaveAttribute('href', '/manage-plans');
+    expect(within(sheet).getByRole('link', { name: 'Add another goal' })).toHaveAttribute('href', '/purchase?exam=cbse');
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'My goals' })).not.toBeInTheDocument());
 
@@ -239,19 +243,32 @@ describe('board shell', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'My goals' })).not.toBeInTheDocument());
   });
 
-  it('opens the mobile menu drawer with the profile and account links', async () => {
+  it('opens the mobile menu drawer with the account menu and the navigation the bottom bar lacks', async () => {
     server.use(purchased(['cbse', 'CBSE'], ['neet-ug', 'NEET-UG']), account, studyPlan(false), plans(boardPlan()));
     renderShell('cbse');
-    await userEvent.click(await screen.findByRole('button', { name: 'Open account menu' }));
+    // The red "new" dot shows until the menu is opened once.
+    await userEvent.click(await screen.findByRole('button', { name: 'Open account menu (new: Medium)' }));
+    expect(localStorage.getItem('prepzy:account-menu-seen')).toBe('1');
     const drawer = screen.getByRole('dialog', { name: 'Menu' });
-    expect(await within(drawer).findByText('Asha Rao')).toBeInTheDocument();
-    expect(within(drawer).getByRole('link', { name: /Refer & Earn/ })).toHaveAttribute('href', '/cbse/refer-and-earn');
-    expect(within(drawer).getByRole('link', { name: /Manage Plans/ })).toHaveAttribute('href', '/cbse/plans');
+    expect(await within(drawer).findByRole('link', { name: 'My profile: Asha Rao' })).toHaveAttribute('href', '/cbse/profile');
+    expect(within(drawer).getByText('+91 98765 43210')).toBeInTheDocument();
+    expect(within(drawer).getByRole('link', { name: /Manage Plans/ })).toHaveAttribute('href', '/manage-plans');
+    // Study Plan and Refer & Earn aren't in the bottom bar, so the drawer keeps them (locks as in the sidebar).
+    const more = within(drawer).getByRole('navigation', { name: 'More' });
+    expect(within(more).getByRole('link', { name: /Refer & Earn/ })).toHaveAttribute('href', '/cbse/refer-and-earn');
+    expect(within(more).getByText('Study Plan').closest('[aria-disabled]')).not.toBeNull();
+    // Medium: English only, nothing to save.
+    await userEvent.click(within(drawer).getByRole('button', { name: 'Medium: English' }));
+    expect(within(drawer).getByRole('radio', { name: 'English' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(drawer).getByText('More languages are coming soon.')).toBeInTheDocument();
+    expect(within(drawer).getByRole('button', { name: 'Logout' })).toBeInTheDocument();
+    expect(within(drawer).queryByText('Delete Account')).not.toBeInTheDocument();
     // Classes and exams switch from the goals pill now.
     expect(within(drawer).queryByRole('button', { name: /CLASS 12/ })).not.toBeInTheDocument();
 
     await userEvent.click(within(drawer).getByRole('button', { name: 'Close menu' }));
     expect(screen.queryByRole('dialog', { name: 'Menu' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open account menu' })).toBeInTheDocument();
   });
 
   it('suggests topics while typing in the search box', async () => {
@@ -293,6 +310,20 @@ describe('board shell', () => {
     await userEvent.click(suggestion);
     expect(navigation.push).toHaveBeenCalledWith('/cbse/learn');
   });
+
+  it('submits the search with the arrow button, which is disabled while the box is empty', async () => {
+    server.use(purchased(['cbse', 'CBSE']), account, studyPlan(false), plans(boardPlan()));
+    renderShell('cbse');
+    await screen.findByText('Page');
+    const [arrow] = screen.getAllByRole('button', { name: 'Search' });
+    expect(arrow).toBeDisabled();
+    const [box] = screen.getAllByRole('combobox', { name: 'Search topics' });
+    await userEvent.type(box!, 'elec');
+    expect(arrow).toBeEnabled();
+    navigation.push.mockClear();
+    await userEvent.click(arrow!);
+    expect(navigation.push).toHaveBeenCalledWith('/cbse/learn');
+  });
 });
 
 describe('competitive shell', () => {
@@ -325,12 +356,6 @@ describe('competitive shell', () => {
           data: { purchases: [{ purchase_id: 9, plan_id: 5, duration_months: 12, status: 'active', display_name: 'Topper NEET-UG 2027 + CBSE' }] },
         }),
       ),
-      http.get(`${API}/api/v4/student/plans/2/summary`, () =>
-        HttpResponse.json({
-          success: true,
-          data: { planName: 'NEET Basic', planType: 'basic', status: 'ACTIVE', expiryDate: null, daysLeft: null, isFreeForever: true },
-        }),
-      ),
       http.post(`${API}/api/v4/auth/logout`, () => {
         loggedOut = true;
         return HttpResponse.json({ success: true, message: 'Logged out', data: null });
@@ -344,24 +369,31 @@ describe('competitive shell', () => {
     expect(within(rail).getByRole('link', { name: 'Custom Exam' })).toHaveAttribute('href', '/neet/custom-test');
     expect(within(rail).getByRole('button', { name: 'Daily Practice' })).toBeInTheDocument();
     expect(await screen.findByText('Topper NEET-UG 2027 + CBSE')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Manage plan' })).toHaveAttribute('href', '/neet/plans');
+    expect(screen.getByRole('link', { name: 'Manage plan' })).toHaveAttribute('href', '/manage-plans');
 
-    // Same header as board: the goals pill, no header links.
+    const dashboardPill = within(screen.getByRole('banner')).getByRole('link', { name: 'Dashboard' });
+    expect(dashboardPill).toHaveAttribute('href', '/neet/dashboard');
+    expect(dashboardPill).not.toHaveAttribute('aria-current');
+    // Same header as board, but the competitive pill names only the class (no "{Exam} · ").
     expect(screen.queryByRole('navigation', { name: 'Header' })).not.toBeInTheDocument();
-    const [pill] = await screen.findAllByRole('button', { name: 'My goals: NEET-UG · NEET' });
+    const [pill] = await screen.findAllByRole('button', { name: 'My goals: NEET' });
     await userEvent.click(pill!);
     const goals = await screen.findByRole('menu', { name: /My goals/ });
     expect(within(goals).getByRole('menuitem', { name: /^NEET-UG NEET, Topper plan/ })).toHaveAttribute('aria-current', 'true');
     expect(within(goals).getByRole('group', { name: 'CBSE' })).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
-    const menu = await screen.findByRole('menu');
-    expect(within(menu).getByText('Asha Rao')).toBeInTheDocument();
-    expect(await within(menu).findByText('Free forever')).toBeInTheDocument();
-    expect(within(menu).getByRole('link', { name: /Upgrade/ })).toHaveAttribute('href', '/neet/plans');
-    expect(within(menu).getByRole('menuitem', { name: /My Plans/ })).toHaveAttribute('href', '/neet/plans');
-    expect(within(menu).getByRole('menuitem', { name: /My Profile/ })).toHaveAttribute('href', '/neet/profile');
+    // The account menu: profile row, Medium (NEW), Manage Plans, Logout; the red dot clears once opened.
+    expect(screen.getAllByTestId('account-menu-dot')).toHaveLength(2); // desktop and mobile avatars
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu (new: Medium)' }));
+    const menu = await screen.findByRole('menu', { name: /Account menu/ });
+    expect(screen.queryByTestId('account-menu-dot')).not.toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'My profile: Asha Rao' })).toHaveAttribute('href', '/neet/profile');
+    expect(within(menu).getByText('+91 98765 43210')).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: 'Medium: English' })).toHaveAttribute('aria-haspopup', 'menu');
+    expect(within(menu).getByText('New')).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /Manage Plans/ })).toHaveAttribute('href', '/manage-plans');
+    expect(within(menu).queryByText(/Delete Account|My Plans|Free forever/)).not.toBeInTheDocument();
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Logout' }));
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/login'));
     expect(loggedOut).toBe(true);
@@ -386,14 +418,89 @@ describe('competitive shell', () => {
   });
 
   it('opens the mobile account panel', async () => {
+    localStorage.setItem('prepzy:account-menu-seen', '1');
     server.use(purchased(['neet-ug', 'NEET-UG']), account, neetPlan);
     renderShell('neet');
     await userEvent.click(await screen.findByRole('button', { name: 'Open account menu' }));
     const panel = screen.getByRole('dialog', { name: 'Account' });
-    expect(await within(panel).findByText('Asha Rao')).toBeInTheDocument();
-    expect(within(panel).getByRole('link', { name: /My Plans/ })).toHaveAttribute('href', '/neet/plans');
+    expect(await within(panel).findByRole('link', { name: 'My profile: Asha Rao' })).toHaveAttribute('href', '/neet/profile');
+    expect(within(panel).getByRole('link', { name: /Manage Plans/ })).toHaveAttribute('href', '/manage-plans');
+    expect(within(panel).queryByRole('navigation', { name: 'More' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Open account menu' }));
     expect(screen.queryByRole('dialog', { name: 'Account' })).not.toBeInTheDocument();
+  });
+});
+
+describe('account menu', () => {
+  it('formats Indian phone numbers and keeps others as stored', () => {
+    expect(formatPhone('+916303632127')).toBe('+91 63036 32127');
+    expect(formatPhone('6303632127')).toBe('+91 63036 32127');
+    expect(formatPhone('+44 20 7946 0958')).toBe('+44 20 7946 0958');
+    expect(formatPhone('')).toBe('');
+  });
+
+  it('shows the Medium choice on desktop: English only, checked; no dot once the menu was opened before', async () => {
+    localStorage.setItem('prepzy:account-menu-seen', '1');
+    navigation.pathname = '/cbse/dashboard';
+    server.use(purchased(['cbse', 'CBSE']), account, plans(boardPlan()), studyPlan(false));
+    renderShell('cbse');
+    await screen.findByText('Page');
+    expect(screen.queryByTestId('account-menu-dot')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    const menu = await screen.findByRole('menu', { name: 'Account menu' });
+    within(menu).getByRole('menuitem', { name: 'Medium: English' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    const medium = await screen.findByRole('menu', { name: 'Medium: English' });
+    expect(within(medium).getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(medium).getAllByRole('menuitemradio')).toHaveLength(1);
+    expect(within(medium).getByText('More languages are coming soon.')).toBeInTheDocument();
+  });
+});
+
+describe('AccountFrame (/manage-plans)', () => {
+  afterEach(() => {
+    document.cookie = 'prepzy_exam=; path=/; max-age=0';
+  });
+
+  it('uses the remembered exam the student owns: its header and pill, no sidebar', async () => {
+    document.cookie = 'prepzy_exam=neet; path=/';
+    navigation.pathname = '/manage-plans';
+    server.use(purchased(['cbse', 'CBSE'], ['neet-ug', 'NEET-UG']), account, plansByExam({ 2: [boardPlan({ plan_id: 7, class_name: 'CLASS 12', stream_name: '' })] }));
+    const { container } = renderWithProviders(
+      <AccountFrame>
+        <p>Plans page</p>
+      </AccountFrame>,
+    );
+    expect(await screen.findByText('Plans page')).toBeInTheDocument();
+    expect(container.querySelector('[data-theme="competitive"]')).not.toBeNull();
+    expect((await screen.findAllByRole('button', { name: 'My goals: Class 12' })).length).toBeGreaterThan(0);
+    // Competitive keeps its mobile navigation drawer, without the desktop rail.
+    expect(screen.getByRole('button', { name: 'Open navigation' })).toBeInTheDocument();
+    expect(container.querySelector('aside')).toHaveClass('md:hidden');
+  });
+
+  it('falls back to the first owned exam (board: no navigation), and to the bare header without exams', async () => {
+    document.cookie = 'prepzy_exam=neet; path=/';
+    server.use(purchased(['cbse', 'CBSE']), account, plans(boardPlan()));
+    const { container, unmount } = renderWithProviders(
+      <AccountFrame>
+        <p>Plans page</p>
+      </AccountFrame>,
+    );
+    expect(await screen.findByText('Plans page')).toBeInTheDocument();
+    expect(container.querySelector('[data-theme="board"]')).not.toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open navigation' })).not.toBeInTheDocument();
+    unmount();
+
+    server.use(purchased());
+    renderWithProviders(
+      <AccountFrame>
+        <p>Plans page</p>
+      </AccountFrame>,
+    );
+    expect(await screen.findByText('Plans page')).toBeInTheDocument();
+    expect(screen.getByRole('banner')).toBeInTheDocument();
   });
 });
 

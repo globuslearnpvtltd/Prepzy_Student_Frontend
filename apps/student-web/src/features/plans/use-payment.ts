@@ -1,5 +1,6 @@
 'use client';
 
+import { colorValue } from '@prepzy/design-system';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { env } from '@/shared/config/env';
 import type { ExamRef } from '@/shared/config/exams';
@@ -31,7 +32,8 @@ export interface FailedPayment {
 }
 
 interface Options {
-  exam: ExamRef;
+  /** The exam to sell (null until the student picks one: nothing can be paid then). */
+  exam: ExamRef | null;
   coupon: string | null;
   /** Line shown in the Razorpay sheet. */
   describe: (plan: Plan) => string;
@@ -95,6 +97,8 @@ export function usePayment({ exam, coupon, describe, prefill }: Options) {
   const [pending, setPending] = useState<PendingPayment | null>(null);
   const [failed, setFailed] = useState<FailedPayment | null>(null);
   const [succeeded, setSucceeded] = useState<Plan | null>(null);
+  /** The exam of the plan that succeeded (where "Start learning" goes). */
+  const [succeededExam, setSucceededExam] = useState<ExamRef | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const live = useRef(true);
   useEffect(() => {
@@ -116,8 +120,10 @@ export function usePayment({ exam, coupon, describe, prefill }: Options) {
     if (status === 'pending' || !live.current) return;
     forgetPending();
     setPending(null);
-    if (status === 'paid') setSucceeded(payment.plan);
-    else setFailed({ plan: payment.plan, exam: payment.exam, transactionId: payment.transactionId, attemptedAt: new Date(), reason: null });
+    if (status === 'paid') {
+      setSucceeded(payment.plan);
+      setSucceededExam(payment.exam);
+    } else setFailed({ plan: payment.plan, exam: payment.exam, transactionId: payment.transactionId, attemptedAt: new Date(), reason: null });
   }, []);
 
   /** Asks the server, which reconciles the order with Razorpay. Errors count as "still pending". */
@@ -151,8 +157,13 @@ export function usePayment({ exam, coupon, describe, prefill }: Options) {
     if (status === 'pending') setAttempts(VERIFY_RETRY_DELAYS.length);
   };
 
-  const pay = async (plan: Plan, forExam: ExamRef = exam) => {
-    if (busy) return;
+  const succeed = (plan: Plan, forExam: ExamRef) => {
+    setSucceeded(plan);
+    setSucceededExam(forExam);
+  };
+
+  const pay = async (plan: Plan, forExam: ExamRef | null = exam) => {
+    if (busy || !forExam) return;
     setBusy(true);
     setFailed(null);
     setWarning(null);
@@ -160,13 +171,13 @@ export function usePayment({ exam, coupon, describe, prefill }: Options) {
     try {
       if (plan.isFree) {
         await plansApi.activateFree(forExam, plan);
-        setSucceeded(plan);
+        succeed(plan, forExam);
         return;
       }
       const order = await plansApi.createOrder(forExam, { priceId: plan.priceId, coupon });
       // A 100% coupon: the server fulfilled the order already.
       if (order.status === 'paid') {
-        setSucceeded(plan);
+        succeed(plan, forExam);
         return;
       }
       const key = order.keyId || env.razorpayKeyId;
@@ -194,7 +205,7 @@ export function usePayment({ exam, coupon, describe, prefill }: Options) {
         description: describe(plan),
         order_id: order.orderId,
         prefill,
-        theme: { color: '#3D348B' },
+        theme: { color: colorValue('brand') },
         handler: async (payment) => {
           recorded = true;
           const pendingPayment: PendingPayment = {
@@ -213,7 +224,7 @@ export function usePayment({ exam, coupon, describe, prefill }: Options) {
           setBusy(false);
           if (!live.current) return;
           if (status === 'paid') {
-            setSucceeded(plan);
+            succeed(plan, forExam);
           } else {
             savePending(pendingPayment);
             setAttempts(0);
@@ -253,6 +264,7 @@ export function usePayment({ exam, coupon, describe, prefill }: Options) {
     pending,
     failed,
     succeeded,
+    succeededExam,
     warning,
     pay,
     recheck,

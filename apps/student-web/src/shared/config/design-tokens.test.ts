@@ -84,4 +84,16 @@ describe('design tokens', () => {
     );
     expect([...new Set(problems)]).toEqual([]);
   });
+
+  it('no raw hex colour in app code: colours come from design.config.ts (classes or var(--color-…))', () => {
+    // Multi-colour illustrations ported as-is from the previous app.
+    const ALLOWED = new Set(['features/schools/components/icons.tsx']);
+    const HEX = /#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\b/gi;
+    const root = join(process.cwd(), 'src');
+    const found = sourceFiles(root)
+      .map((file) => file.slice(root.length + 1).split('\\').join('/'))
+      .filter((file) => !ALLOWED.has(file))
+      .flatMap((file) => (readFileSync(join(root, file), 'utf8').match(HEX) ?? []).map((hex) => `${file}: ${hex}`));
+    expect([...new Set(found)]).toEqual([]);
+  });
 });

@@ -21,6 +21,13 @@ export function rememberExam(slug: string) {
   document.cookie = `${EXAM_COOKIE}=${encodeURIComponent(slug)}; path=/; max-age=31536000; samesite=lax`;
 }
 
+/** The remembered exam's slug (null when none, or outside the browser). */
+export function rememberedExam(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.split('; ').find((part) => part.startsWith(`${EXAM_COOKIE}=`));
+  return match ? decodeURIComponent(match.slice(EXAM_COOKIE.length + 1)) || null : null;
+}
+
 export function forgetExam() {
   document.cookie = `${EXAM_COOKIE}=; path=/; max-age=0; samesite=lax`;
 }

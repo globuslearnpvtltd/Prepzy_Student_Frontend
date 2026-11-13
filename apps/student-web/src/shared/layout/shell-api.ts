@@ -1,13 +1,13 @@
 'use client';
 
-import { assessmentsApiBase, type ExamRef } from '@/shared/config/exams';
+import { assessmentsApiBase } from '@/shared/config/exams';
 import { useQuery } from '@tanstack/react-query';
 import type { ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk } from '@/shared/lib/unwrap';
 
-/** Backend calls the app shell needs (sidebar locks, search, daily practice, plan summary). */
+/** Backend calls the app shell needs (sidebar locks, search, daily practice). */
 
 type Envelope<T> = { success?: boolean; message?: string; data?: T };
 
@@ -38,15 +38,6 @@ export interface LiveDpp {
   attempted: number;
   subjects: string[];
   attempt: { status: 'submitted' | 'in_progress'; attemptId: string } | null;
-}
-
-export interface PlanSummary {
-  planName: string;
-  planType: 'basic' | 'topper';
-  status: string;
-  expiryDate: string | null;
-  daysLeft: number | null;
-  isFreeForever: boolean;
 }
 
 /** Backend subject names look like "NEET-PHYSICS"; the UI shows "Physics". */
@@ -148,18 +139,12 @@ export const shellApi = {
     const id = body.data?.[0]?.first_dpp_id;
     return id ? String(id) : null;
   },
-
-  async planSummary(exam: Pick<ExamRef, 'examId'>): Promise<PlanSummary | null> {
-    const body = assertOk(await apiClient.get<Envelope<PlanSummary>>(`/api/v4/student/plans/${exam.examId}/summary`));
-    return body.data && typeof body.data === 'object' && 'planName' in body.data ? body.data : null;
-  },
 };
 
 export const shellKeys = {
   studyPlan: (classId: number | null) => ['shell', 'study-plan', classId] as const,
   search: (exam: string, query: string, classId: number | null) => ['shell', 'search', exam, query, classId] as const,
   liveDpp: (exam: string) => ['shell', 'live-dpp', exam] as const,
-  planSummary: (exam: string) => ['shell', 'plan-summary', exam] as const,
 };
 
 export function useHasStudyPlan(classId: number | null) {
@@ -173,14 +158,4 @@ export function useHasStudyPlan(classId: number | null) {
 
 export function useLiveDpp(exam: ExamConfig) {
   return useQuery({ queryKey: shellKeys.liveDpp(exam.slug), queryFn: () => shellApi.liveDpp(exam) });
-}
-
-/** Plan summary shown in the account menu (competitive exams only), for the current exam. */
-export function usePlanSummary(exam: ExamConfig | null) {
-  return useQuery({
-    queryKey: shellKeys.planSummary(exam?.slug ?? ''),
-    queryFn: () => shellApi.planSummary(exam!),
-    enabled: exam?.category === 'competitive',
-    staleTime: 5 * 60_000,
-  });
 }

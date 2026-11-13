@@ -2,17 +2,16 @@
 
 import { cx } from '@prepzy/design-system';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, ChevronDown, MessageCircle, Users } from 'lucide-react';
+import { BookOpen, ChevronDown, MessageCircle, Users } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useActivePlan, useCurrentUser, type ActivePlan } from '@/features/auth';
+import { useActivePlan, type ActivePlan } from '@/features/auth';
 import { useActivePlanName } from '@/features/plans';
 import { hasTestType } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { dashboardApi, syllabusCards, type ContinueTest } from './api';
 import {
-  boardOverviewQuery,
   ProgressBar,
   SectionError,
   useDashboardContext,
@@ -123,7 +122,7 @@ export function PlanBanner() {
         {expanded && <p className={cx('mt-1.5 text-[14px] leading-5', tone.soft)}>{subline}</p>}
         {cta && (
           <Link
-            href={routes.plans(exam.slug)}
+            href={routes.managePlans()}
             className="bg-accent-400 text-on-brand mt-4 flex w-full items-center justify-center rounded-[14px] px-[18px] py-3 text-[14px] font-bold md:h-[38px] md:w-[146px] md:p-0"
           >
             {state === 'ended' ? 'View plans' : 'Upgrade Plan'}
@@ -235,49 +234,6 @@ export function ContinueAssessment() {
 }
 
 /* --------------------------------- Right column --------------------------------- */
-
-export function ProfileCard() {
-  const { exam, classId } = useDashboardContext();
-  const user = useCurrentUser();
-  const overview = useQuery({ ...boardOverviewQuery(exam, classId), enabled: classId !== null });
-  const profile = overview.data?.profile;
-  const name = user.data ? `Hey ${[user.data.firstName, user.data.lastName].filter(Boolean).join(' ')}` : 'Hey there!';
-  const initials = profile?.initials ?? `${user.data?.firstName.charAt(0) ?? ''}${user.data?.lastName.charAt(0) ?? ''}`;
-  const percent = profile?.percent ?? 0;
-  return (
-    <section aria-label="Your profile" className="border-info-soft bg-surface hidden items-center gap-5 rounded-xl border-[1.5px] p-5 md:flex">
-      <span className="bg-accent-500 text-on-brand flex size-[76px] shrink-0 items-center justify-center overflow-hidden rounded-lg text-[16px] font-semibold">
-        {profile?.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={profile.image} alt="" className="size-full object-cover" />
-        ) : (
-          initials.toUpperCase()
-        )}
-      </span>
-      <div className="flex min-w-0 grow flex-col gap-2 py-2">
-        <p className="text-neutral-850 text-center text-[20px] leading-5 font-bold">
-          {name.length > 16 ? `${name.slice(0, 16)}...` : name}
-        </p>
-        <p className="text-foreground flex items-center gap-2 text-[14px] font-semibold">
-          <span
-            role="progressbar"
-            aria-label="Profile completion"
-            aria-valuenow={percent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            className="bg-canvas h-3 w-[85%] overflow-hidden rounded-full"
-          >
-            <span className="bg-brand block h-full rounded-full" style={{ width: `${percent}%` }} />
-          </span>
-          {percent}%
-        </p>
-        <Link href={routes.profile(exam.slug)} className="text-neutral-450 flex items-center gap-1 text-[12px] font-semibold">
-          Complete Profile <ArrowRight aria-hidden className="size-3.5" />
-        </Link>
-      </div>
-    </section>
-  );
-}
 
 /** Socrates (step-by-step solver) card with the concept-card illustration. */
 export function SolverDiscovery() {

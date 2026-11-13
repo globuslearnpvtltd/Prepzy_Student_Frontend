@@ -33,7 +33,7 @@ export function DailyPractice() {
   const today = live.data;
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-6 pt-6 lg:pt-4">
+    <div className="flex flex-col gap-6">
       <HubBreadcrumb label="Daily Practice" />
       <h1 className="text-brand text-2xl font-bold">Daily Practice</h1>
 

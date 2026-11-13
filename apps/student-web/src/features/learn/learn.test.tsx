@@ -455,7 +455,7 @@ describe('Courses', () => {
       http.get(`${API}/api/v4/learn/classes/subscribed`, () => HttpResponse.json({}, { status: 500 })),
     );
     renderWithProviders(<CourseDetailScreen courseId="7" />, { exam: cbse });
-    expect(await screen.findByRole('link', { name: 'Enroll Now' })).toHaveAttribute('href', '/cbse/plans');
+    expect(await screen.findByRole('link', { name: 'Enroll Now' })).toHaveAttribute('href', '/manage-plans');
 
     server.use(http.get(`${API}/api/v4/learn/courses/9`, () => HttpResponse.json({}, { status: 500 })));
     renderWithProviders(<CourseDetailScreen courseId="9" />, { exam: cbse });

@@ -66,7 +66,8 @@ export function goalSubtitle(plan: ActivePlan): string {
 
 /**
  * Every goal of the student: each owned exam with its plans (one query per exam, shared with usePlans), the current
- * exam's selected class marked current. Also the label of the header pill ("CBSE · Class 8").
+ * exam's selected class marked current. Also the label of the header pill ("{Exam} · Class 8"; competitive exams show
+ * only the class).
  */
 export function useGoals(current: ExamConfig | null) {
   const owned = useOwnedExams();
@@ -101,7 +102,9 @@ export function useGoals(current: ExamConfig | null) {
 
   const examName = owned.find((o) => o.exam.slug === current?.slug)?.name ?? current?.label ?? REFERENCE.label;
   const plan = currentPlan as ActivePlan | null;
-  const label = current && plan ? `${examName} · ${classLabel(plan.className, plan.streamName)}` : examName;
+  // Board: "{Exam} · {Class}"; competitive: just the class ("Class 12"), the exam is clear from the page.
+  const planLabel = plan ? classLabel(plan.className, plan.streamName) : '';
+  const label = current && plan ? (current.category === 'competitive' ? planLabel || examName : `${examName} · ${planLabel}`) : examName;
   // Pages without an exam (reference books) manage plans of the student's first exam.
   const home = current ?? owned[0]?.exam ?? null;
   return { groups, label, home, hasGoals: owned.length > 0 };
@@ -194,7 +197,7 @@ function Pill({ label, open, compact = false, ...props }: { label: string; open:
   );
 }
 
-/** Desktop: the "{Exam} · {Class}" pill opening the "My goals" dropdown. */
+/** Desktop: the goals pill ("{Exam} · {Class}"; competitive: "{Class}") opening the "My goals" dropdown. */
 export function GoalMenu({ exam }: { exam: ExamConfig | null }) {
   const { groups, label, home, hasGoals } = useGoals(exam);
   const switchGoal = useSwitchGoal();
@@ -216,7 +219,7 @@ export function GoalMenu({ exam }: { exam: ExamConfig | null }) {
             {home && (
               <DropdownMenu.Item asChild>
                 <Link
-                  href={routes.plans(home.slug)}
+                  href={routes.managePlans()}
                   className="text-brand rounded-md text-[13px] font-semibold outline-none hover:underline data-[highlighted]:underline"
                 >
                   Manage plans
@@ -287,7 +290,7 @@ export function GoalSheet({ exam }: { exam: ExamConfig | null }) {
           <DialogTitle className="text-ink text-[17px] leading-6 font-semibold">My goals</DialogTitle>
           <div className="flex items-center gap-3">
             {home && (
-              <Link href={routes.plans(home.slug)} onClick={close} className="text-brand px-1 py-2.5 text-[14px] font-semibold">
+              <Link href={routes.managePlans()} onClick={close} className="text-brand px-1 py-2.5 text-[14px] font-semibold">
                 Manage plans
               </Link>
             )}

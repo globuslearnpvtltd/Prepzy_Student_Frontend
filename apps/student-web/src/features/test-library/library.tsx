@@ -63,9 +63,11 @@ export function TestLibrary({ kind }: { kind: LibraryKind }) {
   const shown = filter === 'all' ? list : list.filter((s) => s.status === filter);
   const ongoing = shown.filter((s) => s.status === 'in-progress');
   const rest = shown.filter((s) => s.status !== 'in-progress');
+  const attempts = recent.data ?? [];
+  const hasSide = ongoing.length > 0 || attempts.length > 0;
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-6 pt-6 lg:pt-4">
+    <div className="flex flex-col gap-6">
       <HubBreadcrumb label={copy.crumb} />
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -116,21 +118,27 @@ export function TestLibrary({ kind }: { kind: LibraryKind }) {
       ) : list.length === 0 ? (
         <EmptyState title="No tests yet" text="New papers are added regularly. Check back soon." />
       ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="flex flex-col gap-4">
-            {ongoing.map((set) => (
-              <OngoingCard key={set.setId} set={set} />
-            ))}
-            <RecentAttempts attempts={recent.data ?? []} kind={kind} />
+        // The side column (ongoing tests, previous submissions) only when it has something; otherwise the papers
+        // take the full width. Paper columns follow the width the list gets (container query), not the viewport.
+        <div className={cx('grid items-start gap-4', hasSide && 'lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]')}>
+          {hasSide && (
+            <div className="flex flex-col gap-4">
+              {ongoing.map((set) => (
+                <OngoingCard key={set.setId} set={set} />
+              ))}
+              <RecentAttempts attempts={attempts} kind={kind} />
+            </div>
+          )}
+          <div className="@container">
+            <ul className="grid gap-4 @xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4">
+              {rest.map((set) => (
+                <li key={set.setId}>
+                  <SetCard set={set} kind={kind} />
+                </li>
+              ))}
+              {shown.length === 0 && <li className="text-foreground-muted text-sm">No tests match this filter.</li>}
+            </ul>
           </div>
-          <ul className="grid gap-4 sm:grid-cols-2">
-            {rest.map((set) => (
-              <li key={set.setId}>
-                <SetCard set={set} kind={kind} />
-              </li>
-            ))}
-            {shown.length === 0 && <li className="text-foreground-muted text-sm">No tests match this filter.</li>}
-          </ul>
         </div>
       )}
     </div>

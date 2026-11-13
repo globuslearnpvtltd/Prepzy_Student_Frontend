@@ -1,14 +1,11 @@
-import { renderHook, screen, waitFor, within } from '@testing-library/react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import type { ReactNode } from 'react';
-import { createTestQueryClient, renderWithProviders } from '@/test/render';
+import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
 import type { ApiPlan } from './catalog';
 import { Checkout } from './components/checkout/checkout';
-import { usePlanPayments } from './hooks';
 import type { RazorpayFailure, RazorpayOptions } from './razorpay';
 import { billingError, billingOk, billingUrl, quoteData } from '@/test/billing';
 import { testExam } from '@/test/exams';
@@ -120,7 +117,7 @@ describe('Checkout plan picker', () => {
 
   it('shows a loading panel, then switches class, stream and exam', async () => {
     server.use(...handlers());
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     expect(screen.getByLabelText('Loading plans')).toBeInTheDocument();
     // Class 10 is first and has nothing on sale yet.
     expect(await screen.findByText('No plans are live for this selection yet.')).toBeInTheDocument();
@@ -140,6 +137,9 @@ describe('Checkout plan picker', () => {
     expect(screen.getByRole('button', { name: /View less/ })).toHaveAttribute('aria-expanded', 'true');
 
     await userEvent.click(screen.getByRole('button', { name: /NEET/ }));
+    // Switching exam names it in the URL of the one common page (replace, not a new history entry).
+    expect(navigation.replace).toHaveBeenCalledWith('/purchase?exam=neet', { scroll: false });
+    expect(navigation.push).not.toHaveBeenCalled();
     expect(screen.getByText('Target year')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^NEET 2027/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /^Topper NEET UG Monthly$/ })).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe('Checkout plan picker', () => {
   it('asks for an exam when the link names one without plans', async () => {
     navigation.searchParams = new URLSearchParams('exam=unknown-exam');
     server.use(...handlers());
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     expect(await screen.findByText('Select your exam to explore the best plan for your preparation.')).toBeInTheDocument();
     expect(pressed(/^CBSE ?Prepare/)).toBe('false');
     expect(pressed(/^NEET UG ?Prepare/)).toBe('false');
@@ -178,15 +178,57 @@ describe('Checkout plan picker', () => {
   it('picks the exam of a ?exam= link by its id', async () => {
     navigation.searchParams = new URLSearchParams(`exam=${neet.examId}`);
     server.use(...handlers());
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     expect(await screen.findByText('Target year')).toBeInTheDocument();
     expect(pressed(/^NEET UG ?Prepare/)).toBe('true');
+  });
+
+  it('opens the remembered exam when the URL names none, else the first purchasable exam', async () => {
+    document.cookie = 'prepzy_exam=neet; path=/';
+    server.use(...handlers());
+    const { unmount } = renderWithProviders(<Checkout />);
+    expect(await screen.findByText('Target year')).toBeInTheDocument();
+    expect(pressed(/^NEET UG ?Prepare/)).toBe('true');
+    unmount();
+
+    document.cookie = 'prepzy_exam=; path=/; max-age=0';
+    renderWithProviders(<Checkout />);
+    await waitFor(() => expect(pressed(/^CBSE ?Prepare/)).toBe('true'));
+    expect(screen.getByText('Choose your class')).toBeInTheDocument();
+  });
+
+  it('lets ?exam= win over the remembered exam', async () => {
+    document.cookie = 'prepzy_exam=neet; path=/';
+    navigation.searchParams = new URLSearchParams('exam=cbse');
+    server.use(...handlers());
+    renderWithProviders(<Checkout />);
+    await waitFor(() => expect(pressed(/^CBSE ?Prepare/)).toBe('true'));
+    expect(screen.getByText('Choose your class')).toBeInTheDocument();
+  });
+
+  it('preselects the class of a link that names its exam (the routes helper’s URL)', async () => {
+    navigation.searchParams = new URLSearchParams('exam=cbse&CLASSID=11&stream_id=2');
+    server.use(...handlers());
+    renderWithProviders(<Checkout />);
+    expect(await screen.findByRole('button', { name: /^Topper CBSE Academic$/ })).toBeInTheDocument();
+    expect(pressed('Class 11')).toBe('true');
+    expect(pressed('PCB')).toBe('true');
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it('moves an old ?CLASSID= link to the exam that has that class, and names it in the URL', async () => {
+    navigation.searchParams = new URLSearchParams('CLASSID=20');
+    server.use(...handlers());
+    renderWithProviders(<Checkout />);
+    expect(await screen.findByText('Target year')).toBeInTheDocument();
+    expect(pressed(/^NEET UG ?Prepare/)).toBe('true');
+    expect(navigation.replace).toHaveBeenCalledWith('/purchase?exam=neet', { scroll: false });
   });
 
   it('preselects class and stream from an old link', async () => {
     navigation.searchParams = new URLSearchParams('CLASSID=11&stream_id=2');
     server.use(...handlers());
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     expect(await screen.findByRole('button', { name: /^Topper CBSE Academic$/ })).toBeInTheDocument();
     expect(pressed('PCB')).toBe('true');
     expect(pressed('Class 11')).toBe('true');
@@ -194,19 +236,19 @@ describe('Checkout plan picker', () => {
 
   it('preselects the student’s own class, and ignores an unknown one', async () => {
     server.use(...handlers({ account_id: 1, class: 12 }));
-    const { unmount } = renderWithProviders(<Checkout />, { exam: cbse });
+    const { unmount } = renderWithProviders(<Checkout />);
     await waitFor(() => expect(pressed('Class 12')).toBe('true'));
     unmount();
 
     navigation.searchParams = new URLSearchParams('class=99');
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     expect(await screen.findByText('No plans are live for this selection yet.')).toBeInTheDocument();
   });
 
   it('shows an error screen when the catalog fails', async () => {
     server.use(...handlers());
     server.use(http.get(billingUrl(cbse, '/catalog'), () => billingError(404, 'PURCHASE_NOT_AVAILABLE', 'Catalog offline')));
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     expect(await screen.findByText('Something Went Wrong')).toBeInTheDocument();
     expect(screen.getByText('Catalog offline')).toBeInTheDocument();
   });
@@ -238,7 +280,7 @@ describe('Checkout payment outcomes', () => {
   const markFailed = http.post(billingUrl(neet, '/orders/:id/fail'), ({ params }) => billingOk({ order_id: params.id, status: 'failed' }));
 
   async function reviewNeetMonthly() {
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     await userEvent.click(await screen.findByRole('button', { name: /^Topper NEET UG 2027$/ }));
     await userEvent.click(screen.getByRole('button', { name: /^Topper NEET UG Monthly$/ }));
     await userEvent.click(screen.getByRole('button', { name: /Continue with this plan/ }));
@@ -394,7 +436,7 @@ describe('Checkout with an active plan', () => {
     ];
     server.use(catalog(cbse, active), ...handlers({ account_id: 1, class: 12 }));
     window.scrollTo = vi.fn();
-    renderWithProviders(<Checkout />, { exam: cbse });
+    renderWithProviders(<Checkout />);
     await userEvent.click(await screen.findByRole('button', { name: /^Topper CBSE Monthly$/ }));
     expect(screen.getAllByText('Current plan').length).toBeGreaterThan(0);
     expect(screen.getByText('Your current active plan')).toBeInTheDocument();
@@ -405,15 +447,5 @@ describe('Checkout with an active plan', () => {
     // Another plan can still be chosen.
     await userEvent.click(screen.getByRole('button', { name: /^Topper CBSE Academic$/ }));
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
-  });
-});
-
-describe('usePlanPayments', () => {
-  it('stays idle without a plan', () => {
-    const client = createTestQueryClient();
-    const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-    const { result } = renderHook(() => usePlanPayments(cbse, null, 1), { wrapper });
-    expect(result.current.fetchStatus).toBe('idle');
-    expect(client.getQueryCache().find({ queryKey: ['plans', 'plan-payments', cbse.category, cbse.examId, 0, 1] })).toBeDefined();
   });
 });

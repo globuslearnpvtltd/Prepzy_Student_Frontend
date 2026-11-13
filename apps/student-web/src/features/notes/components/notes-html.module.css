@@ -1,27 +1,65 @@
 /*
- * Study-notes HTML from the content team uses these class names (exam-tip-box, example-box …). The previous app
- * injected the same stylesheet globally; here it is scoped to the notes body and reads design tokens.
+ * Study-notes HTML from the content team uses these class names (content-card, exam-tip-box, example-box …). The
+ * previous app injected the same stylesheet globally; here it is scoped to the notes body and reads design tokens.
+ * Phones get a smaller type scale; nothing may widen the page (tables scroll in their own box, see document.ts).
  */
 .notes {
-  color: var(--color-neutral-800);
-  line-height: 1.6;
-  font-size: 1rem;
+  color: var(--color-neutral-700);
+  line-height: 1.65;
+  font-size: 0.875rem;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
-.notes :global(a) { color: var(--color-brand); }
-.notes :global(:is(h1, h2, h3, h4)) { color: var(--color-brand); margin: 0 0 0.75rem; font-weight: 700; line-height: 1.2; }
-.notes :global(h1) { font-size: 2rem; }
-.notes :global(h2) { font-size: 1.5rem; border-bottom: 2px solid var(--color-accent-500); padding-bottom: 0.3rem; margin-top: 1rem; }
-.notes :global(h3) { font-size: 1.25rem; margin-top: 1rem; }
-.notes :global(h4) { font-size: 1.1rem; margin-top: 1rem; color: var(--color-accent-500); }
+.notes > :global(:first-child),
+.notes :global(.content-card) > :global(:first-child) { margin-top: 0; }
+.notes :global([id]) { scroll-margin-top: 96px; }
+.notes :global(a) { color: var(--color-brand); text-decoration: underline; text-underline-offset: 2px; }
+.notes :global(:is(h1, h2, h3, h4)) { color: var(--color-brand); margin: 1.25rem 0 0.5rem; font-weight: 700; line-height: 1.3; }
+.notes :global(h1) { font-size: 1.25rem; }
+.notes :global(h2) { font-size: 1.0625rem; border-bottom: 2px solid var(--color-accent-500); padding-bottom: 0.5rem; margin-top: 1.75rem; margin-bottom: 0.875rem; }
+.notes :global(h3) { font-size: 0.9375rem; font-weight: 600; }
+.notes :global(h4) { font-size: 0.875rem; font-weight: 600; color: var(--color-accent-800); }
 .notes :global(p) { margin: 0 0 0.75rem; }
-.notes :global(ul) { list-style: disc; padding-left: 1.5rem; margin: 0 0 0.75rem; }
-.notes :global(ol) { list-style: decimal; padding-left: 1.5rem; margin: 0 0 0.75rem; }
-.notes :global(img) { display: block; max-width: 100%; height: auto; margin: 1rem auto; border-radius: var(--radius-sm); }
-.notes :global(.figure-title) { text-align: center; font-size: 0.9rem; color: var(--color-neutral-550); margin: 0.25rem 0 1rem; font-style: italic; }
-.notes :global(.content-card) { background: var(--color-surface); border-radius: var(--radius-md); box-shadow: var(--shadow-card); padding: 1.5rem 2rem; }
-.notes :global(.exam-tip-box) { background: var(--color-accent-100); border-left: 5px solid var(--color-accent-500); padding: 1rem 1.25rem; border-radius: var(--radius-sm); margin: 1rem 0; color: var(--color-accent-800); font-weight: 600; }
-.notes :global(.example-box) { background: var(--color-learn-notes); border-left: 5px solid var(--color-brand); padding: 1rem 1.25rem; border-radius: var(--radius-sm); margin: 1rem 0; color: var(--color-brand); font-weight: 600; }
-.notes :global(.study-alert-box) { background: var(--color-danger-soft); border-left: 5px solid var(--color-danger); padding: 1rem 1.25rem; border-radius: var(--radius-sm); margin: 1rem 0; color: var(--color-danger); font-weight: 600; }
-.notes :global(table) { border-collapse: collapse; width: 100%; min-width: 320px; font-size: 0.95rem; color: var(--color-neutral-700); }
-.notes :global(:is(th, td)) { border: 1px solid var(--color-neutral-300); padding: 0.5rem 0.75rem; }
-.notes :global(th) { background: var(--color-learn-notes); color: var(--color-brand); }
+.notes :global(:is(strong, b)) { color: var(--color-neutral-900); font-weight: 600; }
+.notes :global(ul) { list-style: disc; padding-left: 1.25rem; margin: 0 0 0.75rem; }
+.notes :global(ol) { list-style: decimal; padding-left: 1.25rem; margin: 0 0 0.75rem; }
+.notes :global(li) { margin: 0.25rem 0; }
+.notes :global(li::marker) { color: var(--color-brand); }
+.notes :global(:is(img, video, iframe, svg, figure, canvas)) { max-width: 100%; }
+.notes :global(img) { display: block; height: auto; margin: 1rem auto; border-radius: var(--radius-sm); }
+.notes :global(.figure-title) { text-align: center; font-size: 0.8125rem; color: var(--color-neutral-550); margin: 0.25rem 0 1rem; font-style: italic; }
+.notes :global(:is(pre, code)) { font-family: var(--font-mono); font-size: 0.8125rem; }
+.notes :global(pre) { overflow-x: auto; background: var(--color-neutral-100); padding: 0.75rem; border-radius: var(--radius-sm); }
+.notes :global(blockquote) { border-left: 3px solid var(--color-brand-200); padding-left: 0.875rem; color: var(--color-neutral-600); margin: 1rem 0; }
+.notes :global(hr) { border: 0; border-top: 1px solid var(--color-neutral-150); margin: 1.5rem 0; }
+
+/* The notes come as one or more content cards; the page already draws the card, so they become sections. */
+.notes :global(.content-card) { background: none; box-shadow: none; padding: 0; border-radius: 0; }
+.notes :global(.content-card + .content-card) { margin-top: 2rem; }
+/* Layout pieces of the generated standalone page, in case a chapter was saved with them: the reader has its own. */
+.notes :global(:is(.navbar, .sidebar, footer.footer)) { display: none; }
+.notes :global(:is(.main-container, .content-area)) { display: block; padding: 0; margin: 0; max-width: none; }
+
+.notes :global(:is(.exam-tip-box, .example-box, .study-alert-box)) { padding: 0.75rem 1rem; border-left: 4px solid; border-radius: var(--radius-sm); margin: 1rem 0; font-weight: 500; }
+.notes :global(.exam-tip-box) { background: var(--color-accent-100); border-color: var(--color-accent-500); color: var(--color-accent-800); }
+.notes :global(.example-box) { background: var(--color-learn-notes); border-color: var(--color-brand); color: var(--color-brand); }
+.notes :global(.study-alert-box) { background: var(--color-danger-soft); border-color: var(--color-danger); color: var(--color-danger); }
+
+.notes :global(.table-scroll) { overflow-x: auto; margin: 1rem 0; border-radius: var(--radius-sm); -webkit-overflow-scrolling: touch; }
+.notes :global(table) { display: table; max-width: none; overflow: visible; border-collapse: collapse; width: 100%; font-size: 0.8125rem; color: var(--color-neutral-700); }
+.notes :global(:is(th, td)) { border: 1px solid var(--color-neutral-300); padding: 0.5rem 0.625rem; text-align: left; vertical-align: top; min-width: 6rem; }
+.notes :global(th) { background: var(--color-learn-notes); color: var(--color-brand); font-weight: 600; }
+
+/* Maths (MathJax): long display formulas scroll sideways. */
+.notes :global(mjx-container[display='true']) { display: block; overflow-x: auto; overflow-y: hidden; max-width: 100%; padding: 0.25rem 0; }
+
+@media (min-width: 768px) {
+  .notes { font-size: 1rem; line-height: 1.7; }
+  .notes :global(h1) { font-size: 1.75rem; }
+  .notes :global(h2) { font-size: 1.375rem; margin-top: 2.25rem; }
+  .notes :global(h3) { font-size: 1.125rem; }
+  .notes :global(h4) { font-size: 1rem; }
+  .notes :global(:is(.exam-tip-box, .example-box, .study-alert-box)) { padding: 1rem 1.25rem; }
+  .notes :global(table) { font-size: 0.9375rem; }
+  .notes :global(:is(th, td)) { padding: 0.625rem 0.875rem; }
+}

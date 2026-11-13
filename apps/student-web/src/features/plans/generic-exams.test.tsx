@@ -2,12 +2,12 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { ExamConfig } from '@/shared/config/exams';
-import { billingOk, billingUrl, paymentDto, purchaseDto, quoteData } from '@/test/billing';
+import { billingOk, billingUrl, overviewHistoryDto, overviewPlanDto, overviewUrl, quoteData } from '@/test/billing';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
 import { Checkout } from './components/checkout/checkout';
-import { ManagePlans } from './components/manage-plans';
+import { ManagePlans } from './components/manage/manage-plans';
 import type { RazorpayOptions } from './razorpay';
 
 /**
@@ -138,7 +138,7 @@ describe('a new board and competitive exam (DB rows only)', () => {
       }),
       http.post(billingUrl(jee, '/orders/order_j/verify'), () => billingOk({ order_id: 'order_j', status: 'paid', purchase: {} })),
     );
-    renderWithProviders(<Checkout />, { exam: icse });
+    renderWithProviders(<Checkout />);
 
     // The student's class 10 of the page's exam is preselected; the reference exam has no card.
     expect(await screen.findByRole('button', { name: /^Topper ICSE Academic$/ })).toBeInTheDocument();
@@ -151,6 +151,8 @@ describe('a new board and competitive exam (DB rows only)', () => {
     noOtherExam();
 
     await userEvent.click(screen.getByRole('button', { name: /^JEE ?Prepare for your entrance exam/ }));
+    // The exam is named in the URL by its slice (the app has no route for it), replacing the history entry.
+    expect(navigation.replace).toHaveBeenCalledWith('/purchase?exam=jee', { scroll: false });
     expect(screen.getByText('Target year')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^JEE 2027/ })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(screen.getByRole('switch', { name: 'Add ICSE' }));
@@ -169,43 +171,68 @@ describe('a new board and competitive exam (DB rows only)', () => {
     expect(options!.description).toBe('Topper JEE + ICSE Monthly · 1 Month · JEE 2027 + ICSE');
     options!.handler({ razorpay_payment_id: 'p', razorpay_order_id: 'order_j', razorpay_signature: 's' });
     expect(await screen.findByText('Payment Successful')).toBeInTheDocument();
-    // The app has no pages for this exam yet, so the student lands on the page's exam.
+    // The app has no pages for this exam yet (and nothing is remembered), so the student lands on Manage Plans.
     await userEvent.click(screen.getByRole('button', { name: 'Start learning' }));
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/icse/dashboard'));
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/manage-plans'));
   });
 
-  it('manages the new exam\'s plans on the common page', async () => {
+  it('opens a new exam named by its slice in ?exam= on the common /purchase page', async () => {
+    navigation.searchParams = new URLSearchParams('exam=jee');
+    server.use(...handlers());
+    renderWithProviders(<Checkout />);
+    expect(await screen.findByText('Target year')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^JEE ?Prepare for your entrance exam/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^ICSE ?Prepare/ })).toHaveAttribute('aria-pressed', 'false');
+    navigation.searchParams = new URLSearchParams();
+  });
+
+  it('manages the new exams\' plans on the common page, named by the API, acting on each plan\'s own exam', async () => {
+    let extended: unknown = null;
     server.use(
-      http.get(billingUrl(jee, '/purchases'), () =>
+      http.get(overviewUrl, () =>
         billingOk({
-          purchases: [
-            purchaseDto({
-              purchase_id: 5,
-              plan_id: 92,
-              exam_id: 9,
-              class_id: 30,
-              class_name: 'JEE',
-              stream_name: null,
-              display_name: 'Topper JEE + ICSE Monthly',
-              exam_title: 'JEE',
-              category: 'competitive',
-              tier: 'monthly',
-              is_free: false,
-              courses: [{ class_id: 11, class_name: 'Class 11 PCM', exam_title: 'ICSE' }],
+          active: [
+            overviewPlanDto({
+              exam_id: 9, exam_name: 'JEE', exam_slice: 'jee', category: 'competitive', group_key: 'target_year',
+              class_id: 30, class_title: 'JEE', target_year: 2027, scope_label: 'JEE 2027', purchase_id: 5, plan_id: 92,
+              plan_name: 'Topper JEE + ICSE Monthly', cancel_falls_back_to_basic: true,
+              history: [overviewHistoryDto({ plan_id: 92, invoice_number: 'J-1', plan_name: 'Topper JEE + ICSE Monthly' })],
             }),
+            overviewPlanDto({
+              exam_id: 7, exam_name: 'ICSE', exam_slice: 'icse', class_id: 10, class_title: 'Class 10', scope_label: 'Class 10',
+              purchase_id: 6, plan_id: 70, plan_name: 'Basic ICSE', tier: 'basic', duration_months: 0, paid_amount: 0,
+              is_free: true, expiry_date: null, history: [],
+            }),
+          ],
+          expired: [
+            {
+              ...overviewHistoryDto({ payment_history_id: 400, plan_id: 71, invoice_number: 'I-400', plan_name: 'Topper ICSE Monthly', purchase_status: 'expired', ended_on: '2026-05-01T00:00:00.000Z' }),
+              exam_id: 7, exam_name: 'ICSE', exam_slice: 'icse', category: 'board', group_key: 'class', class_title: 'Class 11', scope_label: 'Class 11 PCM',
+            },
           ],
         }),
       ),
-      http.get(billingUrl(jee, '/payments'), () =>
-        billingOk({ payments: [paymentDto({ description: 'x', display_name: 'Topper JEE + ICSE Monthly', invoice_number: 'J-1' })] }),
-      ),
+      http.post(billingUrl(jee, '/extensions'), async ({ request }) => {
+        extended = await request.json();
+        return billingOk({ months: 1, expiry_date: '2026-08-10T06:00:00.000Z' });
+      }),
     );
-    renderWithProviders(<ManagePlans />, { exam: jee });
-    expect(await screen.findByRole('heading', { name: 'Topper JEE + ICSE Monthly' })).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'Included courses' })).toHaveTextContent('ICSE · Class 11 PCM');
-    expect(screen.getByRole('link', { name: 'Upgrade' })).toHaveAttribute('href', '/jee/plans/purchase?CLASSID=30');
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    expect(await within(screen.getByRole('table', { name: 'Billing history' })).findByText('J-1')).toBeInTheDocument();
+    renderWithProviders(<ManagePlans />, { exam: icse });
+    expect((await screen.findAllByText('Topper JEE + ICSE Monthly')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('JEE 2027').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('ICSE · Class 10').length).toBeGreaterThan(0);
+    // One filter chip per exam, from the API.
+    expect(screen.getByRole('button', { name: 'JEE' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'ICSE' }));
+    expect(screen.queryByText('Topper JEE + ICSE Monthly')).toBeNull();
+    expect(screen.getAllByText('Topper ICSE Monthly · Class 11 PCM · ended 1 May 2026').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: 'All courses' }));
+    // The extension goes to the plan's own exam (category + id from the API).
+    await userEvent.click(screen.getAllByRole('button', { name: 'Extend plan' })[0]!);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Coupon code' }), 'more');
+    await userEvent.click(screen.getByRole('button', { name: 'Extend' }));
+    expect(await screen.findByRole('heading', { name: 'Plan extended' })).toBeInTheDocument();
+    expect(extended).toEqual({ coupon_code: 'more', purchase_id: 5 });
     noOtherExam();
   });
 });

@@ -73,7 +73,7 @@ function PlanCard({ exam, onNavigate }: { exam: ExamConfig; onNavigate: () => vo
           </>
         )}
         <Link
-          href={routes.plans(exam.slug)}
+          href={routes.managePlans()}
           onClick={onNavigate}
           className="text-brand mt-2 inline-block text-[13px] font-semibold hover:underline"
         >

@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./config": "./design.config.ts",
+    "./runtime": "./src/config/runtime.ts",
     "./styles.css": "./src/styles/design-system.css"
   },
   "sideEffects": [

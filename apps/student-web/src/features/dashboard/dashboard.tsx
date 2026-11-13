@@ -10,7 +10,6 @@ import {
   ContinueAssessment,
   LinkParentCard,
   PlanBanner,
-  ProfileCard,
   ReferEarnTeaser,
   SolverDiscovery,
   SyllabusCards,
@@ -40,7 +39,7 @@ export const DASHBOARD_WIDGETS: Record<ExamCategory, DashboardLayout> = {
       },
       {
         className: 'flex w-full min-w-0 flex-col gap-5 md:w-[30%]',
-        widgets: [ProfileCard, SolverDiscovery, LinkParentCard, ReferEarnTeaser, SyllabusCards],
+        widgets: [SolverDiscovery, LinkParentCard, ReferEarnTeaser, SyllabusCards],
       },
     ],
   },

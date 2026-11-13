@@ -72,7 +72,7 @@ export function ReferAndEarn() {
   const basic = rewardFor(rate, 'free');
   const topper = rewardFor(rate, 'paid');
   const hasFriends = friends.length > 0;
-  const plansHref = routes.plans(exam.slug);
+  const plansHref = routes.managePlans();
 
   const share = () => {
     window.open(whatsappUrl(shareMessage(exam, summary.shareLink, summary.friendJoinCredit)), '_blank', 'noopener,noreferrer');

@@ -65,7 +65,7 @@ function ActivePlanCard({ exam }: { exam: ExamConfig }) {
   const plan = useActivePlan(exam).data;
   return (
     <Link
-      href={routes.plans(exam.slug)}
+      href={routes.managePlans()}
       aria-label={plan ? `Active plan: ${classLabel(plan)} ${planTier(plan)}. Manage` : 'Free User. Manage plan'}
       className="bg-brand-75 flex flex-col gap-0.5 rounded-xl px-[18px] py-4"
     >

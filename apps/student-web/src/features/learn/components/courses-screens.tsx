@@ -222,7 +222,7 @@ export function CourseDetailScreen({ courseId }: { courseId: string }) {
           </ul>
           <div className="mt-auto pl-3">
             <Link
-              href={isSubscribed ? routes.learnCourse(exam.slug, detail.id) : routes.plans(exam.slug)}
+              href={isSubscribed ? routes.learnCourse(exam.slug, detail.id) : routes.managePlans()}
               className="border-info bg-surface text-info flex h-12 items-center justify-center rounded-[14px] border-[1.5px] text-[16px] leading-[22px] font-semibold"
             >
               {isSubscribed ? 'Resume Course' : 'Enroll Now'}

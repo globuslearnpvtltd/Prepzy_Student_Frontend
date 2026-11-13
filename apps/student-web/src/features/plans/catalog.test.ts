@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { billingError, billingOk, billingUrl, quoteData } from '@/test/billing';
 import { testExam } from '@/test/exams';
 import { API, server } from '@/test/server';
-import { classLabel, isPlanCategory, plansApi, toPurchase, toTransaction } from './api';
+import { classLabel, isPlanCategory, plansApi, toPurchase } from './api';
 import {
   accessLabel,
   addMonths,
@@ -268,13 +268,6 @@ describe('plan api normalisers', () => {
       displayName: 'From server',
       category: 'board',
     });
-    expect(toTransaction({ status: 'failed', invoice_url: 'https://x.test/i.pdf', amount: null })).toMatchObject({
-      status: 'failed',
-      amount: 0,
-      invoiceUrl: 'https://x.test/i.pdf',
-    });
-    expect(toTransaction({ status: 'pending' }).status).toBe('pending');
-    expect(toTransaction({ description: 'Old text', display_name: 'New name', plan_id: '' })).toMatchObject({ description: 'New name', planId: null });
     expect(toPurchase({ has_pending_plan: 1, pending_start_date: null })).toMatchObject({ hasPendingPlan: true, pendingStartDate: null });
   });
 });
@@ -389,15 +382,11 @@ describe('plansApi (v4 billing)', () => {
         return billingOk({ purchase: {}, refund: null });
       }),
       http.get(billingUrl(cbse, '/purchases'), () => billingOk({})),
-      http.get(billingUrl(cbse, '/purchases/1/payments'), () => billingOk({})),
-      http.get(billingUrl(neet, '/payments'), () => billingOk({})),
     );
     await expect(plansApi.extend(cbse, 'CODE')).resolves.toEqual({ months: null, expiryDate: null });
     await plansApi.cancel(neet, 7);
     expect(bodies).toEqual([{ coupon_code: 'CODE' }, {}]);
     await expect(plansApi.purchases(cbse)).resolves.toEqual([]);
-    await expect(plansApi.planPayments(cbse, 1, 3)).resolves.toEqual({ payments: [], page: 3, totalPages: 1 });
-    await expect(plansApi.payments(neet, 1)).resolves.toEqual({ payments: [], page: 1, totalPages: 1 });
   });
 
   it('checks referral codes', async () => {

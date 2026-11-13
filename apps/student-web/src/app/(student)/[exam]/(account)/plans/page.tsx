@@ -1,8 +1,7 @@
-import type { Metadata } from 'next';
-import { ManagePlans } from '@/features/plans/ui';
+import { redirect } from 'next/navigation';
+import { routes } from '@/shared/config/routes';
 
-export const metadata: Metadata = { title: 'My Plans' };
-
+/** The exam's plans page moved to the common /manage-plans (every exam's plans on one page). */
 export default function PlansPage() {
-  return <ManagePlans />;
+  redirect(routes.managePlans());
 }

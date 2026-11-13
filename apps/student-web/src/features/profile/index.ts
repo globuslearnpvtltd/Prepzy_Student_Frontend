@@ -1,13 +1,13 @@
 /** Profile and account logic. Screens live in ./ui. */
-export { formatUpdated, profileApi, toDateInput, toParent, toProfile } from './api';
-export type { ContactMethod, Parent, ParentDetails, Profile, ProfileUpdate } from './api';
+export { profileApi, toDateInput, toHelpRequest, toParent, toProfile } from './api';
+export type { ContactMethod, DeleteInfo, HelpRequest, Parent, ParentDetails, Profile, ProfileUpdate } from './api';
 export {
   profileKeys,
   useChangePassword,
-  useClassOptions,
-  useDeleteAccount,
+  useDeleteInfo,
+  useHelpRequests,
   useParent,
   useProfile,
+  useProfilePhoto,
   useUpdateProfile,
-  useUploadPhoto,
 } from './hooks';

@@ -15,7 +15,7 @@ export function useDashboardContext() {
   return { exam, classId: context?.classId ?? null, noPlan: !isPending && !context };
 }
 
-/** Board "learner data" (weekly hours + profile completion), shared by the activity chart and the profile card. */
+/** Board "learner data" (weekly hours) for the activity chart. */
 export const boardOverviewQuery = (exam: ExamConfig, classId: number | null) => ({
   queryKey: ['dashboard', exam.slug, 'board-overview', classId] as const,
   queryFn: () => dashboardApi.boardOverview(exam, classId!),

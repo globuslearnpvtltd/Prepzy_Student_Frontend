@@ -31,7 +31,7 @@ export function CustomTests() {
   const create = routes.customTestCreate(exam.slug);
 
   return (
-    <div className="mx-auto flex max-w-[1080px] flex-col gap-6 pt-6 lg:pt-4">
+    <div className="flex flex-col gap-6">
       <header>
         <h1 className="text-[32px] leading-10 font-bold text-neutral-900">Custom Tests</h1>
         <p className="text-brand-950/80 text-[16px]">Make your own practice test from any chapter, or pick up a test you saved earlier.</p>
@@ -218,7 +218,7 @@ export function CustomTestCreate() {
   );
 
   return (
-    <div className="mx-auto flex max-w-[1160px] flex-col gap-6 pt-6 pb-32 lg:pt-4">
+    <div className="flex flex-col gap-6 pb-32">
       <div className="bg-surface flex items-center justify-between gap-4 rounded-2xl p-2 pr-4 shadow-sm">
         <button
           type="button"

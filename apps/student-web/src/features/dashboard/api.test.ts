@@ -42,16 +42,9 @@ describe('dashboard normalisers: missing and odd fields', () => {
     await expect(dashboardApi.pyqTeasers(BOARD)).rejects.toThrow('Plan expired');
   });
 
-  it('board overview without a profile or activity', async () => {
-    server.use(get('/api/v4/dashboard/board/1/overview', { success: true, data: { profileProgress: null } }));
-    expect(await dashboardApi.boardOverview(BOARD, 12)).toEqual({ activity: [], profile: null });
-    server.use(
-      get('/api/v4/dashboard/board/1/overview', {
-        success: true,
-        data: { profileProgress: { name: 'AK', image: '', completion_percentage: '66.6' } },
-      }),
-    );
-    expect((await dashboardApi.boardOverview(BOARD, 12)).profile).toEqual({ initials: 'AK', image: null, percent: 67 });
+  it('board overview without activity (the profile progress it also sends is not used)', async () => {
+    server.use(get('/api/v4/dashboard/board/1/overview', { success: true, data: { profileProgress: { name: 'AK' } } }));
+    expect(await dashboardApi.boardOverview(BOARD, 12)).toEqual({ activity: [] });
   });
 
   it('subject scores, subjects, courses and tests with missing lists', async () => {

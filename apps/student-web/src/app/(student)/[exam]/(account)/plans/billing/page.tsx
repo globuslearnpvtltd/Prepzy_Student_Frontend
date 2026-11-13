@@ -1,8 +1,7 @@
-import type { Metadata } from 'next';
-import { BillingPage } from '@/features/plans/ui';
+import { redirect } from 'next/navigation';
+import { routes } from '@/shared/config/routes';
 
-export const metadata: Metadata = { title: 'Billing & Invoices' };
-
+/** Billing history is part of /manage-plans now (each plan's invoices and the invoices of ended plans). */
 export default function PlansBillingPage() {
-  return <BillingPage />;
+  redirect(routes.managePlans());
 }

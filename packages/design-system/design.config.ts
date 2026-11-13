@@ -95,9 +95,9 @@ export const designConfig = defineDesignConfig({
         950: '#0A0A0D', // learn: video player backdrop
       },
       // proposed status colours
-      success: { 50: '#ECFDF3', 100: '#DCFCE7', 350: '#25D366', 400: '#22C55E', 450: '#2FA36B', 500: '#10B981', 600: '#039855', 700: '#16A34A' },
-      warning: { 50: '#FFFAEB', 100: '#FDE7D9', 500: '#EA580C', 600: '#DC6803' },
-      danger: { 25: '#FDECEC', 50: '#FEF3F2', 450: '#E5484D', 600: '#D92D20' }, // 25/450: exam review incorrect
+      success: { 50: '#ECFDF3', 100: '#DCFCE7', 300: '#32D583', 350: '#25D366', 400: '#22C55E', 450: '#2FA36B', 500: '#10B981', 600: '#039855', 700: '#16A34A' },
+      warning: { 50: '#FFFAEB', 100: '#FDE7D9', 500: '#EA580C', 600: '#DC6803', 700: '#B54708' },
+      danger: { 25: '#FDECEC', 50: '#FEF3F2', 400: '#F97066', 450: '#E5484D', 600: '#D92D20' }, // 25/450: exam review incorrect
       // Board learn / notes pages (chapter, lecture, PYQ and NCERT screens of the previous app).
       learn: {
         ink: '#1C1B2E', // titles
@@ -364,6 +364,52 @@ export const designConfig = defineDesignConfig({
         'notice-text': '#92400E',
         'notice-icon': '#B45309', // banner icon, "SOON" badge
       },
+      // My Account (profile), parent, help and support, delete account (previous app's profile pages).
+      account: {
+        ink: '#1E1B39', // titles, toast background
+        hover: '#33257A', // primary button hover
+        line: '#ECECF3', // card borders, row dividers
+        outline: '#D8D4E8', // outline buttons, inputs
+        soft: '#F7F7FA', // info boxes, completion box
+        tile: '#F4F3FA', // contact switch track, topic chips
+        track: '#E4E2F0', // progress track, disabled button
+        bone: '#ECEAF3', // skeletons, upload track
+        body: '#344054', // FAQ answers, chip text
+        placeholder: '#98A2B3',
+        'disabled-text': '#9B97B8',
+        avatar: '#F28C28', // initials circle
+        progress: '#F4A340', // mobile card progress bar
+        'progress-text': '#F4C27A',
+        'gold-soft': '#FFF1DC', // plan chip, "In progress" badge
+        gold: '#B86A00',
+        'info-soft': '#EDE9FE', // sheet icon circle
+        'ok-soft': '#E8F6EE',
+        'ok-line': '#ABEFC6', // "is linked" banner
+        'ok-text': '#067647',
+        'error-line': '#F04438', // invalid input border
+        'error-text': '#B42318',
+        'error-soft-line': '#FDA29B', // wrong OTP digit
+        'danger-line': '#FECDCA', // "Remove photo" outline
+        logout: '#D03B3B',
+        'logout-soft': '#FEF2F2',
+        'offline-line': '#FEDF89',
+        'offline-text': '#7A2E0E',
+        'closed-soft': '#F2F4F7', // "Closed" request badge
+        closed: '#475467',
+        'toast-action': '#C7BFFB',
+        handle: '#D0D5DD', // sheet grab handle
+        scrim: '#1A1733', // desktop modal overlay (40%)
+        'card-hover': '#FBFAFF', // store link hover
+      },
+      // Manage Plans (/manage-plans) colours not in `account` (the previous app's plan cards).
+      manage: {
+        'card-line': '#E9E7F2', // plan card and invoice table borders
+        'chip-line': '#C9BEFB', // "Extend plan" button border
+        'chip-hover': '#E2DCFC', // "Extend plan" hover
+        icon: '#F6F5FA', // invoices toggle circle
+        active: '#128554', // "Active" status text
+        'active-line': '#9DD8BB',
+      },
     },
     fonts: {
       sans: "var(--font-poppins), 'Poppins', ui-sans-serif, system-ui, sans-serif",
@@ -452,6 +498,10 @@ export const designConfig = defineDesignConfig({
       'onboarding-stat': '0 2px 10px rgb(26 18 64 / 0.04)', // stat rows (mobile)
       'onboarding-bar': '0 -10px 28px rgb(0 0 0 / 0.07)', // pinned bottom bar
       'onboarding-bar-soft': '0 -8px 24px rgb(0 0 0 / 0.06)',
+      // My Account (profile) pages
+      'account-modal': '0 16px 44px rgb(26 23 51 / 0.18)', // dialogs, sheets on desktop
+      'account-toast': '0 16px 44px rgb(31 26 56 / 0.18)',
+      'account-tab': '0 1px 4px rgb(26 23 51 / 0.08)', // selected contact method
     },
     breakpoints: {
       sm: '640px',
@@ -493,6 +543,12 @@ export const designConfig = defineDesignConfig({
     'warning-soft': 'warning.50',
     danger: 'danger.600',
     'danger-soft': 'danger.50',
+    // Status icons (offline / error / toast) on My Account and Manage Plans.
+    'warning-strong': 'warning.700', // offline
+    'danger-strong': 'account.error-text', // error, alert
+    'danger-light': 'danger.400', // error toast (on the dark toast)
+    'success-light': 'success.300', // success toast (on the dark toast)
+    'loader-light': 'account.toast-action', // loading toast (on the dark toast)
   },
 
   // Per exam-category themes (chosen from the exam registry). Empty = same as the default.

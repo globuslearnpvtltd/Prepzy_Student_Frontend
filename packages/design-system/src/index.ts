@@ -40,5 +40,12 @@ export { Field, FieldError, FieldHint, FieldLabel } from './components/field/fie
 export { Input, Textarea, type InputProps, type TextareaProps } from './components/input/input.tsx';
 export { InputGroup, InputGroupInput, InputGroupPrefix } from './components/input/input-group.tsx';
 export { Tabs, TabsContent, TabsList, TabsTrigger } from './components/tabs/tabs.tsx';
-export { componentClass, splitVariantProps, type ComponentName, type VariantProps } from './config/runtime.ts';
+export {
+  colorValue,
+  componentClass,
+  splitVariantProps,
+  type ColorName,
+  type ComponentName,
+  type VariantProps,
+} from './config/runtime.ts';
 export { cx } from './lib/cx.ts';

@@ -54,12 +54,6 @@ export interface ContinueTest {
   percent: number;
 }
 
-export interface ProfileProgress {
-  initials: string | null;
-  image: string | null;
-  percent: number;
-}
-
 export interface ReferralSummary {
   balance: number;
   friendCount: number;
@@ -135,27 +129,14 @@ export const dashboardApi = {
     }));
   },
 
-  async boardOverview(exam: ExamRef, classId: number): Promise<{ activity: DayActivity[]; profile: ProfileProgress | null }> {
-    type Raw = {
-      week_activity?: unknown;
-      profileProgress?: { name?: unknown; image?: unknown; completion_percentage?: unknown } | null;
-    };
+  async boardOverview(exam: ExamRef, classId: number): Promise<{ activity: DayActivity[] }> {
+    type Raw = { week_activity?: unknown };
     const body = assertOk(
       await apiClient.get<Envelope<Raw>>(`${dashboardApiBase(exam)}/overview`, {
         params: { class_id: classId },
       }),
     );
-    const profile = body.data?.profileProgress;
-    return {
-      activity: toActivity(body.data?.week_activity),
-      profile: profile
-        ? {
-            initials: text(profile.name),
-            image: text(profile.image),
-            percent: Math.round(toNumber(profile.completion_percentage)),
-          }
-        : null,
-    };
+    return { activity: toActivity(body.data?.week_activity) };
   },
 
   async competitiveActivity(exam: ExamRef, classId: number): Promise<DayActivity[]> {

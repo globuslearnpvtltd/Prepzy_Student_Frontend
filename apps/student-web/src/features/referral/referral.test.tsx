@@ -240,7 +240,7 @@ describe('ReferAndEarn', () => {
     expect(screen.getAllByText('Riya bought a CBSE plan').length).toBeGreaterThan(0);
     expect(screen.getByText('How Riya’s plan turned into your credits')).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'Use credits' })[0]!);
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/plans');
+    expect(navigation.push).toHaveBeenCalledWith('/manage-plans');
     await userEvent.click(screen.getByRole('button', { name: /How much can I earn/ }));
     await userEvent.click(screen.getByRole('button', { name: /Who can I invite/ }));
     expect(screen.getByText(/One link works for all of them/)).toBeInTheDocument();

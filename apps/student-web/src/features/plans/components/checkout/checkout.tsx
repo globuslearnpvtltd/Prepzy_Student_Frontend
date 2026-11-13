@@ -4,10 +4,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { BookOpen, CalendarDays, Check, GraduationCap, Target } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { rememberExam, useCurrentUser } from '@/features/auth';
-import { findExam, type ExamCategory } from '@/shared/config/exams';
+import { rememberedExam, rememberExam, useCurrentUser } from '@/features/auth';
+import { getExam, type ExamCategory, type ExamRef } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
-import { useExam } from '@/shared/hooks/use-exam';
 import { StatusScreen } from '@/shared/layout/status-screens';
 import { isApiError, userMessage } from '@/shared/lib/errors';
 import { billingMessage, isPlanCategory } from '../../api';
@@ -27,7 +26,7 @@ import {
   type ApiVariant,
   type CatalogExam,
 } from '../../catalog';
-import { quoteQuery, useCatalogs, useCoupons, useFeatureLimits, useQuote } from '../../hooks';
+import { examParamOf, quoteQuery, useCatalogs, useCheckoutExam, useCoupons, useFeatureLimits, useQuote, type PlanExam } from '../../hooks';
 import { formatPlanDate } from '../../money';
 import { usePayment } from '../../use-payment';
 import { WarningDialog } from '../modal';
@@ -42,13 +41,12 @@ const CATEGORY_CARD: Partial<Record<ExamCategory, { description: string; icon: R
   competitive: { description: 'Prepare for your entrance exam', icon: <GraduationCap size={18} /> },
 };
 
-/** Does a ?exam= value name this exam? It may be the exam id, its slice or its app route. */
-const namesExam = (value: string, exam: { examId: number; examKey: string; slug: string | null }) =>
-  value === String(exam.examId) || value === exam.examKey || value === exam.slug || findExam(value)?.examSlice === exam.examKey;
+type AnyExamRef = { examId: number; category: ExamCategory | null };
+const sameExam = (a: AnyExamRef, b: AnyExamRef) => a.examId === b.examId && a.category === b.category;
 
 const NO_COUPON: CouponState = { input: '', applied: null, error: '', checking: false };
 
-/** Fills the space under the app header (the (checkout) layout). */
+/** Fills the space under the app header (the /purchase layout). */
 function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="bg-surface text-plan-ink flex-1">
@@ -57,18 +55,25 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-/** /[exam]/plans/purchase — choose exam, class or target year and a plan, then review and pay. */
+/**
+ * /purchase — the common checkout of every exam: choose exam, class or target year and a plan, then review and pay.
+ * The exam is the page's (?exam=, else the remembered exam, else the first purchasable one: useCheckoutExam);
+ * switching exam replaces ?exam= in the URL, so the header and a reload follow it.
+ */
 export function Checkout() {
-  const routeExam = useExam();
   const router = useRouter();
   const params = useSearchParams();
   const queryClient = useQueryClient();
   const user = useCurrentUser();
-  const catalog = useCatalogs(routeExam);
+  const selection = useCheckoutExam();
+  const catalog = useCatalogs(selection.exam);
 
-  const examParam = params.get('exam');
-  /** The exam the student picked; null = not picked yet (the ?exam= link, else the page's exam). */
-  const [pickedExamId, setPickedExamId] = useState<number | null>(null);
+  const examParam = selection.examParam;
+  /**
+   * The exam the student just picked, until the URL names it (router.replace is async). It is tied to the ?exam= it
+   * was picked on, so any later change of the URL (a link to another exam, back / forward) wins over it.
+   */
+  const [picked, setPicked] = useState<{ exam: ExamRef; on: string | null } | null>(null);
   const [classTitle, setClassTitle] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<string | null>(null);
   const [addBundle, setAddBundle] = useState(false);
@@ -78,12 +83,14 @@ export function Checkout() {
   const [coupon, setCoupon] = useState<CouponState>(NO_COUPON);
 
   const exams = useMemo(() => catalog.data ?? [], [catalog.data]);
-  const activeExam: CatalogExam | null =
-    pickedExamId !== null
-      ? (exams.find((entry) => entry.examId === pickedExamId) ?? null)
-      : examParam
-        ? (exams.find((entry) => namesExam(examParam, entry)) ?? null)
-        : (exams.find((entry) => entry.examId === routeExam.examId && entry.category === routeExam.category) ?? null);
+  const current = picked && picked.on === examParam ? picked.exam : selection.exam;
+  const activeExam: CatalogExam | null = current ? (exams.find((entry) => sameExam(entry, current)) ?? null) : null;
+
+  /** Shows another exam and names it in the URL (replace: switching exam isn't a step back can undo). */
+  const selectExam = (exam: PlanExam) => {
+    setPicked({ exam: { examId: exam.examId, category: exam.category }, on: examParam });
+    router.replace(routes.plansPurchase(examParamOf(exam)), { scroll: false });
+  };
   const examTitle = activeExam?.title ?? '';
   // Board-style exams pick a class (and stream); competitive-style ones a target year. From the catalog's group_key.
   const byYear = groupKeyOf(activeExam) === 'target_year';
@@ -95,29 +102,35 @@ export function Checkout() {
   const limits = useFeatureLimits(billingExam);
   const coupons = useCoupons(billingExam);
 
-  // Preselect the class from ?CLASSID= (old links), else the student's own class, once the catalog lands.
+  // Preselect the class from ?CLASSID= (old links), else the student's own class, once the catalog lands. A link that
+  // names its exam looks only there; otherwise a ?CLASSID= may pick another exam that has that class.
   const [preselected, setPreselected] = useState(false);
   useEffect(() => {
-    if (preselected || !catalog.data || examParam) return;
+    if (preselected || !catalog.data) return;
     setPreselected(true);
+    const home = selection.exam;
+    if (!home) return;
     const classParam = params.get('CLASSID') ?? params.get('class');
     const streamParam = Number(params.get('stream_id'));
     const targetClass = classParam ? Number(classParam) : user.data?.classId;
     if (!targetClass) return;
-    const routeFirst = [...catalog.data].sort((a, b) => Number(b.examId === routeExam.examId) - Number(a.examId === routeExam.examId));
-    const ordered = classParam ? routeFirst : routeFirst.filter((entry) => entry.examId === routeExam.examId);
+    const homeFirst = [...catalog.data].sort((a, b) => Number(sameExam(b, home)) - Number(sameExam(a, home)));
+    const ordered = classParam && !examParam ? homeFirst : homeFirst.filter((entry) => sameExam(entry, home));
     for (const entry of ordered) {
       const match = entry.variants.find(
         (variant) => variant.class_id === targetClass && (!streamParam || variant.stream_id === streamParam),
       );
       if (match) {
-        setPickedExamId(entry.examId);
+        const other = !sameExam(entry, home) && catalog.exams.find((exam) => sameExam(exam, entry));
+        if (other) selectExam(other);
         setClassTitle(match.class_title);
         setVariantId(groupKeyOf(entry) === 'target_year' && match.target_year != null ? `year-${match.target_year}` : match.variant_id);
         return;
       }
     }
-  }, [preselected, catalog.data, examParam, params, user.data?.classId, routeExam.examId]);
+    // selectExam only reads state setters and the URL of this render; the effect runs once per page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselected, catalog.data, catalog.exams, examParam, params, user.data?.classId, selection.exam]);
 
   const classTitles = useMemo(() => sortedClassTitles(activeExam?.variants ?? []), [activeExam]);
   const years = useMemo(() => (byYear ? yearVariants(activeExam?.variants ?? [], examTitle) : []), [byYear, activeExam, examTitle]);
@@ -160,7 +173,7 @@ export function Checkout() {
     : [label, ...bundleTitles];
 
   const payment = usePayment({
-    exam: billingExam ?? routeExam,
+    exam: billingExam,
     coupon: coupon.applied,
     describe: (plan) => `${plan.name} · ${plan.durationName} · ${contextLabel}`,
     prefill: { name: user.data?.firstName ?? '', contact: user.data?.phone ?? '', email: user.data?.email ?? '' },
@@ -209,13 +222,18 @@ export function Checkout() {
     setCoupon({ ...NO_COUPON, input: coupon.applied, error: userMessage(quoteError, 'This coupon does not apply to this plan.') });
   }, [coupon.applied, quoteError]);
 
-  /** Fresh subscription state everywhere, then the purchased exam's dashboard (the page's exam when the app has none). */
-  const openDashboard = async () => {
-    const slug = activeExam?.slug ?? routeExam.slug;
-    rememberExam(slug);
+  /**
+   * Fresh subscription state everywhere, then the purchased exam's dashboard. An exam the app has no pages for yet
+   * lands on the remembered exam's dashboard, else on Manage Plans (which lists the new plan).
+   */
+  const openDashboard = async (purchased: ExamRef | null) => {
+    const own = purchased ? catalog.exams.find((exam) => sameExam(exam, purchased))?.slug : null;
+    const slug = own ?? getExam(rememberedExam())?.slug ?? null;
+    if (slug) rememberExam(slug);
     await queryClient.invalidateQueries();
-    router.replace(routes.dashboard(slug));
+    router.replace(slug ? routes.dashboard(slug) : routes.managePlans());
   };
+  const openPurchasedDashboard = () => openDashboard(payment.succeededExam ?? billingExam);
 
   const overlays = (
     <>
@@ -225,8 +243,8 @@ export function Checkout() {
           courseAccess={contextLabel || 'Your course'}
           planDetails={accessLabel(payment.succeeded)}
           validUntil={payment.succeeded.validTill ? formatPlanDate(payment.succeeded.validTill) : null}
-          onStartLearning={openDashboard}
-          onBackHome={openDashboard}
+          onStartLearning={openPurchasedDashboard}
+          onBackHome={openPurchasedDashboard}
         />
       )}
       {payment.pending && (
@@ -238,8 +256,9 @@ export function Checkout() {
           refreshing={payment.verifying}
           onRefresh={payment.recheck}
           onBackToDashboard={() => {
+            const exam = payment.pending?.exam ?? billingExam;
             payment.clearPending();
-            void openDashboard();
+            void openDashboard(exam);
           }}
         />
       )}
@@ -309,7 +328,7 @@ export function Checkout() {
                     active={activeExam?.examId === entry.examId}
                     disabled={!loaded}
                     onClick={() => {
-                      setPickedExamId(entry.examId);
+                      selectExam(entry);
                       setClassTitle(null);
                       setVariantId(null);
                       setAddBundle(false);

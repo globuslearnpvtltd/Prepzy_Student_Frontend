@@ -76,7 +76,7 @@ describe('LimitDialog inside an exam', () => {
     renderWithProviders(<LimitDialog />, { exam: neet });
     await act(() => apiClient.get('/api/limited').catch(() => undefined));
     const link = await screen.findByRole('link', { name: 'See plans' });
-    expect(link).toHaveAttribute('href', '/neet/plans/purchase');
+    expect(link).toHaveAttribute('href', '/purchase?exam=neet');
     await userEvent.click(link);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

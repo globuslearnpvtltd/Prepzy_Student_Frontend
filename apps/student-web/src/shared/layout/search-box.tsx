@@ -2,7 +2,7 @@
 
 import { cx } from '@prepzy/design-system';
 import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
+import { ArrowRight, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useState } from 'react';
 import { useActivePlan } from '@/features/auth';
@@ -60,7 +60,7 @@ export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; o
     >
       <form
         role="search"
-        className="border-line bg-surface focus-within:border-brand flex h-11 items-center gap-2.5 rounded-full border px-4 transition-colors"
+        className="border-line bg-surface focus-within:border-brand flex h-11 items-center gap-2.5 rounded-full border pr-1 pl-4 transition-colors"
         onSubmit={(event) => {
           event.preventDefault();
           if (text.trim()) go();
@@ -83,6 +83,14 @@ export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; o
           aria-expanded={open && items.length > 0}
           className="text-foreground placeholder:text-foreground-muted h-full w-full min-w-0 bg-transparent text-[14px] outline-none"
         />
+        <button
+          type="submit"
+          aria-label="Search"
+          disabled={!text.trim()}
+          className="bg-brand text-on-brand hover:bg-brand-800 flex size-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-default disabled:opacity-90"
+        >
+          <ArrowRight aria-hidden className="size-[18px]" />
+        </button>
       </form>
       {open && items.length > 0 && (
         <ul

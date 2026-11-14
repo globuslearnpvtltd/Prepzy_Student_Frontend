@@ -10,8 +10,8 @@ import { useCurrentUser } from '@/features/auth';
 import { routes } from '@/shared/config/routes';
 import { useLiveDpp } from '@/shared/layout/shell-api';
 import { ProgressRing } from '@/shared/ui/charts';
+import { CompetitiveSubjectArt } from '@/shared/ui/competitive-subject-art';
 import { dashboardApi } from './api';
-import { competitiveSubjectArt } from './subject-art';
 import { SectionError, useDashboardContext, WidgetSkeleton } from './widget-kit';
 
 /* ---------------------------------- Welcome ---------------------------------- */
@@ -99,44 +99,31 @@ export function SubjectProgressCards() {
         <SectionError title="Failed to fetch subject progress" error={query.error} />
       ) : (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4 lg:gap-5">
-          {query.data.map((subject) => {
-            const art = competitiveSubjectArt(subject.name);
-            return (
-              <li key={subject.name}>
-                <Link
-                  href={subject.courseId ? routes.learnCourse(exam.slug, subject.courseId) : routes.learn(exam.slug)}
-                  className="group border-line bg-surface text-foreground hover:bg-brand hover:text-on-brand relative flex h-full flex-col justify-between overflow-hidden rounded-lg border p-6 shadow-sm transition-all duration-300"
-                >
-                  <span className="relative z-10 flex items-start justify-between">
-                    <span>
-                      <span className="mb-3 block text-xl leading-tight font-semibold sm:text-[28px] sm:leading-7">
-                        {subject.name}
+          {query.data.map((subject) => (
+            <li key={subject.name}>
+              {/* Previous app's SubjectProgress card: white at rest; on hover (or keyboard focus) it fills with the
+                  brand colour, the text turns white and the background artwork is outlined in orange. */}
+              <Link
+                href={subject.courseId ? routes.learnCourse(exam.slug, subject.courseId) : routes.learn(exam.slug)}
+                className="group bg-surface text-foreground hover:bg-brand hover:text-on-brand focus-visible:bg-brand focus-visible:text-on-brand relative flex h-full flex-col justify-between overflow-hidden rounded-lg border border-neutral-100 p-4 shadow-sm transition-all duration-300 outline-none sm:p-6"
+              >
+                <span className="relative z-10 flex items-start justify-between">
+                  <span>
+                    <span className="mb-3 block text-xl leading-tight font-semibold sm:text-[28px] sm:leading-7">{subject.name}</span>
+                    <span className="flex items-center gap-1.5 text-[14px] leading-[14px]">
+                      <span className="font-semibold">
+                        {subject.completed}/{subject.total}
                       </span>
-                      <span className="flex items-center gap-1.5 text-[14px] leading-[14px]">
-                        <span className="font-semibold">
-                          {subject.completed}/{subject.total}
-                        </span>
-                        Chapters
-                      </span>
+                      Chapters
                     </span>
-                    <ProgressRing percent={subject.percent} label={`${subject.name} progress`} className="group-hover:text-on-brand" />
                   </span>
-                  <span className="hidden sm:mt-20 sm:block" aria-hidden="true" />
-                  {art && (
-                    <Image
-                      src={art.src}
-                      alt=""
-                      width={art.width}
-                      height={art.height}
-                      unoptimized
-                      className="absolute hidden sm:block"
-                      style={{ bottom: art.bottom, right: art.right, left: art.left }}
-                    />
-                  )}
-                </Link>
-              </li>
-            );
-          })}
+                  <ProgressRing percent={subject.percent} label={`${subject.name} progress`} />
+                </span>
+                <span className="hidden sm:mt-20 sm:block" aria-hidden="true" />
+                <CompetitiveSubjectArt subject={subject.name} hover className="hidden sm:block" />
+              </Link>
+            </li>
+          ))}
         </ul>
       )}
     </section>

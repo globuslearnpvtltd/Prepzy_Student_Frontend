@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, CardDescription, CardTitle } from '@prepzy/design-system';
+import { Card, CardDescription, CardTitle, cx } from '@prepzy/design-system';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { routes } from '@/shared/config/routes';
@@ -12,7 +12,8 @@ import { TEST_TYPES } from '../test-types';
 export function TestHub() {
   const exam = useExam();
   return (
-    <div className="flex flex-col gap-6">
+    // Competitive pages add p-3 inside the shell padding, as the previous app's NEET test pages did.
+    <div className={cx('flex flex-col gap-6', exam.category === 'competitive' && 'p-3')}>
       <header>
         <h1 className="text-2xl font-semibold">Tests</h1>
         <p className="text-foreground-muted text-sm">Practise under exam conditions and review every answer.</p>

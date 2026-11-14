@@ -45,6 +45,14 @@ export const env = {
   },
   gaId: optional(process.env.NEXT_PUBLIC_GA_ID),
   clarityId: optional(process.env.NEXT_PUBLIC_CLARITY_ID),
+  /**
+   * Marketing website the navbar logo opens. Local development defaults to the marketing app on :3001; deployed
+   * environments must set it, otherwise the logo stays on the student's dashboard.
+   */
+  marketingUrl: (() => {
+    const value = optional(process.env.NEXT_PUBLIC_MARKETING_URL) ?? (appEnv === 'development' ? 'http://localhost:3001' : undefined);
+    return value ? parseUrl('NEXT_PUBLIC_MARKETING_URL', value) : undefined;
+  })(),
   /** Razorpay public key id for checkout; without it the checkout page explains payments are unavailable. */
   razorpayKeyId: optional(process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID),
 } as const;

@@ -1,9 +1,10 @@
 'use client';
 
 import { cx } from '@prepzy/design-system';
-import { ArrowUp, Loader2, Mic, Plus, Square, X } from 'lucide-react';
+import { ArrowUp, Keyboard, Loader2, Mic, PenLine, Plus, Square, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVoiceAnswer } from '@/features/exam-engine';
+import { InkPad, useInkDoc, useInkVersion } from '@/features/ink';
 import { userMessage } from '@/shared/lib/errors';
 import { MATH_SYMBOLS } from '@/shared/ui/math-symbols';
 
@@ -18,6 +19,15 @@ export interface ComposerProps {
   allowImage?: boolean;
   /** Mic button: speak the question (transcribed by the backend). */
   allowVoice?: boolean;
+  /**
+   * Pen button: write the question by hand (finger, stylus, mouse, trackpad). The writing is sent as the
+   * message's image, exactly like a photo, so nothing changes on the backend. Off unless asked for.
+   */
+  allowInk?: boolean;
+  /** Keep unfinished handwriting across a reload of this tab (e.g. the chat id). */
+  inkDraftKey?: string;
+  /** Name of the full-screen writing dialog. */
+  inkTitle?: string;
   /** Atlas "Live chat" pill (live voice). */
   onLiveChat?: () => void;
   /** A live talk is running (the pill turns green with a red dot). */
@@ -41,6 +51,9 @@ export function Composer({
   disabled,
   allowImage = true,
   allowVoice = false,
+  allowInk = false,
+  inkDraftKey,
+  inkTitle = 'Write your question',
   onLiveChat,
   liveActive = false,
   liveDisabled = false,
@@ -54,10 +67,71 @@ export function Composer({
   const [image, setImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [symbols, setSymbols] = useState(false);
+  const [inkOpen, setInkOpen] = useState(false);
+  const [inkFull, setInkFull] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const preview = useMemo(() => (image ? URL.createObjectURL(image) : null), [image]);
   useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
+
+  // Writing pad: the handwriting is one more way to attach the message's image.
+  const ink = useInkDoc(allowInk ? inkDraftKey : undefined);
+  const inkVersion = useInkVersion(ink);
+  const hasInk = allowInk && !ink.isEmpty;
+
+  // A small picture of the attached handwriting (the same cropped PNG that will be sent), while the pad is closed.
+  const [inkPreview, setInkPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!hasInk || inkOpen) return setInkPreview(null);
+    let live = true;
+    let url: string | null = null;
+    ink
+      .toFile('preview.png')
+      .then((file) => {
+        if (!live || !file) return;
+        url = URL.createObjectURL(file);
+        setInkPreview(url);
+      })
+      .catch(() => undefined); // no canvas: the chip still says "Handwriting attached"
+    return () => {
+      live = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [hasInk, inkOpen, inkVersion, ink]);
+
+  // A message carries one image: once the student writes, the handwriting replaces a chosen photo.
+  useEffect(() => {
+    if (hasInk && image) setImage(null);
+  }, [hasInk, image]);
+
+  // While the pad is open, Escape steps back (full screen -> pad -> typing) instead of closing the chat panel.
+  useEffect(() => {
+    if (!inkOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      if (inkFull) setInkFull(false);
+      else setInkOpen(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [inkOpen, inkFull]);
+
+  // Full-screen writing: the page behind it must not scroll.
+  useEffect(() => {
+    if (!inkFull) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [inkFull]);
+
+  const closeInk = () => {
+    setInkOpen(false);
+    setInkFull(false);
+  };
 
   useEffect(() => {
     if (prefill?.text) {
@@ -79,13 +153,27 @@ export function Composer({
     (cause) => setError(userMessage(cause)),
   );
 
-  const canSend = !disabled && (!!text.trim() || (imageOnly && !!image));
-  const submit = () => {
+  const canSend = !disabled && !preparing && (!!text.trim() || (imageOnly && (!!image || hasInk)));
+  const submit = async () => {
     if (!canSend) return;
-    onSend(text.trim(), image);
+    let attachment = image;
+    if (hasInk) {
+      setPreparing(true);
+      try {
+        attachment = await ink.toFile();
+      } catch (cause) {
+        return setError(userMessage(cause)); // the writing is kept: the student can try again
+      } finally {
+        setPreparing(false);
+      }
+    }
+    onSend(text.trim(), attachment);
     setText('');
     setImage(null);
     setSymbols(false);
+    setError(null);
+    ink.reset();
+    closeInk();
   };
 
   const insert = (symbol: string) => {
@@ -112,7 +200,17 @@ export function Composer({
 
   return (
     <div className={cx('flex flex-col gap-1', className)}>
-      <div className="border-socrates-line bg-surface relative rounded-[20px] border-[3px] px-3.5 pt-3 pb-2.5">
+      <div
+        role={inkFull ? 'dialog' : undefined}
+        aria-modal={inkFull ? true : undefined}
+        aria-label={inkFull ? inkTitle : undefined}
+        className={cx(
+          'bg-surface',
+          inkFull
+            ? 'fixed inset-0 z-[80] flex flex-col px-3.5 pt-[max(12px,env(safe-area-inset-top))] pb-[max(10px,env(safe-area-inset-bottom))]'
+            : 'border-socrates-line relative rounded-[20px] border-[3px] px-3.5 pt-3 pb-2.5',
+        )}
+      >
         {preview && (
           <div className="relative mb-2 w-fit">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -127,27 +225,62 @@ export function Composer({
             </button>
           </div>
         )}
+        {hasInk && !inkOpen && (
+          <div className="bg-socrates-soft text-socrates-text mb-2 flex w-fit max-w-full items-center gap-2 rounded-[12px] p-1 pl-1 text-[12px]">
+            {inkPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element -- local preview of the handwriting
+              <img
+                src={inkPreview}
+                alt="Your handwriting"
+                className="border-socrates-line bg-surface h-12 w-auto max-w-[140px] shrink-0 rounded-[8px] border object-contain p-0.5"
+              />
+            ) : (
+              <PenLine aria-hidden className="text-brand ml-2 size-3.5 shrink-0" />
+            )}
+            <button type="button" onClick={() => setInkOpen(true)} className="font-medium underline-offset-2 hover:underline">
+              Handwriting attached
+            </button>
+            <button
+              type="button"
+              aria-label="Remove handwriting"
+              title="Remove (open the pad and undo to get it back)"
+              onClick={() => ink.clear()}
+              className="text-socrates-muted hover:bg-socrates-chip flex size-6 items-center justify-center rounded-full"
+            >
+              <X aria-hidden className="size-3" />
+            </button>
+          </div>
+        )}
+        {inkOpen && <InkPad doc={ink} expanded={inkFull} onExpandedChange={setInkFull} disabled={disabled || preparing} />}
         <textarea
           ref={area}
           rows={1}
           value={text}
           autoFocus={autoFocus}
           disabled={disabled}
+          hidden={inkOpen}
           placeholder={placeholder}
           aria-label={placeholder}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
-              submit();
+              void submit();
             }
           }}
           className="text-socrates-text placeholder:text-socrates-faint w-full resize-none bg-transparent px-1 text-[14px] leading-5 outline-none"
         />
         <div className="mt-2 flex items-center gap-2">
-          {allowImage && (
+          {allowImage && !inkOpen && (
             <>
-              <button type="button" aria-label="Add a photo" title="Snap or upload a photo" className={roundButton} onClick={() => fileInput.current?.click()} disabled={disabled}>
+              <button
+                type="button"
+                aria-label="Add a photo"
+                title={hasInk ? 'Remove the handwriting to attach a photo instead' : 'Snap or upload a photo'}
+                className={roundButton}
+                onClick={() => fileInput.current?.click()}
+                disabled={disabled || hasInk}
+              >
                 <Plus aria-hidden className="size-4" />
               </button>
               <input
@@ -163,21 +296,45 @@ export function Composer({
               />
             </>
           )}
-          <button
-            type="button"
-            aria-label="Math symbols"
-            aria-expanded={symbols}
-            title="Formulas"
-            className={cx(roundButton, 'font-serif text-[14px] italic')}
-            onClick={() => setSymbols((open) => !open)}
-            disabled={disabled}
-          >
-            fx
-          </button>
+          {allowInk && (
+            <button
+              type="button"
+              aria-label={inkOpen ? 'Back to typing' : 'Write by hand'}
+              aria-pressed={inkOpen}
+              title={inkOpen ? 'Keyboard' : 'Write by hand'}
+              className={roundButton}
+              onClick={() => {
+                setSymbols(false);
+                if (inkOpen) {
+                  closeInk();
+                  requestAnimationFrame(() => area.current?.focus());
+                } else {
+                  area.current?.blur(); // put the on-screen keyboard away so the pad has the room
+                  setInkOpen(true);
+                }
+              }}
+              disabled={disabled}
+            >
+              {inkOpen ? <Keyboard aria-hidden className="size-4" /> : <PenLine aria-hidden className="size-4" />}
+            </button>
+          )}
+          {!inkOpen && (
+            <button
+              type="button"
+              aria-label="Math symbols"
+              aria-expanded={symbols}
+              title="Formulas"
+              className={cx(roundButton, 'font-serif text-[14px] italic')}
+              onClick={() => setSymbols((open) => !open)}
+              disabled={disabled}
+            >
+              fx
+            </button>
+          )}
           {toolbarSlot}
           <span className="flex-1" />
-          {onLiveChat && <LiveChatButton onClick={onLiveChat} active={liveActive} disabled={disabled || liveDisabled} />}
-          {allowVoice && voice.supported && (
+          {onLiveChat && !inkFull && <LiveChatButton onClick={onLiveChat} active={liveActive} disabled={disabled || liveDisabled} />}
+          {allowVoice && voice.supported && !inkFull && (
             <button
               type="button"
               aria-label={voice.state === 'recording' ? 'Stop recording' : 'Speak your question'}
@@ -194,18 +351,19 @@ export function Composer({
               )}
             </button>
           )}
-          {canSend && (
+          {(canSend || preparing) && (
             <button
               type="button"
               aria-label="Send"
-              onClick={submit}
+              onClick={() => void submit()}
+              disabled={!canSend}
               className="from-brand-450 to-brand text-on-brand flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-b"
             >
-              <ArrowUp aria-hidden className="size-4" />
+              {preparing ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <ArrowUp aria-hidden className="size-4" />}
             </button>
           )}
         </div>
-        {symbols && (
+        {symbols && !inkOpen && (
           <div role="group" aria-label="Math symbols" className="border-socrates-divider mt-2 flex flex-wrap gap-1.5 border-t pt-2">
             {MATH_SYMBOLS.map((symbol) => (
               <button
@@ -219,8 +377,13 @@ export function Composer({
             ))}
           </div>
         )}
+        {inkFull && error && (
+          <p role="alert" className="text-socrates-error px-1 pt-1 text-[11.5px]">
+            {error}
+          </p>
+        )}
       </div>
-      {error && (
+      {error && !inkFull && (
         <p role="alert" className="text-socrates-error px-1 text-[11.5px]">
           {error}
         </p>

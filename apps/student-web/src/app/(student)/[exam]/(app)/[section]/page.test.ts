@@ -26,7 +26,7 @@ describe('section placeholder', () => {
 
   it('pre-builds placeholders only for unported sections', () => {
     expect(placeholderSections('competitive')).toEqual([]);
-    expect(placeholderSections('board')).toEqual(['syllabus', 'pyq-trends']);
+    expect(placeholderSections('board')).toEqual([]);
     expect(placeholderSections('reference')).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
+import { resetHistory, simulateHistory } from '@/test/history';
 import { navigation } from '@/test/setup';
 import { doubtsApiBase } from '../api';
 import { useSolver } from '../store';
@@ -49,50 +50,81 @@ const existingChat = (id: number) => [
 beforeEach(() => {
   useSolver.setState({ subject: null, book: null, problem: null, chatId: null, className: null });
   navigation.searchParams = new URLSearchParams();
+  navigation.pathname = '/cbse/doubt-solver';
+  simulateHistory();
 });
+afterEach(resetHistory);
 
 describe('DoubtSolverScreen navigation', () => {
   it('goes back to the dashboard from the subject step', async () => {
     server.use(plan, textbooks([]));
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     expect(await screen.findByText('No subjects available right now.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    expect(screen.getByRole('button', { name: 'Back to dashboard' })).toHaveTextContent('Dashboard');
+    await userEvent.click(screen.getByRole('button', { name: 'Back to dashboard' }));
     expect(navigation.push).toHaveBeenCalledWith('/cbse/dashboard');
   });
 
-  it('steps back from start and ask', async () => {
+  it('steps back from start and ask to the step above when opened directly', async () => {
     server.use(plan);
     useSolver.getState().chooseBook(physicsBook);
     navigation.searchParams = new URLSearchParams('step=start');
     const { unmount } = renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(navigation.replace).toHaveBeenLastCalledWith('/cbse/doubt-solver');
+    navigation.searchParams = new URLSearchParams('step=start');
     await userEvent.click(screen.getByRole('button', { name: 'Question Bank' }));
-    expect(navigation.push).toHaveBeenLastCalledWith('/cbse/doubt-solver?step=question-bank');
+    expect(navigation.push).toHaveBeenLastCalledWith('/cbse/doubt-solver?step=question-bank&from=start');
     unmount();
 
     navigation.searchParams = new URLSearchParams('step=ask');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
     expect(navigation.replace).toHaveBeenLastCalledWith('/cbse/doubt-solver?step=start');
-    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expect(navigation.replace).toHaveBeenCalledTimes(3);
+    expect(navigation.back).not.toHaveBeenCalled();
+    // Only the textbook selection offers the dashboard.
+    expect(screen.queryByRole('button', { name: 'Back to dashboard' })).not.toBeInTheDocument();
   });
 
-  it('leaves the question bank with the browser back, or to change the subject', async () => {
+  it('back buttons return to the step they were opened from', async () => {
+    server.use(plan);
+    useSolver.getState().chooseBook(physicsBook);
+    navigation.searchParams = new URLSearchParams('step=start&from=subject');
+    const { unmount } = renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(navigation.back).toHaveBeenCalledTimes(1);
+    unmount();
+
+    // "Change subject" goes back too when the subject step is right behind, instead of stacking a new one.
+    navigation.searchParams = new URLSearchParams('step=start&from=subject');
+    renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    await userEvent.click(screen.getByRole('button', { name: 'Change subject' }));
+    expect(navigation.back).toHaveBeenCalledTimes(2);
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it('leaves the question bank to where it was opened from, or to the start, or to change the subject', async () => {
     server.use(plan, http.get(`${API}/api/v4/learn/courses/11/outline`, () => HttpResponse.json({ success: true, data: { finalList: [] } })));
     useSolver.getState().chooseBook(physicsBook);
+    navigation.searchParams = new URLSearchParams('step=question-bank&from=ask');
+    const { unmount } = renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    expect(navigation.back).toHaveBeenCalledTimes(1);
+    unmount();
+
+    // Opened directly (a shared link): no history to go back to, so the start options.
     navigation.searchParams = new URLSearchParams('step=question-bank');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
-    expect(navigation.back).toHaveBeenCalled();
+    expect(navigation.replace).toHaveBeenLastCalledWith('/cbse/doubt-solver?step=start');
     await userEvent.click(screen.getByTitle('Change subject'));
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver');
+    expect(navigation.replace).toHaveBeenLastCalledWith('/cbse/doubt-solver');
   });
 
   it('stays on, or leaves, a problem without a subject', async () => {
     server.use(plan, ...existingChat(8));
     useSolver.setState({ problem: question, chatId: 8 });
+    navigation.searchParams = new URLSearchParams('step=chat');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     expect(await screen.findByText('Think about forces.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Question Bank' })).not.toBeInTheDocument();
@@ -108,27 +140,70 @@ describe('DoubtSolverScreen navigation', () => {
     expect(navigation.replace).toHaveBeenCalledWith('/cbse/doubt-solver');
   });
 
+  it('leaving a chat handed over by another page goes back to that page', async () => {
+    server.use(plan, ...existingChat(8));
+    useSolver.setState({ subject: { id: 0, title: 'PHYSICS' }, problem: question, chatId: 8 });
+    navigation.searchParams = new URLSearchParams('step=chat');
+    vi.stubGlobal('navigation', { canGoBack: true });
+    renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    await screen.findByText('Think about forces.');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Go back' })[0]!);
+    await userEvent.click(screen.getByRole('button', { name: 'Leave' }));
+    expect(navigation.back).toHaveBeenCalledTimes(1);
+    expect(navigation.replace).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('the back gesture leaves the chat, keeping it for the forward gesture', async () => {
+    server.use(plan, ...existingChat(8));
+    useSolver.getState().chooseBook(physicsBook);
+    useSolver.setState({ problem: question, chatId: 8 });
+    navigation.searchParams = new URLSearchParams('step=ask&from=start');
+    const view = renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    expect(screen.getByRole('heading', { name: "What's your Physics doubt?" })).toBeInTheDocument();
+    navigation.searchParams = new URLSearchParams('step=chat&from=ask');
+    view.rerender(<DoubtSolverScreen />);
+    expect(await screen.findByText('Think about forces.')).toBeInTheDocument();
+  });
+
   it('asks a new question or starts a new problem from the chat', async () => {
     server.use(plan, ...existingChat(8));
     useSolver.getState().chooseBook(physicsBook);
     useSolver.setState({ problem: question, chatId: 8 });
+    navigation.searchParams = new URLSearchParams('step=chat&from=ask');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     await userEvent.click((await screen.findAllByRole('button', { name: 'Ask a new question' }))[0]!);
     expect(useSolver.getState()).toMatchObject({ problem: null, chatId: null, subject: { id: 1 } });
-    expect(navigation.push).toHaveBeenLastCalledWith('/cbse/doubt-solver?step=ask');
+    // The chat came from the ask step: back there rather than stacking another one.
+    expect(navigation.back).toHaveBeenCalledTimes(1);
+    expect(navigation.push).not.toHaveBeenCalled();
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it('asking a new question from a chat opened elsewhere replaces the chat', async () => {
+    server.use(plan, ...existingChat(8));
+    useSolver.getState().chooseBook(physicsBook);
+    useSolver.setState({ problem: question, chatId: 8 });
+    navigation.searchParams = new URLSearchParams('step=chat&from=question-bank');
+    renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Ask a new question' }))[0]!);
+    expect(navigation.replace).toHaveBeenLastCalledWith('/cbse/doubt-solver?step=ask&from=question-bank');
   });
 
   it('opens the bank and starts over from the chat header', async () => {
     server.use(plan, ...existingChat(8));
     useSolver.getState().chooseBook(physicsBook);
     useSolver.setState({ problem: question, chatId: 8 });
+    navigation.searchParams = new URLSearchParams('step=chat&from=ask');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     await screen.findByText('Think about forces.');
     await userEvent.click(screen.getByRole('button', { name: 'Question Bank' }));
-    expect(navigation.push).toHaveBeenLastCalledWith('/cbse/doubt-solver?step=question-bank');
+    expect(navigation.push).toHaveBeenLastCalledWith('/cbse/doubt-solver?step=question-bank&from=chat');
+    navigation.searchParams = new URLSearchParams('step=chat&from=ask');
     await userEvent.click(screen.getAllByRole('button', { name: 'New problem' })[0]!);
     expect(useSolver.getState()).toMatchObject({ subject: null, book: null, problem: null });
-    expect(navigation.push).toHaveBeenLastCalledWith('/cbse/doubt-solver');
+    // Everything chosen is gone: a fresh subject step (its back goes to the dashboard).
+    expect(navigation.replace).toHaveBeenLastCalledWith('/cbse/doubt-solver');
   });
 
   it('history: retries after an error, ignores the open chat and starts a new doubt', async () => {
@@ -144,6 +219,7 @@ describe('DoubtSolverScreen navigation', () => {
       }),
     );
     useSolver.setState({ subject: { id: 1, title: 'PHYSICS' }, problem: question, chatId: 8 });
+    navigation.searchParams = new URLSearchParams('step=chat');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     await screen.findByText('Think about forces.');
 
@@ -160,7 +236,7 @@ describe('DoubtSolverScreen navigation', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Previous doubts' }));
     await userEvent.click(within(await screen.findByRole('dialog', { name: 'Previous doubts' })).getByRole('button', { name: 'New doubt' }));
     expect(useSolver.getState().problem).toBeNull();
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver');
+    expect(navigation.replace).toHaveBeenCalledWith('/cbse/doubt-solver');
   });
 
   it('switches to another past doubt while in a chat, keeping the subject when it has none', async () => {
@@ -174,12 +250,57 @@ describe('DoubtSolverScreen navigation', () => {
     );
     useSolver.getState().chooseBook(physicsBook);
     useSolver.setState({ problem: question, chatId: 8 });
+    navigation.searchParams = new URLSearchParams('step=chat');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     await screen.findByText('Think about forces.');
     await userEvent.click(screen.getByRole('button', { name: 'Previous doubts' }));
     await userEvent.click(await screen.findByRole('button', { name: /Older/ }));
     expect(useSolver.getState()).toMatchObject({ chatId: 9, subject: { id: 1 }, book: { bookId: 11 }, problem: { display: 'Find g' } });
     expect(navigation.push).not.toHaveBeenCalled();
+  });
+});
+
+describe('Concept cards on phones', () => {
+  it('opens a raised card in a popover under the strip, and closes it by tap or Escape', async () => {
+    server.use(
+      plan,
+      http.get(`${API}${doubtsApiBase(cbse)}/chats/8/messages`, () =>
+        HttpResponse.json({ success: true, data: { conversations: [{ message_id: 1, is_student: 1, text: 'Q' }, { message_id: 2, is_student: 0, text: 'Think.' }] } }),
+      ),
+      http.post(`${API}${doubtsApiBase(cbse)}/chats/8/concept-cards`, () =>
+        HttpResponse.json({
+          success: true,
+          data: { concept_cards: [{ card_no: 1, title: 'Second law', explanation: 'F equals ma', image_url: 'https://cdn.test/d.png' }, { card_no: 2, title: 'Units', explanation: 'Newtons' }], sources: null },
+        }),
+      ),
+    );
+    useSolver.setState({ subject: { id: 1, title: 'PHYSICS' }, problem: question, chatId: 8 });
+    navigation.searchParams = new URLSearchParams('step=chat');
+    renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    const strip = (await screen.findAllByRole('region', { name: 'Concept cards' }))[0]!;
+    const first = await within(strip).findByRole('button', { name: 'Concept 1: Second law' });
+    expect(within(strip).getByText('Tap the concept cards for help')).toBeInTheDocument();
+
+    await userEvent.click(first);
+    expect(first).toHaveAttribute('aria-expanded', 'true');
+    expect(first.className).toContain('mt-0');
+    // The header line makes room; the explanation floats under the strip, pointing at the card.
+    expect(within(strip).queryByText('Tap the concept cards for help')).not.toBeInTheDocument();
+    expect(within(strip).getByText('Concept 1 of 2')).toBeInTheDocument();
+    expect(within(strip).getByText('F equals ma')).toBeInTheDocument();
+    expect(within(strip).getByRole('img', { name: 'Diagram' })).toHaveAttribute('src', 'https://cdn.test/d.png');
+
+    await userEvent.click(within(strip).getByRole('button', { name: 'Close concept 1' }));
+    expect(within(strip).queryByText('F equals ma')).not.toBeInTheDocument();
+
+    // A locked card unlocks and opens.
+    await userEvent.click(within(strip).getByRole('button', { name: 'Concept 2 (locked)' }));
+    expect(within(strip).getByText('Newtons')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(within(strip).queryByText('Newtons')).not.toBeInTheDocument();
+    await userEvent.click(within(strip).getByRole('button', { name: 'Concept 2: Units' }));
+    await userEvent.click(within(strip).getByRole('button', { name: 'Concept 2: Units' }));
+    expect(within(strip).queryByText('Newtons')).not.toBeInTheDocument();
   });
 });
 

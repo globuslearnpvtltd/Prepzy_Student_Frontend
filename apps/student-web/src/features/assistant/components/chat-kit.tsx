@@ -2,6 +2,8 @@
 
 import { cx } from '@prepzy/design-system';
 import { Plus, RotateCw, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { RichText } from '@/features/exam-engine/ui';
 import type { HistoryItem } from '../api';
 
@@ -18,6 +20,67 @@ export function toChatHtml(text: string): string {
 /** A chat message body: sanitised HTML with maths (MathJax only loads when there is maths). */
 export function ChatText({ text, className }: { text: string; className?: string }) {
   return <RichText html={toChatHtml(text)} className={cx('break-words [&_p]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5', className)} />;
+}
+
+/**
+ * A picture in a chat bubble: the student's photo or handwriting, or a figure in a reply. Shown whole (never
+ * cropped) on white paper with a thin border, at a readable size; tapping it opens the full-size viewer.
+ * Handwriting is exported at twice its written size, so the cap keeps it about as large as it was written.
+ */
+export function ChatImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`${alt}: open full size`}
+        className={cx(
+          'border-socrates-line bg-surface shadow-socrates-bubble block w-fit max-w-[min(100%,280px)] overflow-hidden rounded-md border p-1.5 cursor-zoom-in',
+          className,
+        )}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- local preview, data URL or backend CDN */}
+        <img src={src} alt={alt} loading="lazy" className="block h-auto max-h-[220px] w-auto max-w-full rounded-sm object-contain" />
+      </button>
+      {open && <ImageViewer src={src} alt={alt} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+/** Full-size picture over everything; Escape, the close button or a tap outside closes it (and only it). */
+export function ImageViewer({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation(); // the chat panel behind closes on Escape too
+      onClose();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+  // On <body>: chat panels are fixed layers of their own (a transform would trap a fixed child).
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label={alt} className="fixed inset-0 z-[110] flex items-center justify-center p-4" onClick={onClose}>
+      <div aria-hidden className="bg-night-900/80 absolute inset-0" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        onClick={(event) => event.stopPropagation()}
+        className="bg-surface relative max-h-[calc(100dvh-96px)] max-w-full rounded-md object-contain p-2 shadow-lg"
+      />
+      <button
+        type="button"
+        aria-label="Close picture"
+        onClick={onClose}
+        className="bg-surface text-socrates-ink absolute top-[max(12px,env(safe-area-inset-top))] right-3 flex size-10 items-center justify-center rounded-full shadow-lg"
+      >
+        <X aria-hidden className="size-5" />
+      </button>
+    </div>,
+    document.body,
+  );
 }
 
 export function Avatar({ src, size, alt = '', pending }: { src: string | null; size: number; alt?: string; pending?: boolean }) {

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
+import { resetHistory, simulateHistory } from '@/test/history';
 import { navigation } from '@/test/setup';
 import {
   buildSolvePayload,
@@ -21,7 +22,7 @@ import {
   toTutorReply,
 } from './api';
 import { doubtsApiBase as doubts } from './api';
-import { DoubtSolverScreen, resolveStep } from './components/doubt-solver-screen';
+import { DoubtSolverScreen, fromStep, resolveStep } from './components/doubt-solver-screen';
 import { matchesSearch } from './components/question-bank';
 import { bookTransform, wrapOffset } from './components/subject-picker';
 import { useSolver } from './store';
@@ -53,7 +54,9 @@ beforeEach(() => {
   useSolver.setState({ subject: null, book: null, problem: null, chatId: null, className: null });
   navigation.searchParams = new URLSearchParams();
   navigation.pathname = '/cbse/doubt-solver';
+  simulateHistory();
 });
+afterEach(resetHistory);
 
 describe('doubt solver api', () => {
   it('lists solvable board textbooks (all for NEET) and formats subject names', () => {
@@ -124,7 +127,14 @@ describe('doubt solver api', () => {
     expect(resolveStep('ask', { ...none, hasSubject: true })).toBe('ask');
     expect(resolveStep('start', { ...none, hasSubject: true })).toBe('start');
     expect(resolveStep('question-bank', { hasSubject: true, hasBook: true, hasProblem: true })).toBe('question-bank');
-    expect(resolveStep(null, { ...none, hasProblem: true })).toBe('chat');
+    // The URL decides: a stored problem shows only on the chat step (so the back gesture leaves it).
+    expect(resolveStep('chat', { ...none, hasProblem: true })).toBe('chat');
+    expect(resolveStep(null, { ...none, hasProblem: true })).toBe('subject');
+    expect(resolveStep('ask', { hasSubject: true, hasBook: false, hasProblem: true })).toBe('ask');
+    expect(resolveStep('chat', { ...none, hasSubject: true })).toBe('ask');
+    expect(fromStep('question-bank')).toBe('question-bank');
+    expect(fromStep('elsewhere')).toBeNull();
+    expect(fromStep(null)).toBeNull();
   });
 
   it('places carousel books around the centre, wrapping the list', () => {
@@ -146,14 +156,16 @@ describe('Ask Socrates flow', () => {
     // Question Bank before choosing a book asks to pick one.
     await userEvent.click(screen.getByRole('button', { name: 'Question Bank' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Please select a subject first');
-    const center = await screen.findByRole('button', { name: 'Physics, Physics Part 1', pressed: false });
+    expect(await screen.findByRole('button', { name: 'Physics, Physics Part 1', pressed: false })).toBeInTheDocument();
     expect(next).toBeDisabled();
-    await userEvent.click(center);
-    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(useSolver.getState().subject).toEqual({ id: 1, title: 'PHYSICS' });
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=start');
     await userEvent.click(screen.getByRole('button', { name: 'Next subject' }));
     expect(screen.getByText('Maths Part 1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Previous subject' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Physics, Physics Part 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(useSolver.getState().subject).toEqual({ id: 1, title: 'PHYSICS' });
+    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=start&from=subject');
+    expect(await screen.findByRole('heading', { name: 'How do you want to start?' })).toBeInTheDocument();
   });
 
   it('uses the NEET subject list', async () => {
@@ -175,9 +187,11 @@ describe('Ask Socrates flow', () => {
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     expect(screen.getByRole('heading', { name: 'How do you want to start?' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Ask your own doubt/ }));
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=ask');
+    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=ask&from=start');
+    navigation.searchParams = new URLSearchParams('step=start');
     await userEvent.click(screen.getByRole('button', { name: /Solve from Question Bank/ }));
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=question-bank');
+    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=question-bank&from=start');
+    navigation.searchParams = new URLSearchParams('step=start');
     await userEvent.click(screen.getByRole('button', { name: 'Change subject' }));
     expect(navigation.replace).toHaveBeenCalledWith('/cbse/doubt-solver');
   });
@@ -185,6 +199,7 @@ describe('Ask Socrates flow', () => {
   it('asks a typed question: checks it, then solves step by step with concept cards', async () => {
     let created: unknown = null;
     let tutorText: FormDataEntryValue | null = null;
+    let asks = 0;
     server.use(
       plan(),
       http.post(`${API}${doubts(cbse)}/check`, async ({ request }) => {
@@ -203,6 +218,9 @@ describe('Ask Socrates flow', () => {
         }),
       ),
       http.post(`${API}${doubts(cbse)}/chats/90/ask`, async ({ request }) => {
+        asks += 1;
+        // jsdom's File can't be read back from a request body: the picture-only turn is just counted.
+        if (asks > 2) return HttpResponse.json({ success: true, data: { chat_id: 90, text: 'Nice working.', current_card_no: 2 } });
         const form = await request.formData();
         tutorText = form.get('text');
         expect(form.get('sub_name')).toBe('PHYSICS');
@@ -222,7 +240,7 @@ describe('Ask Socrates flow', () => {
 
     await userEvent.clear(screen.getByRole('textbox'));
     await userEvent.type(screen.getByRole('textbox'), 'A force of 10 N acts on 2 kg{Enter}');
-    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=chat'));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=chat&from=ask'));
     expect(useSolver.getState().problem?.display).toBe('A force of 10 N acts on 2 kg');
 
     // With a question in the store the screen switches to the chat.
@@ -239,10 +257,22 @@ describe('Ask Socrates flow', () => {
     await waitFor(() => expect(within(decks[1]!).getByRole('button', { name: 'Concept 2: Units' })).toBeInTheDocument());
     await userEvent.click(within(decks[1]!).getByRole('button', { name: 'Hint' }));
 
+    // A photo or a handwritten step can go on its own (no text), shown whole in the bubble.
+    URL.createObjectURL = vi.fn(() => 'blob:work');
+    URL.revokeObjectURL = vi.fn();
+    expect(screen.getByRole('button', { name: 'Write by hand' })).toBeInTheDocument();
+    await userEvent.upload(screen.getByTestId('composer-file'), new File(['img'], 'work.png', { type: 'image/png' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await within(conversation).findByRole('img', { name: 'Your picture' })).toHaveAttribute('src', 'blob:work');
+    expect(await within(conversation).findByText('Nice working.')).toBeInTheDocument();
+    expect(asks).toBe(3);
+
     await userEvent.click(screen.getAllByRole('button', { name: 'Go back' })[0]!);
     await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Leave' }));
     expect(useSolver.getState().problem).toBeNull();
-    expect(navigation.replace).toHaveBeenCalledWith('/cbse/doubt-solver?step=start');
+    // Back to the step the chat was opened from.
+    expect(navigation.back).toHaveBeenCalled();
+    expect(navigation.searchParams.get('step')).toBe('ask');
   });
 
   it('reads a photo of the question (maths checker) before solving', async () => {
@@ -285,6 +315,7 @@ describe('Ask Socrates flow', () => {
       }),
     );
     useSolver.setState({ subject: { id: 1, title: 'PHYSICS' }, problem: { problem: 'Q', display: 'Q', images: [] } });
+    navigation.searchParams = new URLSearchParams('step=chat');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     expect(await screen.findByText("Couldn't reply")).toBeInTheDocument();
     expect((await screen.findAllByText("Concept cards can't be generated")).length).toBeGreaterThan(0);
@@ -307,6 +338,7 @@ describe('Ask Socrates flow', () => {
       }),
     );
     useSolver.setState({ subject: { id: 1, title: 'PHYSICS' }, problem: { problem: 'Q', display: 'Q', images: [] } });
+    navigation.searchParams = new URLSearchParams('step=chat');
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     await waitFor(() => expect(useSolver.getState().problem).toBeNull());
     expect(asked).toBe(false);
@@ -329,7 +361,7 @@ describe('Ask Socrates flow', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Previous doubts' }));
     await userEvent.click(await screen.findByRole('button', { name: /Old doubt/ }));
     expect(useSolver.getState()).toMatchObject({ chatId: 33, subject: { id: 3, title: 'MATHEMATICS' }, book: null });
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=chat');
+    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=chat&from=ask');
     view.unmount();
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     expect(await screen.findByText('Recall the power rule.')).toBeInTheDocument();
@@ -359,7 +391,7 @@ describe('Ask Socrates flow', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'End of chapter' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Solve' }));
     expect(useSolver.getState().problem).toMatchObject({ display: 'State Coulomb law' });
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=chat');
+    expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=chat&from=question-bank');
     expect(matchesSearch({ html: 'Find $x$', options: [], subQuestions: [] } as never, '')).toBe(true);
   });
 

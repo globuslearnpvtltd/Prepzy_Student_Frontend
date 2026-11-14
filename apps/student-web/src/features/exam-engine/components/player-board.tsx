@@ -112,7 +112,7 @@ function StatusPanel({ session, attempt, question, secondsLeft, counts, onSelect
 
 /** CBSE-style player (previous app's components/elements/mock-exam). */
 export function BoardPlayer(props: ExamPlayerLayout) {
-  const { attempt, question, secondsLeft, onSubmit, onExit, onNext } = props;
+  const { session, attempt, question, secondsLeft, onSubmit, onExit, onNext } = props;
   const [statusOpen, setStatusOpen] = useState(false);
   const { index } = attempt;
   const select = (i: number) => {
@@ -156,6 +156,7 @@ export function BoardPlayer(props: ExamPlayerLayout) {
               number={index + 1}
               answer={attempt.snapshot.answers[question.id]}
               onAnswer={(value) => attempt.answer(question.id, value)}
+              draftKey={`answer:${session.key}:${question.id}`}
             />
           </section>
           <footer className="flex items-center gap-3">

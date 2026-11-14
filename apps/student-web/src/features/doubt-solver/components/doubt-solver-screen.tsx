@@ -17,13 +17,28 @@ import { SubjectPicker } from './subject-picker';
 
 export type SolverStep = 'subject' | 'start' | 'ask' | 'question-bank' | 'chat';
 
-/** Which step to show: the URL asks for one, the stored selection decides whether it's possible. */
+const STEPS: readonly SolverStep[] = ['subject', 'start', 'ask', 'question-bank', 'chat'];
+
+/**
+ * Which step to show: the URL decides (so the browser's and the phone's back gesture move between steps), the stored
+ * selection only says whether that step is possible.
+ */
 export function resolveStep(param: string | null, state: { hasSubject: boolean; hasBook: boolean; hasProblem: boolean }): SolverStep {
   if (param === 'question-bank' && state.hasSubject && state.hasBook) return 'question-bank';
-  if (state.hasProblem) return 'chat';
-  if (param === 'ask' && state.hasSubject) return 'ask';
+  if (param === 'chat' && state.hasProblem) return 'chat';
+  if ((param === 'ask' || param === 'chat') && state.hasSubject) return 'ask';
   if (param === 'start' && state.hasSubject) return 'start';
   return 'subject';
+}
+
+/** Whether the tab has an earlier page of this site to go back to (Navigation API; unknown elsewhere). */
+function canGoBackInApp() {
+  return (window as { navigation?: { canGoBack?: boolean } }).navigation?.canGoBack === true;
+}
+
+/** The solver step the current one was opened from (`from` in the URL), when it was opened inside the solver. */
+export function fromStep(param: string | null): SolverStep | null {
+  return STEPS.find((step) => step === param) ?? null;
 }
 
 function useHydrated() {
@@ -53,11 +68,28 @@ export function DoubtSolverScreen() {
     hasBook: !!solver.book,
     hasProblem: !!solver.problem,
   });
-  const go = (next: Exclude<SolverStep, 'subject'> | 'subject', replace = false) => {
+  const from = fromStep(params?.get('from') ?? null);
+  const urlFor = (next: SolverStep, cameFrom: SolverStep | null) => {
     const url = next === 'subject' ? routes.doubtSolver(exam.slug) : routes.doubtSolverStep(exam.slug, next);
-    if (replace) router.replace(url);
-    else router.push(url);
+    return cameFrom ? `${url}${url.includes('?') ? '&' : '?'}from=${cameFrom}` : url;
   };
+  /** Opens a step on top of this one; its back returns here. */
+  const go = (next: SolverStep) => router.push(urlFor(next, step));
+  /**
+   * Moves to `target` in place of this step: back in history when this step was opened from `target`, so no
+   * duplicate entries pile up; otherwise this entry is replaced and keeps its own way back.
+   */
+  const goBackTo = (target: SolverStep, keepFrom = true) => {
+    if (keepFrom && from === target) router.back();
+    else router.replace(urlFor(target, keepFrom ? from : null));
+  };
+  /** Back buttons: where this step was opened from, else the step above it. */
+  const back = (parent: SolverStep) => {
+    if (from) router.back();
+    else router.replace(urlFor(parent, null));
+  };
+  /** Textbook selection's "‹ Dashboard": out of Socrates. */
+  const exitToDashboard = () => router.push(routes.dashboard(exam.slug));
 
   useEffect(() => {
     if (step !== 'chat' && step !== 'ask') setHistoryOpen(false);
@@ -72,12 +104,14 @@ export function DoubtSolverScreen() {
   };
   const askNew = () => {
     solver.clearProblem();
-    go(solver.subject ? 'ask' : 'subject');
+    goBackTo(solver.subject ? 'ask' : 'subject');
   };
   const newProblem = () => {
     solver.reset();
-    go('subject');
+    // Everything chosen before is gone, so the earlier solver steps in history are too.
+    goBackTo('subject', false);
   };
+  const changeSubject = () => goBackTo('subject');
   const openBank = solver.book ? () => go('question-bank') : undefined;
 
   const historyDrawer = (
@@ -115,7 +149,13 @@ export function DoubtSolverScreen() {
   );
 
   if (step === 'question-bank') {
-    return <QuestionBank onBack={() => router.back()} onChangeSubject={() => go('subject')} onSolve={(payload) => solve({ ...payload })} />;
+    return (
+      <QuestionBank
+        onBack={() => back(solver.subject ? 'start' : 'subject')}
+        onChangeSubject={changeSubject}
+        onSolve={(payload) => solve({ ...payload })}
+      />
+    );
   }
 
   if (step === 'chat') {
@@ -145,7 +185,10 @@ export function DoubtSolverScreen() {
                   onClick={() => {
                     setLeaving(false);
                     solver.clearProblem();
-                    go(solver.subject ? 'start' : 'subject', true);
+                    // Back to the step it was opened from, or to the page that handed the question over (a PYQ's
+                    // "Solve step by step"); a chat opened directly goes to the start of the solver.
+                    if (from || canGoBackInApp()) router.back();
+                    else router.replace(urlFor(solver.subject ? 'start' : 'subject', null));
                   }}
                   className="bg-brand text-on-brand flex-1 rounded-full py-2 text-[14px] font-semibold"
                 >
@@ -162,8 +205,8 @@ export function DoubtSolverScreen() {
   if (step === 'ask') {
     return (
       <div className="bg-socrates-page flex h-dvh flex-col">
-        <SolverHeader onBack={() => go('start', true)} onQuestionBank={openBank} onHistory={() => setHistoryOpen(true)} />
-        <DesktopBack onClick={() => go('start', true)} />
+        <SolverHeader onBack={() => back('start')} onQuestionBank={openBank} onHistory={() => setHistoryOpen(true)} />
+        <DesktopBack onClick={() => back('start')} />
         <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pt-[18vh] pb-8 md:items-center md:pt-0">
           <AskDoubt onSolve={solve} />
         </div>
@@ -175,15 +218,16 @@ export function DoubtSolverScreen() {
   return (
     <div className="bg-socrates-page flex h-dvh flex-col">
       <SolverHeader
-        onBack={() => (step === 'start' ? go('subject', true) : router.push(routes.dashboard(exam.slug)))}
+        onBack={step === 'start' ? () => back('subject') : exitToDashboard}
+        backToDashboard={step === 'subject'}
         onQuestionBank={step === 'subject' ? () => setBankRequest((n) => n + 1) : openBank}
       />
-      {step === 'start' && <DesktopBack onClick={() => go('subject', true)} />}
+      {step === 'start' && <DesktopBack onClick={() => back('subject')} />}
       <div className={`flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pb-8 md:py-10 ${step === 'subject' ? 'pt-[16vh] md:pt-10' : 'max-md:px-0 max-md:pb-0 md:pt-8'}`}>
         {step === 'subject' ? (
           <SubjectPicker onNext={() => go('start')} onQuestionBank={() => go('question-bank')} questionBankRequest={bankRequest} />
         ) : (
-          <StartOptions onAsk={() => go('ask')} onQuestionBank={() => go('question-bank')} onChangeSubject={() => go('subject', true)} />
+          <StartOptions onAsk={() => go('ask')} onQuestionBank={() => go('question-bank')} onChangeSubject={changeSubject} />
         )}
       </div>
     </div>

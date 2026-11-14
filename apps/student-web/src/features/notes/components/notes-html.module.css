@@ -63,3 +63,14 @@
   .notes :global(table) { font-size: 0.9375rem; }
   .notes :global(:is(th, td)) { padding: 0.625rem 0.875rem; }
 }
+
+/*
+ * Notes that bring their own stylesheet (scoped to the notes box, see document.ts) only get what keeps them inside
+ * the reader: nothing widens the page, sections clear the fixed header, and standalone-page chrome stays hidden.
+ */
+.document { min-width: 0; overflow-wrap: break-word; }
+.document :global([id]) { scroll-margin-top: 96px; }
+.document :global(:is(img, video, iframe, svg, figure, canvas)) { max-width: 100%; }
+.document :global(img) { height: auto; }
+.document :global(.table-scroll) { overflow-x: auto; margin: 1rem 0; -webkit-overflow-scrolling: touch; }
+.document :global(:is(.navbar, .sidebar, footer.footer)) { display: none !important; }

@@ -1,4 +1,4 @@
-import type { Answer, AttemptSnapshot, ExamQuestion, QuestionStatus, WrittenAnswer } from './model';
+import type { Answer, AttemptSnapshot, ExamQuestion, QuestionStatus, UploadedImage, WrittenAnswer } from './model';
 
 export const emptySnapshot = (): AttemptSnapshot => ({ answers: {}, visited: [], marked: [] });
 
@@ -82,6 +82,19 @@ export function writtenToHtml(answer: WrittenAnswer): string {
     .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`);
   const images = answer.images.map((img) => imageHtml(img.url));
   return [...paragraphs, ...images].join('');
+}
+
+/** Alt text of a handwritten page in an answer (the result screens style these as paper). */
+export const HANDWRITING_ALT = 'Handwritten answer';
+
+/** The answer with one more uploaded picture at the end (used when the editor is no longer on screen). */
+export function withAnswerImage(answer: WrittenAnswer, image: UploadedImage, alt = 'Answer image'): WrittenAnswer {
+  const html = answer.html?.trim() ? answer.html : writtenToHtml(answer);
+  return {
+    ...answer,
+    html: `${html}<p><img src="${escapeHtml(image.url)}" alt="${escapeHtml(alt)}"></p>`,
+    images: [...answer.images, image],
+  };
 }
 
 /** Image URLs embedded in answer HTML, in order. */

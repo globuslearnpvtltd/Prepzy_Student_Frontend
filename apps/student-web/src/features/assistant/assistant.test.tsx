@@ -6,7 +6,7 @@ import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
 import { atlasEndpoints, imageSrc, toAnswer, toAvatar, toConversation, toHistory, toMessage } from './api';
 import { AtlasHost, showsAtlasLauncher } from './components/atlas-host';
-import { relativeDay, toChatHtml } from './components/chat-kit';
+import { ChatImage, relativeDay, toChatHtml } from './components/chat-kit';
 import { Composer } from './components/composer';
 import { LectureAtlas } from './components/lecture-atlas';
 import { ReviewChat } from './components/review-chat';
@@ -292,6 +292,70 @@ describe('composer', () => {
     expect(onSend).toHaveBeenCalledWith('x√', file);
   });
 
+  it('has no pen unless the writing pad is switched on', () => {
+    renderWithProviders(<Composer placeholder="Ask" onSend={() => undefined} />);
+    expect(screen.queryByRole('button', { name: 'Write by hand' })).not.toBeInTheDocument();
+  });
+
+  it('opens the writing pad, steps back on Escape and sends the handwriting as the image', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      () => new Proxy({}, { get: () => () => undefined, set: () => true }) as never,
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => callback(new Blob(['png'], { type: 'image/png' })));
+    // A saved draft of this chat: one short line.
+    sessionStorage.setItem('prepzy-ink:atlas:7', JSON.stringify([[0, [1, 1, 0.5, 20, 20, 0.5]]]));
+    const onSend = vi.fn();
+    renderWithProviders(<Composer placeholder="Ask" onSend={onSend} allowInk inkDraftKey="atlas:7" />);
+
+    // The draft is attached; a photo can't be added on top of it.
+    expect(await screen.findByRole('button', { name: 'Handwriting attached' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Write by hand' }));
+    expect(screen.getByRole('toolbar', { name: 'Handwriting tools' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Math symbols' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bigger writing area' }));
+    expect(screen.getByRole('dialog', { name: 'Write your question' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('toolbar', { name: 'Handwriting tools' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledWith('', expect.objectContaining({ type: 'image/png' })));
+    expect(screen.queryByRole('button', { name: 'Handwriting attached' })).not.toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
+  it('shows a small picture of the attached handwriting (the PNG that will be sent)', async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      () => new Proxy({}, { get: () => () => undefined, set: () => true }) as never,
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => callback(new Blob(['png'], { type: 'image/png' })));
+    URL.createObjectURL = vi.fn(() => 'blob:ink');
+    URL.revokeObjectURL = vi.fn();
+    sessionStorage.setItem('prepzy-ink:p', JSON.stringify([[0, [1, 1, 0.5, 20, 20, 0.5]]]));
+    const view = renderWithProviders(<Composer placeholder="Ask" onSend={() => undefined} allowInk inkDraftKey="p" inkTitle="Write your answer" />);
+    expect(await screen.findByRole('img', { name: 'Your handwriting' })).toHaveAttribute('src', 'blob:ink');
+    // Opening the pad hides the picture (the pad shows the writing itself), and the full-screen dialog has its title.
+    await userEvent.click(screen.getByRole('button', { name: 'Handwriting attached' }));
+    expect(screen.queryByRole('img', { name: 'Your handwriting' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Bigger writing area' }));
+    expect(screen.getByRole('dialog', { name: 'Write your answer' })).toBeInTheDocument();
+    view.unmount();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:ink');
+    vi.restoreAllMocks();
+  });
+
+  it('removes attached handwriting', async () => {
+    sessionStorage.setItem('prepzy-ink:k', JSON.stringify([[0, [1, 1, 0.5, 20, 20, 0.5]]]));
+    renderWithProviders(<Composer placeholder="Ask" onSend={() => undefined} allowInk inkDraftKey="k" />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove handwriting' }));
+    expect(screen.queryByRole('button', { name: 'Handwriting attached' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeEnabled();
+  });
+
   it('rejects non-images', async () => {
     renderWithProviders(<Composer placeholder="Ask" onSend={() => undefined} />);
     await userEvent.upload(screen.getByTestId('composer-file'), new File(['x'], 'a.pdf', { type: 'application/pdf' }), { applyAccept: false });
@@ -326,5 +390,30 @@ describe('composer', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));
     await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue('what is torque'));
     vi.unstubAllGlobals();
+  });
+});
+
+describe('ChatImage', () => {
+  it('shows the picture whole and opens it full size; Escape closes only the viewer', async () => {
+    const onPanelKey = vi.fn();
+    window.addEventListener('keydown', onPanelKey);
+    renderWithProviders(<ChatImage src="https://cdn.test/ink.png" alt="Your picture" />);
+    const thumb = screen.getByRole('img', { name: 'Your picture' });
+    expect(thumb).toHaveClass('object-contain');
+    expect(thumb).not.toHaveClass('object-cover');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Your picture: open full size' }));
+    const viewer = screen.getByRole('dialog', { name: 'Your picture' });
+    expect(within(viewer).getByRole('img')).toHaveAttribute('src', 'https://cdn.test/ink.png');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onPanelKey).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Your picture: open full size' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('img'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument(); // tapping the picture itself keeps it open
+    await userEvent.click(screen.getByRole('button', { name: 'Close picture' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    window.removeEventListener('keydown', onPanelKey);
   });
 });

@@ -212,7 +212,8 @@ export function useSolverChat(exam: ExamConfig) {
 
   const send = (text: string, image: File | null) => {
     const trimmed = text.trim();
-    if (!trimmed || thinking) return;
+    // A photo or a handwritten step can go on its own: the backend reads it as text for Socrates.
+    if ((!trimmed && !image) || thinking) return;
     const id = newId();
     setMessages((list) => [...list, { id, fromStudent: true, text: trimmed, images: image ? [URL.createObjectURL(image)] : [] }]);
     const request = { text: trimmed, className: classNameToSend, subject, images: image ? [image] : undefined };

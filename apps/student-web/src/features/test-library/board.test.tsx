@@ -30,13 +30,15 @@ describe('BoardAssessments: full length exams', () => {
       }),
     );
     renderWithProviders(<BoardAssessments />, { exam: cbse });
-    const physics = await screen.findByRole('link', { name: /physics/ });
+    const physics = await screen.findByRole('link', { name: /physics/i });
     expect(physics).toHaveAttribute('href', '/cbse/mock-sets/3');
     expect(physics).toHaveTextContent('4 Exams');
+    // The dashboard's subject card (same hover: brand fill, zoom, white text).
+    expect(physics).toHaveClass('group', 'hover:bg-brand', 'hover:scale-105');
 
     await userEvent.click(screen.getByRole('tab', { name: 'Past Year Exams' }));
     expect(screen.getByRole('tab', { name: 'Past Year Exams' })).toHaveAttribute('aria-selected', 'true');
-    expect(await screen.findByRole('link', { name: /chemistry/ })).toHaveAttribute('href', '/cbse/pyq-sets/5');
+    expect(await screen.findByRole('link', { name: /chemistry/i })).toHaveAttribute('href', '/cbse/pyq-sets/5');
     expect(screen.getByText(/Actual CBSE board papers/)).toBeInTheDocument();
   });
 

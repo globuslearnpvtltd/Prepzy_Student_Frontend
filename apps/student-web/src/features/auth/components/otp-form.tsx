@@ -278,6 +278,9 @@ function CodeBoxes({
       <div aria-hidden className="flex gap-[7px] lg:gap-2.5">
         {Array.from({ length: CODE_LENGTH }, (_, i) => {
           const digit = digits[i];
+          // The hidden input's own caret can't show, so the active box draws a blinking one
+          // (after the last digit once all six are typed).
+          const showCaret = focused && i === caret;
           return (
             <span
               key={i}
@@ -290,6 +293,12 @@ function CodeBoxes({
               }`}
             >
               {digit}
+              {showCaret && (
+                <span
+                  data-testid="otp-caret"
+                  className={`otp-caret bg-brand h-6 w-0.5 rounded-full lg:h-7 ${digit ? 'ml-0.5' : ''}`}
+                />
+              )}
             </span>
           );
         })}

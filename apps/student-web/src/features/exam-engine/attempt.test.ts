@@ -1,4 +1,5 @@
 import {
+  withAnswerImage,
   countStatuses,
   emptySnapshot,
   htmlImageUrls,
@@ -116,5 +117,19 @@ describe('rich written answers', () => {
     expect(writtenToHtml({ text: 'plain', html: '', images: [] })).toBe('<p>plain</p>');
     expect(toWritten({ text: '', images: [] })).toEqual({ text: '', images: [] });
     expect(isAnswered({ kind: 'written', text: '', html: '<p><img src="u"></p>', images: [extra] })).toBe(true);
+  });
+});
+
+describe('withAnswerImage', () => {
+  const image = { url: 'https://cdn/i.png?a=1&b=2', publicId: 'p' };
+  it('appends the picture to rich or plain answers', () => {
+    expect(withAnswerImage({ text: 'x', html: '<p>x</p>', images: [] }, image, 'Handwritten answer')).toEqual({
+      text: 'x',
+      html: '<p>x</p><p><img src="https://cdn/i.png?a=1&amp;b=2" alt="Handwritten answer"></p>',
+      images: [image],
+    });
+    expect(withAnswerImage({ text: 'a < b', images: [] }, image).html).toBe(
+      '<p>a &lt; b</p><p><img src="https://cdn/i.png?a=1&amp;b=2" alt="Answer image"></p>',
+    );
   });
 });

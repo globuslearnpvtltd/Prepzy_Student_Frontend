@@ -4,6 +4,9 @@ import { assertOk } from '@/shared/lib/unwrap';
 import type { UploadedImage } from './model';
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+/** Pictures (photos and handwritten pages) one answer may carry; the backend refuses more. */
+export const MAX_ANSWER_IMAGES = 10;
+export const TOO_MANY_IMAGES = `An answer can have up to ${MAX_ANSWER_IMAGES} pictures.`;
 
 /** Uploads one photo of a written answer (the backend accepts a single file per request). */
 export async function uploadAnswerImage(file: File): Promise<UploadedImage> {

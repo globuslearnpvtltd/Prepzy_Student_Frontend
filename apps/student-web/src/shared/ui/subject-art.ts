@@ -42,17 +42,36 @@ const BOARD: Record<string, SubjectArt> = {
 
 const BOARD_DEFAULT = art('board-default', 126, 90, 0, { right: 0 });
 
-const COMPETITIVE: Record<string, SubjectArt> = {
-  physics: art('neet-physics', 292, 109, 0, { right: 0 }),
-  chemistry: art('neet-chemistry', 315, 115, 0, { right: 4 }),
-  botany: art('neet-botany', 318, 86, 0, { left: 8 }),
-  zoology: art('neet-zoology', 325, 87, 0, { left: 8 }),
+/**
+ * Competitive (NEET-style) subject illustrations. The files are colour-free masks: `src` is the resting artwork
+ * (shapes at 30% alpha), `hoverSrc` the 1px outline of the same shapes that the previous app drew in orange when the
+ * card was hovered. `CompetitiveSubjectArt` paints them with design-token colours.
+ */
+export interface CompetitiveArt extends SubjectArt {
+  hoverSrc: string;
+}
+
+const competitiveArt = (file: string, width: number, height: number, side: { right: number } | { left: number }): CompetitiveArt => ({
+  ...art(file, width, height, 0, side),
+  hoverSrc: `/illustrations/subjects/${file}-hover.svg`,
+});
+
+const COMPETITIVE: Record<string, CompetitiveArt> = {
+  physics: competitiveArt('neet-physics', 292, 109, { right: 0 }),
+  chemistry: competitiveArt('neet-chemistry', 315, 115, { right: 4 }),
+  botany: competitiveArt('neet-botany', 318, 86, { left: 8 }),
+  zoology: competitiveArt('neet-zoology', 325, 87, { left: 8 }),
 };
+
+/** Any other subject: the previous app's default artwork (solid, filled orange and outlined on hover). */
+const COMPETITIVE_DEFAULT = competitiveArt('neet-default', 150, 90, { right: 0 });
 
 export function boardSubjectArt(subject: string): SubjectArt {
   return BOARD[subject.trim().toLowerCase()] ?? BOARD_DEFAULT;
 }
 
-export function competitiveSubjectArt(subject: string): SubjectArt | null {
-  return COMPETITIVE[subject.trim().toLowerCase()] ?? null;
+/** Matched by subject name (case-insensitive, an exam prefix such as "NEET-" ignored), else the default artwork. */
+export function competitiveSubjectArt(subject: string): CompetitiveArt {
+  const name = subject.trim().toLowerCase();
+  return COMPETITIVE[name] ?? COMPETITIVE[name.replace(/^[^-]+-\s*/, '')] ?? COMPETITIVE_DEFAULT;
 }

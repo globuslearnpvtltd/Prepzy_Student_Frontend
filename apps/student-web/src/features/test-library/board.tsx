@@ -3,14 +3,14 @@
 import { cx } from '@prepzy/design-system';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart3, ChevronLeft, CircleCheck, FilePenLine, FileText, Lightbulb, Loader, Pause } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ContinueAssessment, SolverDiscovery, SyllabusCards } from '@/features/dashboard';
 import { useTestContext } from '@/features/exam-engine';
+import { titleCase } from '@/features/learn';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
-import { boardSubjectArt } from '@/shared/ui/subject-art';
+import { SubjectCardGrid } from '@/shared/ui/subject-card';
 import { BoardCustomTestBuilder, BoardSavedTests } from './board-custom';
 import { libraryApi, type BoardPaper, type BoardPaperKind } from './api';
 import { EmptyState, GridSkeleton, LoadError, pad2 } from './kit';
@@ -147,30 +147,18 @@ function FullLengthExams() {
       ) : subjects.data.length === 0 ? (
         <EmptyState title="Coming Soon..." />
       ) : (
-        <ul className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {subjects.data.map((subject) => {
-            const art = boardSubjectArt(subject.title);
-            return (
-              <li key={subject.id}>
-                <Link
-                  href={setsRoute(kind, exam.slug, subject.id)}
-                  className="border-neutral-150 bg-surface relative flex h-[150px] flex-col gap-1 overflow-hidden rounded-[20px] border-2 p-5 hover:shadow-card"
-                >
-                  <span className="text-lg font-bold text-neutral-900 capitalize">{subject.title.toLowerCase()}</span>
-                  <span className="text-sm font-bold text-neutral-900">{subject.count} Exams</span>
-                  <Image
-                    src={art.src}
-                    alt=""
-                    width={art.width}
-                    height={art.height}
-                    className="absolute opacity-80"
-                    style={{ bottom: art.bottom, right: art.right, left: art.left }}
-                  />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <SubjectCardGrid
+          key={kind}
+          collapse
+          label={`${copy.title} subjects`}
+          items={subjects.data.map((subject) => ({
+            key: subject.id,
+            title: titleCase(subject.title),
+            subject: subject.title,
+            meta: `${subject.count} Exams`,
+            href: setsRoute(kind, exam.slug, subject.id),
+          }))}
+        />
       )}
     </section>
   );

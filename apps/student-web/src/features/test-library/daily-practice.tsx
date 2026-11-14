@@ -33,7 +33,8 @@ export function DailyPractice() {
   const today = live.data;
 
   return (
-    <div className="flex flex-col gap-6">
+    // As the previous app's DPP page: 22px on phones, 40px (the shell's alone) on desktop.
+    <div className="flex flex-col gap-6 p-3 lg:p-0">
       <HubBreadcrumb label="Daily Practice" />
       <h1 className="text-brand text-2xl font-bold">Daily Practice</h1>
 

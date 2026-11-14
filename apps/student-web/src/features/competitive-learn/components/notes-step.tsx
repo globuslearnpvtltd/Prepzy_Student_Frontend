@@ -3,7 +3,7 @@
 import { Check, Download } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
-import { RichText } from '@/features/exam-engine/ui';
+import { NotesHtml } from '@/features/notes/ui';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { useChapter, useMarkComplete, useStudyNotes } from '../hooks';
@@ -115,7 +115,7 @@ export function NotesStep({ courseId, moduleId, step }: ChapterProps) {
           {notes.isPending ? (
             <p className="text-neutral-800">Loading...</p>
           ) : html ? (
-            <RichText html={html} className="study-notes" />
+            <NotesHtml html={html} fallbackClassName="study-notes" />
           ) : (
             <ComingSoon
               title="Notes Coming Soon!"

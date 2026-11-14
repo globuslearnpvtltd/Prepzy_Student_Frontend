@@ -15,7 +15,7 @@ import { userMessage } from '@/shared/lib/errors';
 import { useExamResult } from '../hooks';
 import type { ExamResult, Outcome, ResultQuestion } from '../model';
 import { testHome } from '../test-links';
-import { CompetitiveBreadcrumb } from './player-competitive';
+import { CompetitiveBreadcrumb, competitivePage } from './player-competitive';
 import { QuestionGrid, REVIEW_LEGEND, StatusLegend } from './question-palette';
 import { ReportProblem } from './report-problem';
 import { RichText } from './rich-text';
@@ -294,7 +294,7 @@ function CompetitiveResult({ result, home }: { result: ExamResult; home: { label
   const card = 'bg-surface rounded-2xl border border-neutral-100 shadow-sm';
 
   return (
-    <div className="mx-auto flex max-w-[1180px] flex-col gap-4 p-4 lg:p-10 lg:pt-12">
+    <div className={cx(competitivePage, 'pb-10')}>
       <CompetitiveBreadcrumb home={home} current="Result" onBack={() => router.push(home.href)} />
       <section className={cx(card, 'flex flex-wrap items-center justify-between gap-4 px-6 py-4')}>
         <div>

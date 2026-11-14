@@ -19,7 +19,7 @@ import type { ExamRef } from '@/shared/config/exams';
 import { useExam } from '@/shared/hooks/use-exam';
 import type { ReviewContext } from '../api';
 import { useReadAloud, useReviewChat } from '../hooks';
-import { Avatar, ChatText, TypingDots } from './chat-kit';
+import { Avatar, ChatImage, ChatText, TypingDots } from './chat-kit';
 import { Composer } from './composer';
 
 export const VEDICA_IMAGE = '/illustrations/tests/vedica.jpg';
@@ -189,10 +189,7 @@ function ReviewChatPanel({ context, onClose }: { context: ReviewContext; onClose
               {chat.messages.map((message) =>
                 message.fromStudent ? (
                   <li key={message.id} className="flex flex-col items-end gap-1.5">
-                    {message.image && (
-                      // eslint-disable-next-line @next/next/no-img-element -- local preview or backend upload
-                      <img src={message.image} alt="Your photo" className="border-socrates-line max-w-[200px] rounded-md border object-contain" />
-                    )}
+                    {message.image && <ChatImage src={message.image} alt="Your picture" />}
                     {message.text && (
                       <div className="from-brand-450 to-brand text-on-brand max-w-[80%] rounded-lg rounded-tr-[4px] bg-linear-to-r px-3.5 py-2.5 text-[13.5px] leading-5 break-words">
                         {message.text}
@@ -203,10 +200,7 @@ function ReviewChatPanel({ context, onClose }: { context: ReviewContext; onClose
                   <li key={message.id} className="flex items-start gap-2.5">
                     <Avatar src={VEDICA_IMAGE} size={32} />
                     <div className="flex max-w-[85%] min-w-0 flex-col items-start">
-                      {message.image && (
-                        // eslint-disable-next-line @next/next/no-img-element -- figure from a live talk
-                        <img src={message.image} alt="Figure" className="border-socrates-line mb-2 max-w-[220px] rounded-md border object-contain" />
-                      )}
+                      {message.image && <ChatImage src={message.image} alt="Figure" className="mb-2" />}
                       <div
                         className={
                           message.error
@@ -285,9 +279,9 @@ function ReviewChatPanel({ context, onClose }: { context: ReviewContext; onClose
             placeholder="Ask Vedica about this question…"
             onSend={ask}
             disabled={chat.streaming}
-            // Board answers can come with a photo (as before); NEET's chat takes text only.
-            allowImage={!competitive}
-            imageOnly={!competitive}
+            // A photo or handwriting goes with the question (NEET's tutor gets it read as text by the backend).
+            allowInk
+            inkDraftKey={`vedica:${context.assessmentId}:${context.questionId}:${context.attemptId}:${context.subQuestionId ?? 0}`}
             // Live talk replaces voice-to-text here: Vedica hears the student directly.
             allowVoice={!voice}
             toolbarSlot={

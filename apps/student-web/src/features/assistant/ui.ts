@@ -3,6 +3,6 @@ export { AskOptionsSheet, AtlasHost, ChatLauncher, ChatOverlay, showsAtlasLaunch
 export { AtlasPanel } from './components/atlas-panel';
 export { LectureAtlas } from './components/lecture-atlas';
 export { ReviewChat, VEDICA_IMAGE } from './components/review-chat';
-export { ATLAS_IMAGE, Avatar, ChatText, Drawer, HistoryList, SOCRATES_IMAGE, toChatHtml, TypingDots } from './components/chat-kit';
+export { ATLAS_IMAGE, Avatar, ChatImage, ChatText, Drawer, HistoryList, ImageViewer, SOCRATES_IMAGE, toChatHtml, TypingDots } from './components/chat-kit';
 export { Composer } from './components/composer';
 export { MATH_SYMBOLS } from '@/shared/ui/math-symbols';

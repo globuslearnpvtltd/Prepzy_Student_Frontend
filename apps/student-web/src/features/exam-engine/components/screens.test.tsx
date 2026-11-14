@@ -7,6 +7,7 @@ import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
 import type { Answer, ExamQuestion, ResultQuestion, TestSetSummary } from '../model';
+import { competitivePage } from './player-competitive';
 import { QuestionView } from './question-view';
 import { ResultContent, ResultView } from './result-view';
 import { SetCard } from './set-card';
@@ -43,6 +44,21 @@ describe('TestHub', () => {
     expect(screen.getByRole('link', { name: /Mock tests/ })).toHaveAttribute('href', '/neet/tests/mock');
     expect(screen.getByRole('link', { name: /Daily practice/ })).toHaveAttribute('href', '/neet/tests/dpp');
     expect(screen.queryByRole('link', { name: /Chapter PYQs/ })).not.toBeInTheDocument();
+  });
+
+  it("adds the previous app's inner padding on competitive exams only", () => {
+    const { container, unmount } = renderWithProviders(<TestHub />, { exam: neet });
+    expect(container.firstElementChild).toHaveClass('p-3');
+    unmount();
+    const board = renderWithProviders(<TestHub />, { exam: testExam('cbse') });
+    expect(board.container.firstElementChild).not.toHaveClass('p-3');
+  });
+});
+
+describe('competitive player / result page box', () => {
+  it('is full width and left-aligned with the old 18px / 48px padding (no centred column)', () => {
+    expect(competitivePage.split(' ')).toEqual(expect.arrayContaining(['w-full', 'max-w-[1760px]', 'px-[18px]', 'pt-[18px]', 'lg:p-12']));
+    expect(competitivePage).not.toContain('mx-auto');
   });
 });
 

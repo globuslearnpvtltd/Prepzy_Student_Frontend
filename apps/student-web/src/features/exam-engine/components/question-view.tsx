@@ -23,12 +23,15 @@ export function QuestionView({
   answer,
   onAnswer,
   look = 'competitive',
+  draftKey,
 }: {
   question: ExamQuestion;
   number: number;
   answer: Answer | undefined;
   onAnswer: (answer: Answer | null) => void;
   look?: Exclude<ExamCategory, 'reference'>;
+  /** This attempt + question: handwriting drafts of written answers are kept per question. */
+  draftKey?: string;
 }) {
   const headingId = useId();
   const board = look === 'board';
@@ -110,6 +113,7 @@ export function QuestionView({
         {question.kind === 'written' && (
           <AnswerBox
             label="Your answer"
+            inkDraftKey={draftKey}
             value={answer?.kind === 'written' ? answer : EMPTY_WRITTEN}
             onChange={(value) => onAnswer({ kind: 'written', ...value })}
           />
@@ -132,6 +136,7 @@ export function QuestionView({
                 )}
                 <AnswerBox
                   label={`Answer for part ${letter}`}
+                  inkDraftKey={draftKey && `${draftKey}:${part.id}`}
                   value={parts[part.id] ?? EMPTY_WRITTEN}
                   onChange={(value) => onAnswer({ kind: 'parts', parts: { ...parts, [part.id]: value } })}
                 />

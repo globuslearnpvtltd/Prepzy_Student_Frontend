@@ -5,6 +5,7 @@ import type { ComponentType } from 'react';
 import type { ExamCategory } from '@/shared/config/exams';
 import { ContinueLearning, SubjectListing as MySubjects } from '@/features/learn/ui';
 import { JourneyCard } from '@/features/study-plan';
+import { SyllabusCards } from '@/features/syllabus/ui';
 import { useExam } from '@/shared/hooks/use-exam';
 import {
   ContinueAssessment,
@@ -12,7 +13,6 @@ import {
   PlanBanner,
   ReferEarnTeaser,
   SolverDiscovery,
-  SyllabusCards,
 } from './board-widgets';
 import { ChooseYourPlan, GetReadyExam } from './free-widgets';
 import { Divider, NeetWelcome, PracticeRow, SubjectProgressCards } from './competitive-widgets';

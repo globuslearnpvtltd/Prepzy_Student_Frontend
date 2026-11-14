@@ -7,7 +7,7 @@ import { htmlToPlain, LiveTalkMiniBar, LiveTalkSummary, useLiveVoice, type Voice
 import type { ExamConfig } from '@/shared/config/exams';
 import type { AtlasSurface, ChatMessage, ChatSources } from '../api';
 import { useAtlasChat, useAtlasHistory, useReadAloud } from '../hooks';
-import { ATLAS_IMAGE, Avatar, ChatText, Drawer, HistoryList, TypingDots } from './chat-kit';
+import { ATLAS_IMAGE, Avatar, ChatImage, ChatText, Drawer, HistoryList, TypingDots } from './chat-kit';
 import { Composer } from './composer';
 
 const SUGGESTIONS = ['What is photosynthesis?', 'Explain Newton’s third law with an example', 'Difference between weather and climate'];
@@ -248,6 +248,8 @@ export function AtlasPanel({ exam, surface, expanded, onExpand, onClose }: Atlas
               onSend={send}
               disabled={chat.loading || chat.loadError}
               allowVoice
+              allowInk
+              inkDraftKey={`${isLecture ? 'lecture' : 'atlas'}:${chat.chatId ?? 'new'}`}
               onLiveChat={voice ? talkLive : undefined}
               liveActive={!!voice?.isActive}
               liveDisabled={chat.thinking}
@@ -294,10 +296,7 @@ function Message({ message, avatarSrc, competitive }: { message: ChatMessage; av
   if (message.fromStudent) {
     return (
       <div className="flex flex-col items-end gap-1.5">
-        {message.image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={message.image} alt="Your photo" className="size-32 rounded-md object-cover" />
-        )}
+        {message.image && <ChatImage src={message.image} alt="Your picture" />}
         {message.text && (
           <div className="from-brand-450 to-brand text-on-brand max-w-[80%] rounded-lg rounded-tr-[4px] bg-linear-to-r px-3.5 py-2.5 text-[13.5px] leading-5">
             <ChatText text={message.text} />

@@ -223,6 +223,25 @@ describe('Onboarding step screens', () => {
     expect(screen.getAllByText('We sent a 6-digit code on WhatsApp to +919876543210.')).toHaveLength(2);
   });
 
+  it('draws a typing caret in the next box while the code input has focus', async () => {
+    useOnboardingStore.getState().startOtp('+919876543210', 'signup');
+    renderWithProviders(<OtpForm />);
+    const input = screen.getByLabelText('One-time code');
+    const caretBox = () => screen.getByTestId('otp-caret').parentElement!;
+    const boxes = () => [...input.parentElement!.querySelectorAll(':scope > [aria-hidden="true"] > span')];
+
+    act(() => input.focus());
+    expect(boxes().indexOf(caretBox())).toBe(0);
+    await userEvent.type(input, '12');
+    expect(boxes().indexOf(caretBox())).toBe(2);
+    await userEvent.type(input, '3456');
+    expect(boxes().indexOf(caretBox())).toBe(5); // after the last digit
+    expect(caretBox()).toHaveTextContent('6');
+
+    act(() => input.blur());
+    expect(screen.queryByTestId('otp-caret')).not.toBeInTheDocument();
+  });
+
   it('shows step 2 and goes back to the start of the flow it came from', () => {
     useOnboardingStore.getState().startOtp('+919876543210', 'login');
     const { unmount } = renderWithProviders(<OtpForm />);

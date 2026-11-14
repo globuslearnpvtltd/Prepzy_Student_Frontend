@@ -6,12 +6,11 @@ import { ChevronDown, ChevronLeft, ChevronRight, Download, ListOrdered, Loader2,
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RichText } from '@/features/exam-engine/ui';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { notesApi, pdfDownloadUrl, type ChapterNotes } from '../api';
 import { prepareNotes, type NoteSection } from '../document';
-import styles from './notes-html.module.css';
+import { NotesContent } from './notes-content';
 import { BottomSheet, Crumbs, Failure, NumberedOption } from './parts';
 
 /** Distance from the top of the viewport where a section counts as "being read": below the fixed header. */
@@ -233,7 +232,7 @@ export function NotesViewScreen({ courseId }: { courseId: string }) {
   const next = chapters[index + 1];
 
   const readable = !!active?.notesReady && !!active.html;
-  const doc = useMemo(() => (readable && active ? prepareNotes(active.html, active.topics) : { html: '', sections: [] }), [readable, active]);
+  const doc = useMemo(() => (readable && active ? prepareNotes(active.html, active.topics) : { html: '', sections: [], css: '', fonts: [] }), [readable, active]);
   const [activeSection, setActiveSection] = useActiveSection(doc.sections);
 
   const openChapter = (chapter: ChapterNotes) => {
@@ -375,7 +374,7 @@ export function NotesViewScreen({ courseId }: { courseId: string }) {
 
                 <article aria-label={`${active.moduleName} notes`} className="bg-surface border-learn-line rounded-2xl border px-4 py-5 md:px-8 md:py-8">
                   {readable ? (
-                    <RichText key={active.moduleId} html={doc.html} className={styles.notes} />
+                    <NotesContent key={active.moduleId} doc={doc} />
                   ) : (
                     <p className="text-[15px] text-neutral-800">Notes Not Ready Yet...</p>
                   )}

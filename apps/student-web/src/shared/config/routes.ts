@@ -82,8 +82,9 @@ export const routes = {
   // Board paper lists per subject (previous app's mock-sets / pyq-sets URLs).
   mockSets: (exam: string, subjectId: string | number) => `/${exam}/mock-sets/${subjectId}`,
   pyqSets: (exam: string, subjectId: string | number) => `/${exam}/pyq-sets/${subjectId}`,
-  syllabus: section('syllabus'),
-  pyqTrends: section('pyq-trends'),
+  /** Syllabus / PYQ trend PDF of a subject of the student's class; without a subject, the subject list. */
+  syllabus: (exam: string, subjectId?: string | number) => `/${exam}/syllabus${subjectId ? `?subject_id=${subjectId}` : ''}`,
+  pyqTrends: (exam: string, subjectId?: string | number) => `/${exam}/pyq-trends${subjectId ? `?subject_id=${subjectId}` : ''}`,
   doubtSolver: section('doubt-solver'),
   /** Ask Socrates: one step of the solver (start options, ask, question bank, the solving chat). */
   doubtSolverStep: (exam: string, step: 'start' | 'ask' | 'question-bank' | 'chat') => `/${exam}/doubt-solver?step=${step}`,

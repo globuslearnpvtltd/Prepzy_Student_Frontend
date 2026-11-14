@@ -3,14 +3,13 @@
 import { Alert, Button, Spinner, cx } from '@prepzy/design-system';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Bookmark, Check, ChevronRight, ClipboardList } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { userMessage } from '@/shared/lib/errors';
-import { competitiveSubjectArt } from '@/shared/ui/subject-art';
+import { CompetitiveSubjectArt } from '@/shared/ui/competitive-subject-art';
 import { libraryApi, type CustomSubject, type Difficulty } from './api';
 import { formatDate, GridSkeleton, LoadError, panel } from './kit';
 
@@ -31,7 +30,8 @@ export function CustomTests() {
   const create = routes.customTestCreate(exam.slug);
 
   return (
-    <div className="flex flex-col gap-6">
+    // The previous app's custom-test page had 24px side padding inside the layout's.
+    <div className="flex flex-col gap-6 px-6">
       <header>
         <h1 className="text-[32px] leading-10 font-bold text-neutral-900">Custom Tests</h1>
         <p className="text-brand-950/80 text-[16px]">Make your own practice test from any chapter, or pick up a test you saved earlier.</p>
@@ -254,7 +254,6 @@ export function CustomTestCreate() {
           ) : (
             <ul className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {subjects.data.map((s) => {
-                const art = competitiveSubjectArt(s.name);
                 const selected = subject?.name === s.name;
                 return (
                   <li key={s.name}>
@@ -273,9 +272,7 @@ export function CustomTestCreate() {
                         <span className="text-foreground-muted text-sm">{s.chapterCount} chapters</span>
                       </span>
                       {tick(selected)}
-                      {art && (
-                        <Image src={art.src} alt="" width={art.width} height={art.height} className="pointer-events-none absolute opacity-60" style={{ bottom: art.bottom, right: art.right, left: art.left }} />
-                      )}
+                      <CompetitiveSubjectArt subject={s.name} className="opacity-60" />
                     </button>
                   </li>
                 );

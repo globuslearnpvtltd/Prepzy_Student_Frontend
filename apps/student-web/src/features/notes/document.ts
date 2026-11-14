@@ -11,6 +11,80 @@ export interface NotesDocument {
   /** Sanitised notes HTML with an id on every indexed section and tables wrapped to scroll sideways. */
   html: string;
   sections: NoteSection[];
+  /** The document's own stylesheet (its <style> blocks), rewritten to apply only inside `[data-notes-doc]`. */
+  css: string;
+  /** Google Fonts stylesheets the document links to (the only outside stylesheets it may load). */
+  fonts: string[];
+}
+
+/** The attribute on the element that holds the notes; the document's CSS applies only inside it. */
+export const NOTES_SCOPE = 'data-notes-doc';
+const SCOPE = `[${NOTES_SCOPE}]`;
+const FONTS_ORIGIN = 'https://fonts.googleapis.com/';
+
+/** Splits a selector list on its top-level commas (not those inside :is(), :not() …). */
+const splitSelectors = (list: string) => {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < list.length; i += 1) {
+    const char = list[i];
+    if (char === '(' || char === '[') depth += 1;
+    else if (char === ')' || char === ']') depth -= 1;
+    else if (char === ',' && depth === 0) {
+      parts.push(list.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(list.slice(start));
+  return parts.map((part) => part.trim()).filter(Boolean);
+};
+
+/** `html`, `body` and `:root` at the start of a selector stand for the notes box; anything else is put inside it. */
+const PAGE_SELECTOR = /^(?::root|html)?(?:\s*>?\s*body)?(?![\w-])/;
+const scopeSelector = (selector: string) => {
+  const page = selector.match(PAGE_SELECTOR)?.[0] ?? '';
+  return page ? `${SCOPE}${selector.slice(page.length)}` : `${SCOPE} ${selector}`;
+};
+
+const scopeRules = (rules: CSSRuleList): string =>
+  Array.from(rules, (rule) => {
+    if (rule instanceof CSSStyleRule) {
+      const selectors = splitSelectors(rule.selectorText);
+      // The document's page background belongs to the page; the reader draws the notes on its own card.
+      if (selectors.every((selector) => PAGE_SELECTOR.exec(selector)?.[0] === selector)) {
+        for (const property of ['background', 'background-color', 'background-image']) rule.style.removeProperty(property);
+      }
+      return `${selectors.map(scopeSelector).join(', ')} { ${rule.style.cssText} }`;
+    }
+    if (rule instanceof CSSMediaRule) return `@media ${rule.media.mediaText} { ${scopeRules(rule.cssRules)} }`;
+    if (rule instanceof CSSSupportsRule) return `@supports ${rule.conditionText} { ${scopeRules(rule.cssRules)} }`;
+    // @font-face and @keyframes don't select elements; other at-rules (@import, @page …) are dropped.
+    if (rule instanceof CSSFontFaceRule || rule instanceof CSSKeyframesRule) return rule.cssText;
+    return '';
+  })
+    .filter(Boolean)
+    .join('\n');
+
+/** The document's <style> blocks as one stylesheet scoped to the notes box, and the Google Fonts it uses. */
+function documentStyles(page: Document): Pick<NotesDocument, 'css' | 'fonts'> {
+  const fonts = new Set<string>();
+  for (const link of Array.from(page.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"][href]'))) {
+    if (link.getAttribute('href')!.startsWith(FONTS_ORIGIN)) fonts.add(link.getAttribute('href')!);
+  }
+  const source = Array.from(page.querySelectorAll('style'), (style) => style.textContent ?? '').join('\n');
+  for (const [, href] of source.matchAll(/@import\s+(?:url\()?\s*['"]?([^'")\s;]+)/g)) {
+    if (href!.startsWith(FONTS_ORIGIN)) fonts.add(href!);
+  }
+  if (!source.trim() || typeof CSSStyleSheet === 'undefined') return { css: '', fonts: [...fonts] };
+  const sheet = new CSSStyleSheet();
+  try {
+    sheet.replaceSync(source.replace(/@import[^;]*;/g, ''));
+  } catch {
+    return { css: '', fonts: [...fonts] };
+  }
+  // Text inside <style> must never close the element.
+  return { css: scopeRules(sheet.cssRules).replace(/<\/style/gi, '<\\/style'), fonts: [...fonts] };
 }
 
 /** Compares titles ignoring case, punctuation, quotes and leading numbering ("2.1 Electric Field"). */
@@ -37,9 +111,11 @@ const slug = (value: string) =>
  * that point nowhere are left out, so every index entry scrolls somewhere.
  */
 export function prepareNotes(html: string, topics: readonly NoteTopic[]): NotesDocument {
-  if (!html || typeof window === 'undefined') return { html: '', sections: [] };
+  if (!html || typeof window === 'undefined') return { html: '', sections: [], css: '', fonts: [] };
+  // The document's own <head> styles are kept, scoped to the notes box (see documentStyles).
+  const styles = documentStyles(new DOMParser().parseFromString(html, 'text/html'));
   // Whole documents (<html><head><style>…) come back as their body; scripts, styles and event handlers are dropped.
-  const clean = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+  const clean = DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, FORBID_TAGS: ['style', 'link'] });
   const body = new DOMParser().parseFromString(`<!doctype html><body>${clean}</body>`, 'text/html').body;
 
   const taken = new Set(Array.from(body.querySelectorAll('[id]'), (element) => element.id));
@@ -98,5 +174,5 @@ export function prepareNotes(html: string, topics: readonly NoteTopic[]): NotesD
     wrapper.appendChild(table);
   }
 
-  return { html: body.innerHTML, sections };
+  return { html: body.innerHTML, sections, ...styles };
 }

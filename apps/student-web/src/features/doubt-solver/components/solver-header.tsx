@@ -12,6 +12,8 @@ export interface SolverHeaderProps {
   onBack: () => void;
   /** Chat: the back chevron shows on desktop too (it asks before leaving). */
   showDesktopBack?: boolean;
+  /** Textbook selection (the first step): back leaves Socrates, so it shows as a labelled "‹ Dashboard" pill. */
+  backToDashboard?: boolean;
   onQuestionBank?: () => void;
   onNewProblem?: () => void;
   onHistory?: () => void;
@@ -19,20 +21,32 @@ export interface SolverHeaderProps {
 
 const pill = 'bg-socrates-chip text-brand hover:bg-socrates-chip-hover flex items-center gap-1.5 rounded-full text-[13px] font-medium md:text-[14px]';
 
-/** Solver top bar: Prepzy › Socrates, Question Bank, New problem, previous doubts. */
-export function SolverHeader({ onBack, showDesktopBack, onQuestionBank, onNewProblem, onHistory }: SolverHeaderProps) {
+/** Solver top bar: back, Prepzy › Socrates, Question Bank, New problem, previous doubts. */
+export function SolverHeader({ onBack, showDesktopBack, backToDashboard, onQuestionBank, onNewProblem, onHistory }: SolverHeaderProps) {
   const exam = useExam();
   return (
     <header className="border-neutral-100 bg-surface flex w-full shrink-0 items-center justify-between gap-2 border-b px-3 py-3 md:px-6 md:py-4">
       <div className="flex min-w-0 items-center gap-1 md:gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Go back"
-          className={cx('text-brand flex size-7 shrink-0 items-center justify-center hover:opacity-80', !showDesktopBack && 'md:hidden')}
-        >
-          <ChevronLeft aria-hidden className="size-5" />
-        </button>
+        {backToDashboard ? (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back to dashboard"
+            className={cx(pill, 'mr-1 h-8 shrink-0 pr-3 pl-1.5 font-semibold md:mr-0 md:h-[34px] md:pr-3.5 md:pl-2')}
+          >
+            <ChevronLeft aria-hidden className="size-4.5" />
+            Dashboard
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Go back"
+            className={cx('text-brand flex size-7 shrink-0 items-center justify-center hover:opacity-80', !showDesktopBack && 'md:hidden')}
+          >
+            <ChevronLeft aria-hidden className="size-5" />
+          </button>
+        )}
         <Link href={routes.dashboard(exam.slug)} aria-label="Go to dashboard" className="hidden shrink-0 md:flex">
           <Image src="/illustrations/assistant/prepzy-mark.png" alt="Prepzy" width={32} height={32} className="size-8 object-contain" />
         </Link>
@@ -46,7 +60,8 @@ export function SolverHeader({ onBack, showDesktopBack, onQuestionBank, onNewPro
         {onQuestionBank && (
           <button type="button" onClick={onQuestionBank} aria-label="Question Bank" className={cx(pill, 'h-8 px-2.5 md:h-[30px]')}>
             <Copy aria-hidden className="size-3.5" />
-            <span className="max-[389px]:hidden">Question Bank</span>
+            {/* Phones show just the icon when the "‹ Dashboard" pill needs the room. */}
+            <span className={backToDashboard ? 'max-[459px]:hidden' : 'max-[389px]:hidden'}>Question Bank</span>
           </button>
         )}
         {onNewProblem && (

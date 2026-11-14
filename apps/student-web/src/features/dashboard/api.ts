@@ -98,12 +98,6 @@ export function weeklyAverage(days: DayActivity[]): number {
   return days.length ? days.reduce((sum, d) => sum + d.hours, 0) / days.length : 0;
 }
 
-/** Class 9–12 see the syllabus card, classes 10 and 12 also PYQ trends (previous app's rule). */
-export function syllabusCards(className: string | null | undefined): { syllabus: boolean; trends: boolean } {
-  const grade = Number(/\d+/.exec(className ?? '')?.[0]);
-  return { syllabus: [9, 10, 11, 12].includes(grade), trends: [10, 12].includes(grade) };
-}
-
 const ENGINE_TYPES: Record<BoardExamKind, TestTypeKey> = { mock: 'mock', pyq: 'pyq', mid_term: 'mid', final: 'final' };
 const KINDS = Object.keys(ENGINE_TYPES) as BoardExamKind[];
 

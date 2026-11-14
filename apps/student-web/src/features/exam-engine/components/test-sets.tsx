@@ -1,8 +1,9 @@
 'use client';
 
-import { Alert, Skeleton, Tabs, TabsList, TabsTrigger } from '@prepzy/design-system';
+import { Alert, Skeleton, Tabs, TabsList, TabsTrigger, cx } from '@prepzy/design-system';
 import { useEffect, useState } from 'react';
 import type { TestTypeKey } from '@/shared/config/exams';
+import { useExam } from '@/shared/hooks/use-exam';
 import { StatusScreen } from '@/shared/layout/status-screens';
 import { userMessage } from '@/shared/lib/errors';
 import { useAdapter, useSubjects, useTestContext, useTestSets } from '../hooks';
@@ -15,6 +16,7 @@ export function TestSets({ testType }: { testType: TestTypeKey }) {
   const adapter = useAdapter(testType);
   const { context, isPending, error } = useTestContext();
   const meta = TEST_TYPES[testType];
+  const exam = useExam();
 
   if (!adapter) return <StatusScreen title="This test type isn't available" />;
   if (!adapter.listSets)
@@ -26,7 +28,8 @@ export function TestSets({ testType }: { testType: TestTypeKey }) {
     );
 
   return (
-    <div className="flex flex-col gap-6">
+    // Competitive pages add p-3 inside the shell padding, as the previous app's NEET test pages did.
+    <div className={cx('flex flex-col gap-6', exam.category === 'competitive' && 'p-3')}>
       <header>
         <h1 className="text-2xl font-semibold">{meta.label}</h1>
         <p className="text-foreground-muted text-sm">{meta.description}</p>

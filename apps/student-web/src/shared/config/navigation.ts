@@ -107,11 +107,13 @@ export const PORTED_SECTIONS = new Set([
   'plans',
   'profile',
   'pyq-library',
+  'pyq-trends',
   'refer-and-earn',
   'study-plan',
+  'syllabus',
 ]);
 
-/** Placeholders for the sections that aren't ported yet (/cbse/syllabus, /neet/plans …). */
+/** Placeholders for the sections that aren't ported yet (none at the moment; the [section] page stays for new ones). */
 export function placeholderSections(category: keyof typeof SECTIONS): string[] {
   return Object.keys(SECTIONS[category]).filter((section) => !PORTED_SECTIONS.has(section));
 }

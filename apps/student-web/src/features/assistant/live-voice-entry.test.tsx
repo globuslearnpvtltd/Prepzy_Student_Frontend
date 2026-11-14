@@ -254,8 +254,9 @@ describe('live talk entry points', () => {
     };
     const view = renderWithProviders(<ReviewChat context={context} open onClose={onClose} />, { exam: neet });
     expect(await screen.findByText(/Vedica already has your answer and the explanation/)).toBeInTheDocument();
-    // NEET's text chat takes no photos; the mic is replaced by live talk.
-    expect(screen.queryByRole('button', { name: 'Add a photo' })).not.toBeInTheDocument();
+    // A photo or handwriting can go with the question (the backend reads it as text); the mic is replaced by live talk.
+    expect(screen.getByRole('button', { name: 'Add a photo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Write by hand' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Speak your question' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Talk live with Vedica' }));
     await waitFor(() => expect(starts).toHaveLength(1));

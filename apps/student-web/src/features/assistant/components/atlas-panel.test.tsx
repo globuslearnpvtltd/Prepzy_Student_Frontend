@@ -104,7 +104,7 @@ describe('AtlasPanel', () => {
     renderWithProviders(<AtlasPanel exam={cbse} surface={{ kind: 'dashboard' }} {...panelProps} />);
 
     const conversation = await screen.findByRole('list', { name: 'Conversation' });
-    expect(within(conversation).getByRole('img', { name: 'Your photo' })).toHaveAttribute('src', 'https://cdn.test/q.png');
+    expect(within(conversation).getByRole('img', { name: 'Your picture' })).toHaveAttribute('src', 'https://cdn.test/q.png');
     expect(within(conversation).getByRole('img', { name: 'Diagram' })).toHaveAttribute('src', 'https://cdn.test/diagram.png');
 
     const source = within(conversation).getByRole('button', { name: /View source · CBSE textbook/ });

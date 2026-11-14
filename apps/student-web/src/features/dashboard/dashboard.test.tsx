@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
-import { formatHours, syllabusCards, toActivity, weeklyAverage } from './api';
+import { formatHours, toActivity, weeklyAverage } from './api';
 import { daysUntil, planCopy, planState } from './board-widgets';
 import { untilMidnight } from './competitive-widgets';
 import { Dashboard, DASHBOARD_WIDGETS } from './dashboard';
@@ -150,8 +150,9 @@ describe('board dashboard (CBSE)', () => {
       'href',
       '/cbse/refer-and-earn',
     );
-    expect(screen.getByRole('link', { name: /View Syllabus/ })).toHaveAttribute('href', '/cbse/syllabus');
-    expect(screen.getByRole('link', { name: 'View Trend Analysis' })).toHaveAttribute('href', '/cbse/pyq-trends');
+    // Syllabus / PYQ trends open the subject picker (covered in features/syllabus).
+    expect(screen.getByRole('button', { name: /View Syllabus/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View Trend Analysis' })).toBeInTheDocument();
   });
 
   it('expands the plan banner and shows the full plan details', async () => {
@@ -266,6 +267,8 @@ describe('competitive dashboard (NEET)', () => {
     expect(botany).toHaveAttribute('href', '/neet/learn/7');
     expect(within(botany).getByRole('img', { name: 'Botany progress: 40%' })).toBeInTheDocument();
     expect(within(botany).getByText('4/10')).toBeInTheDocument();
+    // The old card's background artwork, outlined on hover.
+    expect(within(botany).getByTestId('subject-art')).toHaveAttribute('data-art', '/illustrations/subjects/neet-botany.svg');
 
     expect(await screen.findByText('Day 14')).toBeInTheDocument();
     expect(screen.getByText('3 / 15')).toBeInTheDocument();
@@ -325,13 +328,6 @@ describe('dashboard logic', () => {
     expect(toBars(days, 'alternate').map((b) => b.label)).toEqual(['Monday', '', 'Today']);
   });
 
-  it('shows syllabus / trends by class', () => {
-    expect(syllabusCards('CLASS 12')).toEqual({ syllabus: true, trends: true });
-    expect(syllabusCards('Class 11')).toEqual({ syllabus: true, trends: false });
-    expect(syllabusCards('Class 8')).toEqual({ syllabus: false, trends: false });
-    expect(syllabusCards(null)).toEqual({ syllabus: false, trends: false });
-  });
-
   it('works out the plan banner state', () => {
     const now = new Date('2026-11-04T10:00:00');
     const base = { planId: 1, examId: 1, classId: 12, className: 'CLASS 12', streamName: '', status: 'active', relatedExams: [], year: null };
@@ -359,7 +355,8 @@ describe('dashboard logic', () => {
   it('maps subjects to illustrations', () => {
     expect(boardSubjectArt('Mathematics').src).toContain('board-maths');
     expect(boardSubjectArt('Sanskrit').src).toContain('board-default');
-    expect(competitiveSubjectArt('Botany')).toMatchObject({ left: 8 });
-    expect(competitiveSubjectArt('Maths')).toBeNull();
+    expect(competitiveSubjectArt('Botany')).toMatchObject({ left: 8, hoverSrc: '/illustrations/subjects/neet-botany-hover.svg' });
+    expect(competitiveSubjectArt('NEET-Physics').src).toContain('neet-physics');
+    expect(competitiveSubjectArt('Maths')).toMatchObject({ src: '/illustrations/subjects/neet-default.svg', right: 0 });
   });
 });

@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import { apiClient } from '@/shared/lib/api-client';
 import { API, server } from '@/test/server';
 import { testExam } from '@/test/exams';
 import { assistantApi, chatApiBase, reviewApi, toAnswer, toConversation, toHistory, toMessage, type ReviewContext } from './api';
@@ -152,6 +153,25 @@ describe('reviewApi', () => {
       selected_option_id: null,
       explanation: '',
     });
+  });
+
+  it('sends a competitive picture (photo or handwriting) as a form with JSON fields', async () => {
+    // jsdom's File can't go through Node's fetch: read the form the client is given instead.
+    let form: FormData | null = null;
+    vi.spyOn(apiClient, 'stream').mockImplementation(async (_path, body) => {
+      form = body as FormData;
+      return new Response('data: {"final":"Looks right."}\n\ndata: [DONE]\n\n').body!;
+    });
+    const image = new File(['png'], 'handwriting.png', { type: 'image/png' });
+    const reply = await reviewApi.ask(neet, { ...ctx, options: [{ id: 1, text: 'A' }], correctOptionId: 1, selectedOptionId: 'b' }, '', () => {}, undefined, image);
+    expect(reply.text).toBe('Looks right.');
+    expect(form!.get('text')).toBe('');
+    expect(form!.get('question')).toBe('Q?');
+    expect(JSON.parse(String(form!.get('options')))).toEqual([{ id: 1, text: 'A' }]);
+    expect(form!.get('correct_option_id')).toBe('1');
+    expect(form!.get('selected_option_id')).toBe('"b"');
+    expect((form!.get('image') as File).name).toBe('handwriting.png');
+    vi.restoreAllMocks();
   });
 
   it('streams a board reply from a form', async () => {

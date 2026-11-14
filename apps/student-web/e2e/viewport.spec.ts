@@ -37,7 +37,7 @@ const studentPages = (exam: string, extra: string[]) => [
 ];
 
 const ROUTES: { path: string; exam: Exam | null; slug?: string }[] = [
-  ...studentPages('cbse', ['/cbse/notes/5']).map((path) => ({ path, exam: 'board' as const, slug: 'cbse' })),
+  ...studentPages('cbse', ['/cbse/notes/5', '/cbse/assessments', '/cbse/syllabus', '/cbse/syllabus?subject_id=3', '/cbse/pyq-trends?subject_id=3']).map((path) => ({ path, exam: 'board' as const, slug: 'cbse' })),
   ...studentPages('neet', ['/neet/learn/214/341/study-notes?from=notes']).map((path) => ({
     path,
     exam: 'competitive' as const,

@@ -233,12 +233,12 @@ export const reviewApi = {
     text: string,
     onText: (text: string) => void,
     signal?: AbortSignal,
-    /** Board only: a photo with the question. */
+    /** A photo or the student's handwriting with the question. */
     image?: File | null,
   ): Promise<StreamedReply> => {
     let body: unknown;
     if (exam.category === 'competitive') {
-      body = {
+      const fields = {
         text,
         question: ctx.questionText,
         question_diagram: ctx.questionDiagram ?? '',
@@ -247,6 +247,17 @@ export const reviewApi = {
         selected_option_id: ctx.selectedOptionId ?? null,
         explanation: ctx.feedback ?? '',
       };
+      if (image) {
+        // A picture goes as multipart; the options and the option ids travel as JSON strings (types kept).
+        const form = new FormData();
+        const { options, correct_option_id, selected_option_id, ...plain } = fields;
+        for (const [key, value] of Object.entries(plain)) form.append(key, value);
+        form.append('options', JSON.stringify(options));
+        form.append('correct_option_id', JSON.stringify(correct_option_id));
+        form.append('selected_option_id', JSON.stringify(selected_option_id));
+        form.append('image', image, image.name || 'image.jpg');
+        body = form;
+      } else body = fields;
     } else {
       const form = new FormData();
       if (ctx.subQuestionId) form.append('sub_question_id', String(ctx.subQuestionId));

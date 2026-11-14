@@ -44,6 +44,16 @@
     height: auto;
     border-radius: var(--radius-sm);
   }
+  /* A handwritten page (writing pad): whole, on white paper, about as large as it was written. */
+  .rich-text :where(img[alt='Handwritten answer']) {
+    display: block;
+    width: auto;
+    max-height: 360px;
+    object-fit: contain;
+    padding: 4px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+  }
   .rich-text :where(table) {
     display: block;
     max-width: 100%;
@@ -239,6 +249,28 @@
     .live-talk-pill,
     .live-talk-pill-text,
     .live-lang-menu {
+      animation: none;
+    }
+  }
+}
+
+/* OTP digit boxes (features/auth OtpForm): the boxes picture one hidden input, so the typing caret is drawn. */
+@layer components {
+  @keyframes otp-caret-blink {
+    0%,
+    50% {
+      opacity: 1;
+    }
+    50.01%,
+    100% {
+      opacity: 0;
+    }
+  }
+  .otp-caret {
+    animation: otp-caret-blink 1s step-end infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .otp-caret {
       animation: none;
     }
   }

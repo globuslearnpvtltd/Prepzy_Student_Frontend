@@ -2,7 +2,7 @@
 
 import { cx } from '@prepzy/design-system';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, ChevronDown, MessageCircle, Users } from 'lucide-react';
+import { ChevronDown, MessageCircle, Users } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -10,7 +10,7 @@ import { useActivePlan, type ActivePlan } from '@/features/auth';
 import { useActivePlanName } from '@/features/plans';
 import { hasTestType } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
-import { dashboardApi, syllabusCards, type ContinueTest } from './api';
+import { dashboardApi, type ContinueTest } from './api';
 import {
   ProgressBar,
   SectionError,
@@ -363,44 +363,5 @@ export function ReferEarnTeaser() {
         {repeat ? 'Invite more friends' : 'See how it works'}
       </span>
     </Link>
-  );
-}
-
-export function SyllabusCards() {
-  const { exam } = useDashboardContext();
-  const plan = useActivePlan(exam);
-  const { syllabus, trends } = syllabusCards(plan.data?.className);
-  if (!syllabus && !trends) return null;
-  const box = 'border-line bg-surface mt-5 flex w-full flex-col gap-3 rounded-xl border-2 p-3.5 shadow-lg md:p-6';
-  const button =
-    'bg-brand hover:bg-brand-deep text-on-brand flex w-full items-center justify-center gap-2 rounded-[16.4px] px-2 py-3.5 text-[12px] leading-[14px] font-semibold';
-  return (
-    <section aria-label="Syllabus and trends" className="mb-[50px] flex flex-col gap-2.5 md:mb-0">
-      {syllabus && (
-        <div className={box}>
-          <div className="flex flex-col gap-2.5">
-            <h2 className="text-neutral-850 text-[20px] leading-5 font-semibold">Syllabus</h2>
-            <p className="text-[14px] leading-[19px] text-neutral-800">Always updated with your latest syllabus.</p>
-          </div>
-          <Link href={routes.syllabus(exam.slug)} className={button}>
-            <BookOpen aria-hidden className="size-4" />
-            View Syllabus
-          </Link>
-        </div>
-      )}
-      {trends && (
-        <div className={box}>
-          <div className="flex flex-col gap-2.5">
-            <h2 className="text-neutral-850 text-[20px] leading-5 font-semibold">PYQ Trends</h2>
-            <p className="text-[14px] leading-[19px] text-neutral-800">
-              Curated analysis of past year exams focused on top ranks.
-            </p>
-          </div>
-          <Link href={routes.pyqTrends(exam.slug)} className={button}>
-            View Trend Analysis
-          </Link>
-        </div>
-      )}
-    </section>
   );
 }

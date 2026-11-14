@@ -110,7 +110,7 @@ export function AskDoubt({ onSolve }: { onSolve: (payload: SolvePayload) => void
         setBusy('reading');
         const read = await solverApi.extractQuestion(exam, image);
         if (!read.text && !text) {
-          setError("We couldn't read a question in that photo. Please try another or type it.");
+          setError("We couldn't read a question in that picture. Please try again or type it.");
           return;
         }
         display = [read.text, text].filter(Boolean).join('\n');
@@ -143,17 +143,20 @@ export function AskDoubt({ onSolve }: { onSolve: (payload: SolvePayload) => void
         className="border-surface from-socrates-panel-from to-socrates-panel-to shadow-socrates-card size-[68px] rounded-full border-[3px] bg-linear-to-b object-cover object-top"
       />
       <h1 className="text-socrates-ink mt-3 text-center font-serif text-[24px] leading-8 font-bold md:text-[28px]">What&apos;s your {subjectName} doubt?</h1>
-      <p className="text-socrates-muted mt-1.5 text-center text-[12.5px]">Type it, use fx for formulas, or tap + to snap a photo of the question.</p>
+      <p className="text-socrates-muted mt-1.5 text-center text-[12.5px]">Type it, use fx for formulas, tap + to snap a photo or the pen to write it by hand.</p>
       <Composer
         className="mt-6 w-full"
         placeholder="Type or snap your question"
         onSend={(text, image) => void ask(text, image)}
         disabled={busy !== null}
         autoFocus
+        // A handwritten question is read like a photo of one (extract-question).
+        allowInk
+        inkDraftKey={`socrates:ask:${subject?.id ?? 'any'}`}
       />
       {busy && (
         <p role="status" className="text-socrates-muted mt-3 text-[12.5px]">
-          {busy === 'reading' ? 'Reading your photo…' : 'Checking your question…'}
+          {busy === 'reading' ? 'Reading your picture…' : 'Checking your question…'}
         </p>
       )}
       {error && (

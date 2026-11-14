@@ -45,7 +45,7 @@ describe('notesApi requests', () => {
 
 describe('prepareNotes', () => {
   it('returns nothing for empty notes', () => {
-    expect(prepareNotes('', [])).toEqual({ html: '', sections: [] });
+    expect(prepareNotes('', [])).toEqual({ html: '', sections: [], css: '', fonts: [] });
   });
 
   it('matches index entries by title, ignoring numbering, and by title prefix', () => {

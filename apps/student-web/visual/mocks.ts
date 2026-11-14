@@ -217,6 +217,36 @@ MOCKS['/api/v4/dashboard/board/1/classes/12/subjects'] = MOCKS['/api/v1/student/
 MOCKS['/api/v4/dashboard/board/1/classes/12/continue-courses'] = MOCKS['/api/v1/student/continue-dashboard-courses/12'];
 MOCKS['/api/v4/dashboard/board/1/classes/12/continue-exams'] = MOCKS['/api/v1/student/continue-dashboard-exams/12'];
 MOCKS['/api/v4/dashboard/board/1/classes/12/subject-scores'] = MOCKS['/api/v1/student/getsubjectGraphData/12'];
+// Syllabus / PYQ trend PDFs of class 12 (the subject picker and the PDF pages). The PDF host isn't served in e2e,
+// so the page shows its "Open PDF" fallback unless a spec routes the URL.
+const syllabusSubjects = {
+  success: true,
+  message: 'Subjects fetched',
+  data: {
+    subjects: [
+      { subject_id: 3, subject_name: 'PHYSICS' },
+      { subject_id: 4, subject_name: 'CHEMISTRY' },
+      { subject_id: 5, subject_name: 'BIOLOGY' },
+      { subject_id: 6, subject_name: 'ENGLISH' },
+    ],
+  },
+};
+MOCKS['/api/v4/dashboard/board/1/classes/12/syllabus-trends/syllabus/subjects'] = syllabusSubjects;
+MOCKS['/api/v4/dashboard/board/1/classes/12/syllabus-trends/trend/subjects'] = syllabusSubjects;
+for (const type of ['syllabus', 'trend']) {
+  MOCKS[`/api/v4/dashboard/board/1/classes/12/syllabus-trends/${type}/subjects/3`] = {
+    success: true,
+    message: 'PDF fetched',
+    data: {
+      type,
+      class_id: 12,
+      class_name: 'CLASS 12',
+      subject_id: 3,
+      subject_name: 'PHYSICS',
+      pdf_url: `https://cdn.e2e.test/${type}/class-12-physics.pdf`,
+    },
+  };
+}
 MOCKS['/api/v4/dashboard/competitive/2/classes/20/subject-scores'] = MOCKS['/api/v1/student/getsubjectGraphData/20'];
 MOCKS['/api/v4/student/account'] = { success: true, data: { ...student, language: { id: 1, name: 'english' } } };
 // Content mediums (the change-medium dialog).

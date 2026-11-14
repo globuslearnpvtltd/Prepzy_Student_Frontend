@@ -271,7 +271,7 @@ describe('prepareNotes', () => {
     // Numbered headings still match their index entry.
     expect(prepareNotes(html, [{ anchorId: 'refl', topic: 'Reflection' }]).sections).toEqual([{ id: 'notes-refl', title: 'Reflection' }]);
     expect(prepareNotes('<h1>Only</h1><h3>A</h3><h3>B</h3>', []).sections.map((s) => s.title)).toEqual(['A', 'B']);
-    expect(prepareNotes('', [])).toEqual({ html: '', sections: [] });
+    expect(prepareNotes('', [])).toEqual({ html: '', sections: [], css: '', fonts: [] });
   });
 
   it('keeps anchors on non-heading elements and doesn’t reuse an id', () => {

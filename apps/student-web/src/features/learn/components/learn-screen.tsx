@@ -2,11 +2,10 @@
 
 import { cx, Dialog, DialogContent, DialogDescription, DialogTitle, Skeleton } from '@prepzy/design-system';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, X } from 'lucide-react';
-import Image from 'next/image';
+import { X } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
-import { boardSubjectArt } from '@/shared/ui/subject-art';
+import { SubjectCardGrid } from '@/shared/ui/subject-card';
 import { routes } from '@/shared/config/routes';
 import { activityHref, learnApi, titleCase, type LearnSubject } from '../api';
 import { learnKeys, useLearnContext, useSubjectCourses, useSubjects } from '../hooks';
@@ -199,7 +198,6 @@ export function CourseListingModal({ subject, onClose }: { subject: LearnSubject
 export function SubjectListing() {
   const { classId, isPending } = useLearnContext();
   const subjects = useSubjects(classId);
-  const [showAll, setShowAll] = useState(false);
   const [selected, setSelected] = useState<LearnSubject | null>(null);
   // Without a plan the student gets the free courses instead (previous app's SubjectListing).
   if (classId === null) return isPending ? null : <FreeCourses />;
@@ -219,49 +217,17 @@ export function SubjectListing() {
       ) : subjects.data.length === 0 ? (
         <p className="text-foreground-muted text-sm">No Subjects Available</p>
       ) : (
-        <>
-          <ul className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-5">
-            {subjects.data.map((subject, index) => {
-              const art = boardSubjectArt(subject.name);
-              return (
-                <li key={subject.id} className={cx(index >= 3 && !showAll && 'max-md:hidden')}>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(subject)}
-                    className="group border-line hover:bg-brand relative flex min-h-[96px] w-full flex-col overflow-hidden rounded-xl border-2 px-6 py-4 text-left transition-all duration-300 hover:scale-105"
-                  >
-                    <span className="text-foreground group-hover:text-on-brand relative z-10 line-clamp-2 text-[22px] leading-7 font-semibold">
-                      {titleCase(subject.name)}
-                    </span>
-                    <span className="text-foreground group-hover:text-on-brand relative z-10 mt-2 text-[14px] font-bold">
-                      {subject.courseCount} Books
-                    </span>
-                    <Image
-                      src={art.src}
-                      alt=""
-                      width={art.width}
-                      height={art.height}
-                      unoptimized
-                      className="absolute group-hover:brightness-0 group-hover:invert"
-                      style={{ bottom: art.bottom, right: art.right, left: art.left }}
-                    />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {subjects.data.length > 3 && (
-            <button
-              type="button"
-              onClick={() => setShowAll((v) => !v)}
-              aria-expanded={showAll}
-              className="border-line text-foreground mt-4 flex w-full items-center justify-center gap-2 rounded-lg border-2 py-1 font-medium md:hidden"
-            >
-              {showAll ? 'Show Less' : 'View All Subjects'}
-              <ChevronDown aria-hidden className={cx('size-5 transition-transform', showAll && 'rotate-180')} />
-            </button>
-          )}
-        </>
+        <SubjectCardGrid
+          className="mt-3"
+          collapse
+          items={subjects.data.map((subject) => ({
+            key: subject.id,
+            title: titleCase(subject.name),
+            subject: subject.name,
+            meta: `${subject.courseCount} Books`,
+            onClick: () => setSelected(subject),
+          }))}
+        />
       )}
       <CourseListingModal subject={selected} onClose={() => setSelected(null)} />
     </section>

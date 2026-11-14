@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useCurrentUser } from '@/features/auth';
 import { MediumDialogHost } from '@/features/language/ui';
+import { env } from '@/shared/config/env';
 import type { ExamCategory, ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { isNavLocked, navigationFor } from '@/shared/config/navigation';
@@ -17,18 +18,24 @@ import { GoalMenu, GoalSheet, useOwnedExams } from './goal-switcher';
 import { useMobileNav } from './mobile-nav-store';
 import { SearchBox } from './search-box';
 
+/** The navbar logo opens the marketing website (env `marketingUrl`); without one it stays on the student's dashboard. */
 function Logo({ exam, compact = false, className }: { exam: ExamConfig | null; compact?: boolean; className?: string }) {
+  const image = compact ? (
+    <Image src="/brand/logo-mark.png" alt="Prepzy" width={40} height={40} priority className="size-10" />
+  ) : (
+    <Image src="/brand/logo.png" alt="Prepzy" width={104} height={38} priority className={cx('w-auto', className ?? 'h-[38px]')} />
+  );
+  const linkClass = 'shrink-0 transition-transform duration-300 hover:scale-105';
+  if (env.marketingUrl) {
+    return (
+      <a href={env.marketingUrl} aria-label="Prepzy website" className={linkClass}>
+        {image}
+      </a>
+    );
+  }
   return (
-    <Link
-      href={exam ? routes.dashboard(exam.slug) : routes.referenceBooks()}
-      aria-label="Prepzy home"
-      className="shrink-0 transition-transform duration-300 hover:scale-105"
-    >
-      {compact ? (
-        <Image src="/brand/logo-mark.png" alt="Prepzy" width={40} height={40} priority className="size-10" />
-      ) : (
-        <Image src="/brand/logo.png" alt="Prepzy" width={104} height={38} priority className={cx('w-auto', className ?? 'h-[38px]')} />
-      )}
+    <Link href={exam ? routes.dashboard(exam.slug) : routes.referenceBooks()} aria-label="Prepzy home" className={linkClass}>
+      {image}
     </Link>
   );
 }

@@ -15,6 +15,13 @@ import { QuestionView } from './question-view';
 const pill = 'h-10 rounded-full px-6 text-sm font-semibold transition-colors disabled:opacity-50';
 const card = 'bg-surface rounded-2xl border border-neutral-100 shadow-sm';
 
+/**
+ * Page box of the competitive player and result, as the previous app's NEET test pages: full width next to the rail and
+ * left-aligned (capped like the competitive shell, no centred column), 18px on phones and 48px on desktop (its
+ * 10px / 40px layout padding plus the page's own 8px).
+ */
+export const competitivePage = 'flex w-full max-w-[1760px] flex-col gap-4 px-[18px] pt-[18px] md:px-8 md:pt-8 lg:p-12';
+
 /** Breadcrumb bar shared by the competitive player and result: Back · Dashboard > Section > Test. */
 export function CompetitiveBreadcrumb({
   home,
@@ -119,7 +126,8 @@ export function CompetitivePlayer({ session, attempt, question, secondsLeft, cou
   );
 
   return (
-    <div className="mx-auto flex max-w-[1180px] flex-col gap-4 p-4 pb-40 lg:p-10 lg:pt-12 lg:pb-10">
+    // pb-40: room for the fixed action bar on phones.
+    <div className={cx(competitivePage, 'pb-40')}>
       <CompetitiveBreadcrumb home={home} current="Test" onBack={onExit}>
         {secondsLeft !== null && <Timer secondsLeft={secondsLeft} />}
         <button type="button" onClick={onSubmit} className={cx(pill, 'bg-brand text-on-brand hover:bg-brand-hover')}>
@@ -166,6 +174,7 @@ export function CompetitivePlayer({ session, attempt, question, secondsLeft, cou
             number={index + 1}
             answer={attempt.snapshot.answers[question.id]}
             onAnswer={(value) => attempt.answer(question.id, value)}
+            draftKey={`answer:${session.key}:${question.id}`}
           />
           <footer className="mt-auto hidden items-center justify-between gap-4 lg:flex">{actions}</footer>
         </section>

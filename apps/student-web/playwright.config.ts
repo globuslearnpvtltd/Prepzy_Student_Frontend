@@ -6,6 +6,7 @@ export const E2E_API = 'http://api.e2e.test';
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: '**/staging/**',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -17,6 +18,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'on',
     video: 'retain-on-failure',
+    channel: process.env.E2E_BROWSER_CHANNEL || undefined,
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },

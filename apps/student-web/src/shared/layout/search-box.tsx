@@ -1,14 +1,16 @@
 'use client';
 
 import { cx } from '@prepzy/design-system';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Search } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { ArrowRight, BookOpen, FileText, Library, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useActivePlan } from '@/features/auth';
+import { track } from '@/shared/analytics/track';
 import type { ExamConfig } from '@/shared/config/exams';
-import { routes } from '@/shared/config/routes';
-import { shellApi, shellKeys } from './shell-api';
+import { ApiError } from '@/shared/lib/errors';
+import { SearchResults, type SearchResultLink } from './search-results';
+import { shellApi, shellKeys, type SearchSuggestion, type SuggestionKind } from './shell-api';
 
 export function useDebounced<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -19,13 +21,25 @@ export function useDebounced<T>(value: T, delay: number): T {
   return debounced;
 }
 
-/** Where search results open until Learn / Notes are ported (board: Learn, competitive: Notes). */
-export const searchTarget = (exam: ExamConfig) =>
-  exam.category === 'competitive' ? routes.notes(exam.slug) : routes.learn(exam.slug);
+/** Label and icon of each suggestion type. */
+export const SUGGESTION_KINDS = {
+  topic: { label: 'Topic', Icon: FileText },
+  chapter: { label: 'Chapter', Icon: BookOpen },
+  course: { label: 'Course', Icon: Library },
+} satisfies Record<SuggestionKind, { label: string; Icon: typeof Search }>;
+
+/** The backend's message for a rejected search (e.g. too many searches); a generic one for failures and outages. */
+export const searchErrorText = (error: unknown) =>
+  error instanceof ApiError && error.status >= 400 && error.status < 500
+    ? error.message
+    : "Search couldn't finish right now. Please try again.";
 
 /**
- * "Search chapters, notes and tests" box with suggestions from GET /api/v4/search/:category/:examId/suggestions
- * (board: topics of the student's class, competitive: the whole exam).
+ * The header's "Search chapters, notes and tests" box (the previous app's Searchbar):
+ * - while typing, suggestions from GET /api/v4/search/:category/:examId/suggestions, each with its type. A suggestion
+ *   with a link (competitive: course, notes topic, chapter) opens it; one without (board topics) runs the lecture
+ *   search for its title and subject, as before.
+ * - the arrow button runs the lecture search (POST .../lectures) and shows the results panel (see SearchResults).
  */
 export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; onNavigate?: () => void; className?: string }) {
   const router = useRouter();
@@ -33,29 +47,128 @@ export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; o
   const classId = plan.data?.classId ?? null;
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
-  const query = useDebounced(text.trim(), 500);
+  const [active, setActive] = useState(-1);
+  const subjectRef = useRef<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const listId = useId();
-  const canSearch = query.length > 0 && (exam.category === 'competitive' || classId !== null);
+  const panelId = useId();
+
+  const lectures = useMutation({
+    mutationFn: ({ query, subjectName }: { query: string; subjectName: string | null }) =>
+      shellApi.searchLectures(exam, query, { subjectName, classId }),
+    onSuccess: (result, { query }) =>
+      track('search_performed', {
+        exam_id: exam.examSlice,
+        search_query: query,
+        results_count: result ? 1 : 0,
+        has_results: !!result,
+      }),
+  });
+  const showingResults = !lectures.isIdle;
+
+  const query = useDebounced(text.trim(), 500);
+  const canSuggest = query.length > 0 && !showingResults && (exam.category === 'competitive' || classId !== null);
   const suggestions = useQuery({
     queryKey: shellKeys.search(exam.slug, query, classId),
     queryFn: () => shellApi.searchSuggestions(exam, query, classId),
-    enabled: canSearch,
+    enabled: canSuggest,
     staleTime: 60_000,
   });
-  const items = canSearch ? (suggestions.data ?? []) : [];
+  const items = canSuggest ? (suggestions.data ?? []) : [];
+  const listOpen = open && !showingResults && items.length > 0;
+  const panelOpen = open && showingResults;
 
-  const go = (href?: string | null) => {
+  useEffect(() => setActive(-1), [query]);
+
+  // A click anywhere else closes the list and the results (as before).
+  useEffect(() => {
+    if (!listOpen && !panelOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+        setActive(-1);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [listOpen, panelOpen]);
+
+  const close = () => {
     setOpen(false);
-    setText('');
-    onNavigate?.();
-    router.push(href ?? searchTarget(exam));
+    setActive(-1);
+    lectures.reset();
   };
+
+  const reset = () => {
+    close();
+    setText('');
+  };
+
+  const runSearch = (value: string, subjectName: string | null) => {
+    if (!value.trim()) return;
+    subjectRef.current = subjectName;
+    setOpen(true);
+    setActive(-1);
+    lectures.mutate({ query: value.trim(), subjectName });
+  };
+
+  const pick = (item: SearchSuggestion) => {
+    if (item.href) {
+      reset();
+      onNavigate?.();
+      router.push(item.href);
+      return;
+    }
+    setText(item.title);
+    runSearch(item.title, item.subjectName);
+  };
+
+  const openResult = (link: SearchResultLink) => {
+    track('search_result_clicked', {
+      exam_id: exam.examSlice,
+      result_type: link.type,
+      subject: subjectRef.current,
+      chapter_name: lectures.data?.moduleName ?? null,
+      result_position: link.position,
+    });
+    reset();
+    onNavigate?.();
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      if (listOpen || panelOpen) event.preventDefault();
+      close();
+      return;
+    }
+    if (!listOpen) {
+      if (event.key === 'ArrowDown' && items.length > 0) setOpen(true);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActive((current) => (current >= items.length - 1 ? 0 : current + 1));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActive((current) => (current <= 0 ? items.length - 1 : current - 1));
+    } else if (event.key === 'Enter' && active >= 0 && active < items.length) {
+      event.preventDefault();
+      pick(items[active]!);
+    }
+  };
+
+  const optionId = (index: number) => `${listId}-option-${index}`;
 
   return (
     <div
+      ref={containerRef}
       className={cx('relative', className)}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+        // Keyboard focus moving out of the box closes it (pointer clicks outside are handled above).
+        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) {
+          setOpen(false);
+          setActive(-1);
+        }
       }}
     >
       <form
@@ -63,7 +176,7 @@ export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; o
         className="border-line bg-surface focus-within:border-brand flex h-11 items-center gap-2.5 rounded-full border pr-1 pl-4 transition-colors"
         onSubmit={(event) => {
           event.preventDefault();
-          if (text.trim()) go();
+          runSearch(text, null);
         }}
       >
         <Search aria-hidden className="text-foreground-muted size-[18px] shrink-0" />
@@ -73,14 +186,17 @@ export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; o
           onChange={(event) => {
             setText(event.target.value);
             setOpen(true);
+            lectures.reset();
           }}
           onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
           placeholder="Search chapters, notes and tests"
           role="combobox"
           aria-autocomplete="list"
           aria-label="Search topics"
-          aria-controls={listId}
-          aria-expanded={open && items.length > 0}
+          aria-controls={panelOpen ? panelId : listId}
+          aria-expanded={listOpen || panelOpen}
+          aria-activedescendant={listOpen && active >= 0 && active < items.length ? optionId(active) : undefined}
           className="text-foreground placeholder:text-foreground-muted h-full w-full min-w-0 bg-transparent text-[14px] outline-none"
         />
         <button
@@ -92,35 +208,60 @@ export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; o
           <ArrowRight aria-hidden className="size-[18px]" />
         </button>
       </form>
-      {open && items.length > 0 && (
+      {listOpen && (
         <ul
           id={listId}
+          role="listbox"
           aria-label="Suggestions"
           className="border-line bg-surface absolute top-full left-0 z-50 mt-2 w-full rounded-xl border px-4 py-2 shadow-lg"
         >
-          {items.map((item) => (
-            <li key={item.key}>
-              <button
-                type="button"
-                onClick={() => go(item.href)}
-                className="hover:bg-canvas flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left text-[14px]"
+          {items.map((item, index) => {
+            const { label, Icon } = SUGGESTION_KINDS[item.kind];
+            return (
+              <li
+                key={item.key}
+                id={optionId(index)}
+                role="option"
+                aria-selected={index === active}
+                // Keeps focus in the box while the click lands.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => pick(item)}
+                className={cx(
+                  'hover:bg-canvas flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-2 text-left text-[14px]',
+                  index === active && 'bg-canvas',
+                )}
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  <Search aria-hidden className="text-foreground-subtle size-4 shrink-0" />
+                  <Icon aria-hidden className="text-foreground-subtle size-4 shrink-0" />
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate capitalize">{item.title.toLowerCase()}</span>
-                    {item.context && (
-                      <span className="text-foreground-subtle truncate text-[11px] capitalize">{item.context}</span>
-                    )}
+                    <span className="text-foreground-subtle truncate text-[11px]">
+                      {label}
+                      {item.context && <span className="capitalize"> · {item.context}</span>}
+                    </span>
                   </span>
                 </span>
-                <span className="bg-canvas text-foreground-subtle shrink-0 rounded-sm px-2 py-0.5 text-[10px] uppercase">
-                  {item.subject}
-                </span>
-              </button>
-            </li>
-          ))}
+                {item.subject && (
+                  <span className="bg-canvas text-foreground-subtle shrink-0 rounded-sm px-2 py-0.5 text-[10px] uppercase">
+                    {item.subject}
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
+      )}
+      {panelOpen && (
+        <SearchResults
+          exam={exam}
+          id={panelId}
+          status={lectures.isPending ? 'pending' : lectures.isError ? 'error' : 'success'}
+          result={lectures.data ?? null}
+          error={lectures.isError ? searchErrorText(lectures.error) : null}
+          onRetry={() => lectures.variables && lectures.mutate(lectures.variables)}
+          onDismiss={close}
+          onOpen={openResult}
+        />
       )}
     </div>
   );

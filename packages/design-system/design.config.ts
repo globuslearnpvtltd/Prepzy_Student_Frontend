@@ -94,6 +94,13 @@ export const designConfig = defineDesignConfig({
         900: '#0C0918',
         950: '#0A0A0D', // learn: video player backdrop
       },
+      // Lecture video player (previous app's LectureVideoPlayer): stage, scrims, centre icon, menus.
+      player: {
+        stage: '#0A0A0D', // frame behind the 16:9 stage
+        ink: '#000000', // video letterbox, scrims, menus, duration pill
+        accent: '#4338CA', // centre play / pause / replay icon, "Try again"
+        active: '#A5B4FC', // selected language in the menu
+      },
       // proposed status colours
       success: { 50: '#ECFDF3', 100: '#DCFCE7', 300: '#32D583', 350: '#25D366', 400: '#22C55E', 450: '#2FA36B', 500: '#10B981', 600: '#039855', 700: '#16A34A' },
       warning: { 50: '#FFFAEB', 100: '#FDE7D9', 500: '#EA580C', 600: '#DC6803', 700: '#B54708' },
@@ -420,6 +427,8 @@ export const designConfig = defineDesignConfig({
       mono: "ui-monospace, SFMono-Regular, Menlo, monospace",
       // Partners portal sign-in / sign-up body text (loaded by app/partners/layout.tsx).
       partner: "var(--font-source-sans), 'Source Sans 3', ui-sans-serif, system-ui, sans-serif",
+      // Board test player (previous app's font-gilroy; loaded by app/(student)/[exam]/(focus)/layout.tsx, which re-declares it).
+      gilroy: "var(--font-gilroy-face), 'Gilroy', var(--font-poppins), ui-sans-serif, sans-serif",
       // Parents portal sign-in: the previous app rendered it in the browser's default sans face.
       plain: 'Arial, Helvetica, sans-serif',
     },
@@ -472,6 +481,11 @@ export const designConfig = defineDesignConfig({
       'bar-up': '0 -2px 10px rgb(0 0 0 / 0.1)',
       raised: '0 6px 14px rgb(61 52 139 / 0.35)',
       'cta-dark': '0 6px 24px 0 rgb(0 0 0 / 0.33)',
+      // Lecture video player
+      'player-button': '0 10px 25px rgb(0 0 0 / 0.35)', // big centre play button
+      'player-spinner': '0 0 20px rgb(0 0 0 / 0.35)',
+      'player-thumb': '0 0 0 3px rgb(67 56 202 / 0.35)', // seek thumb ring
+      'player-frame': '0 25px 60px -20px rgb(0 0 0 / 0.7)', // competitive (NEET) frame
       'socrates-card': '0 8px 25px rgb(61 51 140 / 0.10)', // doubt solver cards
       'socrates-book': '0 8px 18px rgb(31 26 77 / 0.25)', // centred textbook
       'socrates-pick': '0 11px 42px rgb(240 178 64 / 0.55), 0 14px 22px rgb(89 56 10 / 0.26)', // selected textbook

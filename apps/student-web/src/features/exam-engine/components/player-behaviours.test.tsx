@@ -79,6 +79,13 @@ describe('board player', () => {
     expect(screen.getByRole('heading', { name: 'Status' })).toBeInTheDocument();
     expect(screen.getAllByRole('timer')[0]).toHaveTextContent(/0\d:\d{2}:\d{2}/);
     expect(screen.getAllByRole('tab', { name: 'Multiple choice' })[0]).toHaveAttribute('aria-selected', 'true');
+    // Short chip names on one line (previous app's "MCQ" / "Short Answer"), full names for assistive tech.
+    expect(screen.getAllByRole('tab', { name: 'Multiple choice' })[0]).toHaveTextContent(/^MCQ$/);
+    expect(screen.getAllByRole('tab', { name: 'Multiple choice' })[0]!.className).toContain('whitespace-nowrap');
+    // The question scrolls on its own; the footer buttons stay outside the scroll area.
+    const scroller = screen.getByTestId('question-scroll');
+    expect(scroller).toContainElement(screen.getByText('SI unit of charge?'));
+    expect(scroller).not.toContainElement(screen.getByRole('button', { name: /Save & Next/ }));
 
     await userEvent.click(screen.getByRole('radio', { name: /Coulomb/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Skip' }));

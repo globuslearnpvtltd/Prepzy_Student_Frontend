@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useActivePlan } from '@/features/auth';
 import { LiveVoiceLayer, LiveVoiceProvider, useLiveVoice, type VoiceConfig } from '@/features/live-voice';
 import { useExam } from '@/shared/hooks/use-exam';
@@ -16,12 +16,19 @@ export interface LectureAtlasProps {
   lectureId?: number | string | null;
   /** Render your own opener (e.g. NEET's "Ask Atlas AI" card); the floating launcher is always shown too. */
   children?: (open: () => void) => React.ReactNode;
+  /** Told whenever the chat panel opens / closes or a live voice call starts / ends (the lecture video pauses for them). */
+  onActivity?: (activity: TutorActivity) => void;
+}
+
+export interface TutorActivity {
+  chatOpen: boolean;
+  voiceActive: boolean;
 }
 
 const toNumber = (value: number | string | null | undefined) => (value === null || value === undefined || value === '' ? null : Number(value));
 
 /** The lecture tutor (Atlas scoped to the course): floating launcher + chat panel over the lecture. */
-export function LectureAtlas({ courseId, moduleId, lectureId, children }: LectureAtlasProps) {
+export function LectureAtlas({ courseId, moduleId, lectureId, children, onActivity }: LectureAtlasProps) {
   const exam = useExam();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -50,6 +57,7 @@ export function LectureAtlas({ courseId, moduleId, lectureId, children }: Lectur
   return (
     // Leaving the lecture unmounts the provider, which hangs up (and saves) a running call.
     <LiveVoiceProvider config={voiceConfig}>
+      {onActivity && <ActivityReporter chatOpen={open} onActivity={onActivity} />}
       {children?.(() => setOpen(true))}
       <LectureLauncher show={!open} label={`Ask ${avatar.data?.name ?? 'your tutor'}`} image={avatar.data?.image} onOpen={() => setOpen(true)} />
       <ChatOverlay open={open} expanded={expanded} onClose={close}>
@@ -63,4 +71,14 @@ export function LectureAtlas({ courseId, moduleId, lectureId, children }: Lectur
 function LectureLauncher({ show, ...props }: { show: boolean; label: string; image?: string | null; onOpen: () => void }) {
   const voice = useLiveVoice();
   return show && !voice?.isActive ? <ChatLauncher {...props} /> : null;
+}
+
+function ActivityReporter({ chatOpen, onActivity }: { chatOpen: boolean; onActivity: (activity: TutorActivity) => void }) {
+  const voiceActive = !!useLiveVoice()?.isActive;
+  const callback = useRef(onActivity);
+  callback.current = onActivity;
+  useEffect(() => {
+    callback.current({ chatOpen, voiceActive });
+  }, [chatOpen, voiceActive]);
+  return null;
 }

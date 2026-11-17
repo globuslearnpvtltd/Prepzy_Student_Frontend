@@ -12,6 +12,46 @@ for (const proto of [Element.prototype, Range.prototype] as { getClientRects?: u
 }
 document.elementFromPoint ??= () => null;
 
+// jsdom has no media playback: play() / pause() flip `paused` and fire the events a browser would.
+const playingMedia = new WeakSet<HTMLMediaElement>();
+Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
+  configurable: true,
+  get(this: HTMLMediaElement) {
+    return !playingMedia.has(this);
+  },
+});
+HTMLMediaElement.prototype.play = function play(this: HTMLMediaElement) {
+  if (!playingMedia.has(this)) {
+    playingMedia.add(this);
+    this.dispatchEvent(new Event('play'));
+  }
+  return Promise.resolve();
+};
+HTMLMediaElement.prototype.pause = function pause(this: HTMLMediaElement) {
+  if (playingMedia.delete(this)) this.dispatchEvent(new Event('pause'));
+};
+HTMLMediaElement.prototype.load = function load() {};
+
+// react-player renders a plain <video> in tests (the real one lazy-loads YouTube's custom element).
+vi.mock('react-player', async () => {
+  const { createElement, forwardRef } = await import('react');
+  const ReactPlayer = forwardRef<HTMLVideoElement, Record<string, unknown>>(function ReactPlayer(props, ref) {
+    const { src, config, volume, playbackRate, width, height, ...rest } = props;
+    void width;
+    void height;
+    return createElement('video', {
+      ...rest,
+      ref,
+      src,
+      'data-testid': 'media',
+      'data-volume': volume,
+      'data-rate': playbackRate,
+      'data-config': JSON.stringify(config ?? {}),
+    });
+  });
+  return { default: ReactPlayer };
+});
+
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => {
   server.resetHandlers();

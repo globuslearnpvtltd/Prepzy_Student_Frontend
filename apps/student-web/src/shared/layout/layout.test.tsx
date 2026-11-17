@@ -317,11 +317,10 @@ describe('board shell', () => {
     await screen.findByText('Page');
     const [box] = screen.getAllByRole('combobox', { name: 'Search topics' });
     await userEvent.type(box!, 'elec');
-    const suggestion = await screen.findByRole('button', { name: /electric charge/i }, { timeout: 2000 });
+    const suggestion = await screen.findByRole('option', { name: /electric charge/i }, { timeout: 2000 });
     expect(query).toBe('?q=elec&class_id=12');
     expect(suggestion).toHaveTextContent('Physics');
-    await userEvent.click(suggestion);
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/learn');
+    expect(suggestion).toHaveTextContent('Topic');
   });
 
   it('submits the search with the arrow button, which is disabled while the box is empty', async () => {
@@ -333,9 +332,17 @@ describe('board shell', () => {
     const [box] = screen.getAllByRole('combobox', { name: 'Search topics' });
     await userEvent.type(box!, 'elec');
     expect(arrow).toBeEnabled();
-    navigation.push.mockClear();
+    let body: unknown;
+    server.use(
+      http.post(`${API}/api/v4/search/board/1/lectures`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ success: true, data: { result: null } });
+      }),
+    );
     await userEvent.click(arrow!);
-    expect(navigation.push).toHaveBeenCalledWith('/cbse/learn');
+    expect(await screen.findByText('No matching lesson found')).toBeInTheDocument();
+    expect(body).toEqual({ query: 'elec', class_id: 12 });
+    expect(navigation.push).not.toHaveBeenCalled();
   });
 });
 
@@ -612,7 +619,16 @@ describe('shell API', () => {
     const neet = testExam('neet');
     const results = await shellApi.searchSuggestions(neet, `cell${'x'.repeat(200)}`, null);
     expect(query).toBe(`?q=cell${'x'.repeat(96)}`);
-    expect(results[0]).toEqual({ key: '0-Cell cycle', title: 'Cell cycle', context: 'in cell division', subject: 'Botany', href: null });
+    expect(results[0]).toEqual({
+      key: '0-Cell cycle',
+      kind: 'topic',
+      title: 'Cell cycle',
+      context: 'in cell division',
+      subject: 'Botany',
+      subjectName: 'NEET-BOTANY',
+      href: null,
+    });
+    expect(results.map((r) => r.kind)).toEqual(['topic', 'topic', 'chapter', 'course']);
     expect(results.slice(1).map((r) => r.href)).toEqual([
       `${routes.learnModule('neet', 3, 9, 'study-notes')}#cell%20cycle`,
       routes.learnModule('neet', 3, 9, 'video-lectures'),

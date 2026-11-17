@@ -283,7 +283,7 @@ export function resolveVideoSource(link: string | null | undefined): VideoSource
   const value = link?.trim();
   if (!value) return null;
   const youtubeId = YOUTUBE_ID.exec(value)?.[1];
-  if (youtubeId) return { kind: 'youtube', id: youtubeId, url: `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&modestbranding=1` };
+  if (youtubeId) return { kind: 'youtube', id: youtubeId, url: `https://www.youtube.com/watch?v=${youtubeId}` };
   if (/^https?:\/\//i.test(value)) return { kind: 'file', url: value };
   return { kind: 'file', url: `https://resource2.heygen.ai/video/${value}/1280x720.mp4` };
 }

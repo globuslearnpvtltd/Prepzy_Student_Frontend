@@ -172,11 +172,11 @@ describe('Lecture page edge cases', () => {
       }),
     );
     renderWithProviders(<LectureScreen courseId="5" moduleId="2" lectureId="8" />, { exam: cbse });
-    const video = await screen.findByLabelText('Mirrors');
-    expect(fireEvent.contextMenu(video)).toBe(false);
+    const video = await screen.findByTestId('media');
+    expect(fireEvent.contextMenu(screen.getByTestId('lecture-video-player'))).toBe(false);
     fireEvent.error(video);
     await new Promise((r) => setTimeout(r, 20));
-    expect(screen.getByLabelText('Mirrors')).toHaveAttribute('src', 'https://cdn.test/a.mp4');
+    expect(screen.getByTestId('media')).toHaveAttribute('src', 'https://cdn.test/a.mp4');
 
     await userEvent.click(screen.getByRole('tab', { name: 'Transcript' }));
     expect(await screen.findByText('No transcript currently available')).toBeInTheDocument();

@@ -423,13 +423,18 @@ describe('QuestionView', () => {
     expect(screen.getByRole('status')).toHaveTextContent('null');
   });
 
-  it('board: numbered question with marks', () => {
-    renderWithProviders(<Controlled question={mcq} look="board" />);
+  it('board: the numbered question on the grey header strip, with its type and marks', () => {
+    const { container } = renderWithProviders(<Controlled question={mcq} look="board" />);
+    expect(screen.getByRole('heading', { name: /^Question \d+$/ })).toBeInTheDocument();
     expect(screen.getByText('Multiple choice · 1 mark')).toBeInTheDocument();
-    renderWithProviders(<Controlled question={{ ...mcq, id: 'q2', marks: 2 }} look="board" />);
+    expect(container.querySelector('header')!.className).toContain('bg-info-25');
+    renderWithProviders(<Controlled question={{ ...mcq, id: 'q4', marks: 2 }} look="board" />);
     expect(screen.getByText('Multiple choice · 2 marks')).toBeInTheDocument();
-    renderWithProviders(<Controlled question={{ ...mcq, id: 'q3', marks: null, image: null }} look="board" />);
+    renderWithProviders(<Controlled question={{ ...mcq, id: 'q5', marks: null, image: null }} look="board" />);
     expect(screen.getAllByText(/Multiple choice ·/)).toHaveLength(2);
+    // Case-based questions sit on a white header, as before.
+    const caseBased = renderWithProviders(<Controlled question={{ ...mcq, id: 'q2', typeLabel: 'Case based' }} look="board" />);
+    expect(caseBased.container.querySelector('header')!.className).toContain('bg-surface');
   });
 
   it('written: types an answer', async () => {

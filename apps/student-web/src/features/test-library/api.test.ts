@@ -16,11 +16,11 @@ const CBSE_V4 = `${API}/api/v4/assessments/board/${cbse.examId}`;
 const ok = (body: Record<string, unknown> = {}) => HttpResponse.json({ success: true, ...body });
 
 describe('examForCategory', () => {
-  it('returns the exam of the right category and 404s otherwise', () => {
-    expect(examForCategory('neet', 'competitive')).toBe(getExam('neet'));
+  it('returns the exam of the right category and 404s otherwise', async () => {
+    expect(await examForCategory('neet', 'competitive')).toBe(getExam('neet'));
     expect(notFound).not.toHaveBeenCalled();
-    examForCategory('cbse', 'competitive');
-    examForCategory('gate', 'board');
+    await examForCategory('cbse', 'competitive');
+    await examForCategory('gate', 'board');
     expect(notFound).toHaveBeenCalledTimes(2);
   });
 });

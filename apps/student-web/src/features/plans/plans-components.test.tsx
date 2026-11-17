@@ -257,14 +257,28 @@ describe('plans chrome (/purchase)', () => {
     expect(await screen.findByText(`header:${neet.category}:${neet.slug}`)).toBeInTheDocument();
   });
 
-  it("shows the student's current exam for an exam the app has no pages for, else the plain header", async () => {
+  it("shows a new exam's own header, the student's current exam for one without pages, else the plain header", async () => {
     server.use(
       http.get(`${API}/api/v4/exams`, () =>
-        HttpResponse.json({ success: true, data: [...EXAM_CATALOG, { exam_id: 7, exam_name: 'ICSE', exam_slice: 'icse', category: 'board' }] }),
+        HttpResponse.json({
+          success: true,
+          data: [
+            ...EXAM_CATALOG,
+            { exam_id: 7, exam_name: 'ICSE', exam_slice: 'icse', category: 'board' },
+            // A slice that can't be a URL segment: no pages.
+            { exam_id: 8, exam_name: 'Olympiad', exam_slice: 'olympiad 2027', category: 'board' },
+          ],
+        }),
       ),
       purchased([{ exam_id: neet.examId, exam_slice: neet.examSlice, exam_name: 'NEET-UG' }]),
     );
+    // A DB-only exam gets its category's design, with its slice as the slug.
     navigation.searchParams = new URLSearchParams('exam=icse');
+    const first = chrome();
+    expect(await screen.findByText('header:board:icse')).toBeInTheDocument();
+    first.unmount();
+
+    navigation.searchParams = new URLSearchParams('exam=8');
     const { unmount } = chrome();
     expect(await screen.findByText(`header:${neet.category}:${neet.slug}`)).toBeInTheDocument();
     unmount();

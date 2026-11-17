@@ -153,11 +153,10 @@ describe('Ask Socrates flow', () => {
     }));
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     const next = screen.getByRole('button', { name: 'Next' });
-    // Question Bank before choosing a book asks to pick one.
-    await userEvent.click(screen.getByRole('button', { name: 'Question Bank' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Please select a subject first');
-    expect(await screen.findByRole('button', { name: 'Physics, Physics Part 1', pressed: false })).toBeInTheDocument();
-    expect(next).toBeDisabled();
+    // The centre book is selected automatically once the list loads.
+    expect(await screen.findByRole('button', { name: 'Physics, Physics Part 1', pressed: true })).toBeInTheDocument();
+    expect(next).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Next subject' }));
     expect(screen.getByText('Maths Part 1')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Previous subject' }));

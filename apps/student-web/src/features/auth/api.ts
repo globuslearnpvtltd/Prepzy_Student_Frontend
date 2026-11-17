@@ -1,4 +1,4 @@
-import { findExam, learnApiBase, type ExamRef } from '@/shared/config/exams';
+import { examDesignFor, learnApiBase, type ExamRef } from '@/shared/config/exams';
 import { fetchExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk, unwrapData } from '@/shared/lib/unwrap';
@@ -62,7 +62,8 @@ export const authApi = {
 
   /**
    * Exams a student can sign up for: the active exams of GET /api/v4/exams (reference books are not an exam).
-   * One the app has no pages for yet is listed as coming soon.
+   * Every board / competitive exam has pages (its category's design); one that can't (e.g. a slice that isn't
+   * URL-safe) is listed as coming soon.
    */
   async examOptions(): Promise<ExamOption[]> {
     return (await fetchExamCatalog())
@@ -71,7 +72,7 @@ export const authApi = {
         examId: exam.examId,
         name: exam.name,
         examSlice: exam.examSlice,
-        comingSoon: !findExam(exam.examSlice),
+        comingSoon: !examDesignFor(exam),
       }));
   },
 

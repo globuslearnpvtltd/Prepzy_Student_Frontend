@@ -4,7 +4,7 @@ import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query
 import { useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 import { planName, rememberedExam, type ActivePlan } from '@/features/auth';
-import { findExam, type ExamConfig, type ExamRef } from '@/shared/config/exams';
+import { examDesignFor, findExam, type ExamConfig, type ExamRef } from '@/shared/config/exams';
 import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { isPlanCategory, plansApi, type PlanCategory } from './api';
 import type { CatalogExam } from './catalog';
@@ -44,9 +44,10 @@ export function usePlanExams() {
   const exams = useMemo<PlanExam[]>(
     () =>
       (examList.data ?? []).flatMap((entry) => {
-        const design = findExam(entry.examSlice);
-        if (!isPlanCategory(entry.category) || (design && design.category !== entry.category)) return [];
-        return [{ examId: entry.examId, category: entry.category, examSlice: entry.examSlice, name: entry.name, slug: design?.slug ?? null }];
+        // Every board / competitive exam has pages: the registry's short slug, else its exam_slice (examDesignFor).
+        const design = examDesignFor(entry);
+        if (!isPlanCategory(entry.category) || !design) return [];
+        return [{ examId: entry.examId, category: entry.category, examSlice: entry.examSlice, name: entry.name, slug: design.slug }];
       }),
     [examList.data],
   );

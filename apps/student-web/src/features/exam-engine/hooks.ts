@@ -20,7 +20,7 @@ export const examKeys = {
 export function useTestContext(): { context: TestContext | null; isPending: boolean; error: unknown } {
   const exam = useExam();
   const plan = useActivePlan(exam);
-  const fallbackClass = exam.onboarding.kind === 'choose-target-year' ? exam.onboarding.classId : null;
+  const fallbackClass = exam.onboarding.kind === 'choose-target-year' ? (exam.onboarding.classId ?? null) : null;
   const classId = plan.data?.classId ?? fallbackClass;
   return {
     context: classId ? { exam, classId } : null,

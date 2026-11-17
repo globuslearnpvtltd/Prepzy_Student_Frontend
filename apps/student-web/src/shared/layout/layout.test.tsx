@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { usePlanSelection } from '@/features/auth';
+import { examDesignFor, getExam } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { apiClient } from '@/shared/lib/api-client';
 import { useExam } from '@/shared/hooks/use-exam';
@@ -62,7 +63,7 @@ const studyPlan = (hasPlan: boolean) =>
 
 function renderShell(slug: 'cbse' | 'neet') {
   return renderWithProviders(
-    <ExamFrame examSlug={slug}>
+    <ExamFrame design={getExam(slug)!}>
       <AppChrome>
         <p>Page</p>
       </AppChrome>
@@ -78,10 +79,42 @@ beforeEach(() => {
 });
 
 describe('ExamFrame access check', () => {
+  it("opens a DB-only exam (no registry entry) with its category's design and the backend's exam id", async () => {
+    server.use(
+      http.get(`${API}/api/v4/exams`, () =>
+        HttpResponse.json({ success: true, data: [{ exam_id: 9, exam_name: 'JEE Main', exam_slice: 'jee-main', category: 'competitive' }] }),
+      ),
+      purchased(['jee-main', 'JEE Main']),
+    );
+    const design = examDesignFor({ examSlice: 'jee-main', name: 'JEE Main', category: 'competitive' })!;
+    const Probe = () => {
+      const exam = useExam();
+      return <p>{`${exam.slug}:${exam.examId}:${exam.label}`}</p>;
+    };
+    const { container } = renderWithProviders(
+      <ExamFrame design={design}>
+        <Probe />
+      </ExamFrame>,
+    );
+    expect(await screen.findByText('jee-main:9:JEE Main')).toBeInTheDocument();
+    expect(container.querySelector('[data-theme="competitive"]')).not.toBeNull();
+    expect(document.cookie).toContain('prepzy_exam=jee-main');
+  });
+
+  it('says a DB-only exam is unavailable once it is switched off', async () => {
+    server.use(http.get(`${API}/api/v4/exams`, () => HttpResponse.json({ success: true, data: [] })));
+    renderWithProviders(
+      <ExamFrame design={examDesignFor({ examSlice: 'icse', name: 'ICSE', category: 'board' })!}>
+        <p>Dashboard content</p>
+      </ExamFrame>,
+    );
+    expect(await screen.findByRole('heading', { name: "ICSE isn't available right now" })).toBeInTheDocument();
+  });
+
   it('renders the page when the student owns the exam, with the exam theme', async () => {
     server.use(purchased(['cbse', 'CBSE']));
     const { container } = renderWithProviders(
-      <ExamFrame examSlug="cbse">
+      <ExamFrame design={getExam('cbse')!}>
         <p>Dashboard content</p>
       </ExamFrame>,
     );
@@ -90,25 +123,34 @@ describe('ExamFrame access check', () => {
     expect(document.cookie).toContain('prepzy_exam=cbse');
   });
 
-  it('moves the student to an exam they own', async () => {
+  it('asks a student without a plan for this exam to purchase one, with a way to the exam they own', async () => {
     server.use(purchased(['neet-ug', 'NEET-UG']));
     renderWithProviders(
-      <ExamFrame examSlug="cbse">
+      <ExamFrame design={getExam('cbse')!}>
         <p>Dashboard content</p>
       </ExamFrame>,
     );
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/neet/dashboard'));
+    const dialog = await screen.findByRole('dialog', { name: 'No plan purchased for CBSE' });
+    expect(within(dialog).getByText(/You don.t have an active plan for CBSE yet/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Upgrade Now' })).toHaveAttribute('href', '/purchase?exam=cbse');
+    expect(within(dialog).getByRole('link', { name: 'Go to my NEET UG dashboard' })).toHaveAttribute('href', '/neet/dashboard');
     expect(screen.queryByText('Dashboard content')).not.toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+    // It can't be dismissed: the exam's pages need a plan.
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('explains when the student has no exam at all', async () => {
+  it('only offers the purchase page when the student has no exam at all', async () => {
     server.use(purchased());
     renderWithProviders(
-      <ExamFrame examSlug="neet">
+      <ExamFrame design={getExam('neet')!}>
         <p>Dashboard content</p>
       </ExamFrame>,
     );
-    expect(await screen.findByRole('heading', { name: "NEET UG isn't on your account" })).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'No plan purchased for NEET UG' });
+    expect(within(dialog).getByRole('link', { name: 'Upgrade Now' })).toHaveAttribute('href', '/purchase?exam=neet');
+    expect(within(dialog).queryByRole('link', { name: /dashboard/ })).not.toBeInTheDocument();
   });
 });
 
@@ -697,7 +739,7 @@ describe('ExamFrame exam id from the backend', () => {
       ),
     );
     renderWithProviders(
-      <ExamFrame examSlug="cbse">
+      <ExamFrame design={getExam('cbse')!}>
         <ShowExamId />
       </ExamFrame>,
     );
@@ -707,7 +749,7 @@ describe('ExamFrame exam id from the backend', () => {
   it('says so when the backend has no such active exam', async () => {
     server.use(http.get(`${API}/api/v4/exams`, () => HttpResponse.json({ success: true, data: [] })));
     renderWithProviders(
-      <ExamFrame examSlug="cbse">
+      <ExamFrame design={getExam('cbse')!}>
         <ShowExamId />
       </ExamFrame>,
     );

@@ -83,8 +83,10 @@ export const designConfig = defineDesignConfig({
       info: {
         50: '#E3EDFC',
         25: '#F6F9FE', // board exam player: status tiles, question header
+        200: '#91B1FA', // "no plan for this exam" modal: sparkles
         400: '#4285F4', // course progress gradient end
         600: '#1363DF',
+        650: '#3367D6', // "no plan for this exam" modal: Upgrade Now hover
         700: '#1158C5', // board exam player: section pills, Save & Next
       },
       // Dark "Ask Socrates" card (NEET dashboard).
@@ -370,6 +372,15 @@ export const designConfig = defineDesignConfig({
         'notice-soft': '#FEF3E7', // info banner
         'notice-text': '#92400E',
         'notice-icon': '#B45309', // banner icon, "SOON" badge
+        // Class setup (previous app's CbseSetupComponent): page, top bar, picked card, captions, stream icons.
+        'class-page': '#F9F8FE',
+        'class-bar': '#EEEDF5', // top bar bottom border
+        'class-pick': '#ECE8FB', // selected class / stream card
+        'class-muted': '#6B6B85', // step label, subtitle
+        'class-radio': '#C9C9D6', // unselected stream radio
+        'stream-pcm': '#3B9BE0',
+        'stream-pcb': '#2FA36B',
+        'stream-humanities': '#5B4FD6',
       },
       // My Account (profile), parent, help and support, delete account (previous app's profile pages).
       account: {
@@ -505,6 +516,10 @@ export const designConfig = defineDesignConfig({
       'onboarding-field-error': '0 4px 24px rgb(239 68 68 / 0.18)',
       'onboarding-cta': '0 6px 20px rgb(61 52 139 / 0.35)', // mobile submit
       'onboarding-continue': '0 6px 20px rgb(61 52 139 / 0.3)', // exam / setup continue
+      'onboarding-continue-hover': '0 10px 28px rgb(61 52 139 / 0.35)',
+      'onboarding-class-card': '0 6px 18px rgb(61 52 139 / 0.08)', // class card hover
+      'onboarding-class-continue': '0 8px 24px rgb(61 52 139 / 0.25)', // class setup continue
+      'onboarding-class-continue-hover': '0 12px 32px rgb(61 52 139 / 0.35)',
       'onboarding-verify': '0 6px 20px rgb(18 4 120 / 0.28)', // OTP verify
       'onboarding-card': '0 10px 40px rgb(26 18 64 / 0.05)', // OTP card (desktop)
       'onboarding-card-float': '0 12px 32px rgb(26 18 64 / 0.14)', // OTP card over the hero (mobile)

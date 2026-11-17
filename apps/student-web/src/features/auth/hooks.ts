@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { DEFAULT_EXAM, getExam, type ExamConfig } from '@/shared/config/exams';
+import { DEFAULT_EXAM, examSlugOf, type ExamConfig } from '@/shared/config/exams';
 import { portalForHost, portalForPath } from '@/shared/config/portals';
 import { routes } from '@/shared/config/routes';
 import { onApiEvent } from '@/shared/lib/api-client';
@@ -77,9 +77,9 @@ export function useActivePlan(exam: ExamConfig) {
   });
 }
 
-/** Dashboard of the student's exam, falling back to the default exam. */
+/** Dashboard of the student's exam (any exam's slug, see Student.targetExam), falling back to the default exam. */
 export function homeFor(student: Pick<Student, 'targetExam'> | null | undefined): string {
-  return routes.dashboard(getExam(student?.targetExam)?.slug ?? DEFAULT_EXAM);
+  return routes.dashboard(examSlugOf(student?.targetExam) ?? DEFAULT_EXAM);
 }
 
 export function useLogout() {

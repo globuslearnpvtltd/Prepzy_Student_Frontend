@@ -1,4 +1,4 @@
-import { findExam, type ExamConfig, type ExamSlug } from '@/shared/config/exams';
+import { examSlugOf, findExam, type ExamConfig, type ExamSlug } from '@/shared/config/exams';
 import { composePlanName } from '@/shared/lib/plan-name';
 
 /** Normalised student, independent of the backend's field names. */
@@ -138,8 +138,9 @@ export function toStudent(raw: unknown): Student {
     classTitle: text(row.class_title),
     userType: text(row.user_type),
     gender: row.gender === 'male' || row.gender === 'female' ? row.gender : null,
-    // exam_slice ('jac') identifies any exam; the name ('NEET-UG', 'CBSE') is the fallback for older responses.
-    targetExam: ((findExam(text(row.target_exam_slice)) ?? findExam(text(row.target_exam)))?.slug as ExamSlug | undefined) ?? null,
+    // exam_slice identifies any exam (registry exams map to their short slug, others use the slice as their URL);
+    // the name ('NEET-UG', 'CBSE') is the fallback for older responses (registry exams only).
+    targetExam: examSlugOf(text(row.target_exam_slice)) ?? findExam(text(row.target_exam))?.slug ?? null,
     language: toStudentLanguage(row.language),
   };
 }

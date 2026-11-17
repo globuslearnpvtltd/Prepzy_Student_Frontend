@@ -313,7 +313,7 @@ describe('SubjectPicker', () => {
     server.use(plan, textbooks(sixBooks));
     const handlers = { onNext: vi.fn(), onQuestionBank: vi.fn() };
     const { rerender } = renderWithProviders(picker(0, handlers), { exam: cbse });
-    await userEvent.click(await screen.findByRole('button', { name: 'Physics, Physics Part 1', pressed: false }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Physics, Physics Part 1', pressed: true }));
     expect(screen.getByText('Class 12 PCB')).toBeInTheDocument();
     rerender(picker(1, handlers));
     expect(handlers.onQuestionBank).toHaveBeenCalledTimes(1);
@@ -324,14 +324,14 @@ describe('SubjectPicker', () => {
     server.use(plan, textbooks(sixBooks));
     useSolver.setState({ book: { bookId: 51, title: 'Flamingo', image: null, className: 'CLASS 12' } });
     const { container } = renderWithProviders(picker(), { exam: cbse });
-    expect(await screen.findByRole('button', { name: 'English, Flamingo', pressed: false })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'English, Flamingo', pressed: true })).toBeInTheDocument();
     // the book three places away wraps out of view
     expect(screen.queryByRole('button', { name: /Chemistry Part 1/ })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Biology, Biology' }));
-    expect(screen.getByRole('button', { name: 'Biology, Biology', pressed: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Biology, Biology', pressed: true })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Previous subject' }));
-    expect(screen.getByRole('button', { name: 'Mathematics, Maths Part 1', pressed: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mathematics, Maths Part 1', pressed: true })).toBeInTheDocument();
 
     const track = container.querySelector('.overflow-hidden') as HTMLElement;
     const swipe = (from: [number, number], to: [number, number]) => {
@@ -339,13 +339,13 @@ describe('SubjectPicker', () => {
       fireEvent.touchEnd(track, { changedTouches: [{ clientX: to[0], clientY: to[1] }] });
     };
     swipe([200, 100], [100, 100]); // left: next book
-    expect(screen.getByRole('button', { name: 'Biology, Biology', pressed: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Biology, Biology', pressed: true })).toBeInTheDocument();
     swipe([100, 100], [200, 100]); // right: previous book
-    expect(screen.getByRole('button', { name: 'Mathematics, Maths Part 1', pressed: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mathematics, Maths Part 1', pressed: true })).toBeInTheDocument();
     swipe([100, 100], [120, 100]); // too short
     swipe([100, 100], [150, 300]); // mostly vertical
     fireEvent.touchEnd(track, { changedTouches: [{ clientX: 0, clientY: 0 }] }); // no start
-    expect(screen.getByRole('button', { name: 'Mathematics, Maths Part 1', pressed: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mathematics, Maths Part 1', pressed: true })).toBeInTheDocument();
 
     const cover = screen.getByRole('img', { name: 'Physics Part 1' }) as HTMLImageElement;
     expect(cover.src).toBe('https://cdn.test/phy.png');
@@ -355,9 +355,14 @@ describe('SubjectPicker', () => {
 
   it('says when the subjects fail to load', async () => {
     server.use(plan, http.get(`${API}${learnApiBase(cbse)}/textbooks`, () => HttpResponse.json({ message: 'down' }, { status: 500 })));
-    renderWithProviders(picker(), { exam: cbse });
+    const handlers = { onNext: vi.fn(), onQuestionBank: vi.fn() };
+    const { rerender } = renderWithProviders(picker(0, handlers), { exam: cbse });
     expect(await screen.findByText("Couldn't load your subjects.")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    // With no book to select, Question Bank asks to pick one.
+    rerender(picker(1, handlers));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please select a subject first');
+    expect(handlers.onQuestionBank).not.toHaveBeenCalled();
   });
 
   it('uses the compact carousel on small screens and follows screen changes', async () => {

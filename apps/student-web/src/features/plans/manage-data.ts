@@ -1,5 +1,5 @@
 import type { ExamCategory, ExamRef } from '@/shared/config/exams';
-import { findExam } from '@/shared/config/exams';
+import { examDesignFor } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 
 /**
@@ -118,12 +118,13 @@ const CATEGORIES: readonly ExamCategory[] = ['board', 'competitive', 'reference'
 function examInfo(raw: Raw): PlanExamInfo {
   const examId = numOrNull(raw.exam_id);
   const category = text(raw.category).toLowerCase() as ExamCategory;
-  const design = findExam(text(raw.exam_slice));
+  // Any board / competitive exam has pages (registry slug, else its exam_slice).
+  const design = text(raw.exam_slice) ? examDesignFor({ examSlice: text(raw.exam_slice), name: text(raw.exam_name), category }) : null;
   return {
     key: examId === null ? '' : String(examId),
     name: text(raw.exam_name) || design?.label || '',
     ref: examId !== null && CATEGORIES.includes(category) ? { category, examId } : null,
-    slug: design && design.category === category ? design.slug : null,
+    slug: design?.slug ?? null,
   };
 }
 

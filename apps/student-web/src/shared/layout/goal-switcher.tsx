@@ -17,7 +17,8 @@ import {
   type ActivePlan,
 } from '@/features/auth';
 import { classLabel } from '@/features/plans';
-import { findExam, REFERENCE, type ExamConfig } from '@/shared/config/exams';
+import { examFromCatalog, REFERENCE, type ExamConfig } from '@/shared/config/exams';
+import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { routes } from '@/shared/config/routes';
 
 export interface OwnedExam {
@@ -26,12 +27,13 @@ export interface OwnedExam {
   name: string;
 }
 
-/** The student's purchased exams that this app knows, in backend order. */
+/** The student's purchased exams that have pages (active, board / competitive), in backend order. */
 export function useOwnedExams(): OwnedExam[] {
   const purchased = usePurchasedExams();
+  const catalog = useExamCatalog();
   return (purchased.data ?? []).flatMap((p) => {
-    const exam = findExam(p.examSlice);
-    return exam ? [{ exam: { ...exam, examId: p.examId }, name: p.name || exam.label }] : [];
+    const exam = examFromCatalog(catalog.data, p.examSlice);
+    return exam ? [{ exam, name: p.name || exam.label }] : [];
   });
 }
 

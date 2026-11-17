@@ -26,11 +26,21 @@ const bigFile = (type: string) => {
 };
 
 describe('resolveTestType', () => {
-  it('accepts only test types the exam offers', () => {
-    expect(resolveTestType('neet', 'dpp')).toBe('dpp');
-    expect(resolveTestType('cbse', 'dpp')).toBeNull();
-    expect(resolveTestType('cbse', 'nonsense')).toBeNull();
-    expect(resolveTestType('gate', 'mock')).toBeNull();
+  it('accepts only test types the exam offers', async () => {
+    expect(await resolveTestType('neet', 'dpp')).toBe('dpp');
+    expect(await resolveTestType('cbse', 'dpp')).toBeNull();
+    expect(await resolveTestType('cbse', 'nonsense')).toBeNull();
+    expect(await resolveTestType('gate', 'mock')).toBeNull();
+  });
+
+  it("uses a DB-only exam's category defaults (its slice is its URL)", async () => {
+    server.use(
+      http.get(`${API}/api/v4/exams`, () =>
+        HttpResponse.json({ success: true, data: [{ exam_id: 9, exam_name: 'JEE', exam_slice: 'jee', category: 'competitive' }] }),
+      ),
+    );
+    expect(await resolveTestType('jee', 'dpp')).toBe('dpp');
+    expect(await resolveTestType('jee', 'quiz')).toBeNull();
   });
 });
 

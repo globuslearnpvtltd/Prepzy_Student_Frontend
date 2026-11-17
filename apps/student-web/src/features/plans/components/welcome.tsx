@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useActivePlan, useCurrentUser } from '@/features/auth';
-import { DEFAULT_EXAM, findExam, getExam, type ExamConfig } from '@/shared/config/exams';
+import { DEFAULT_EXAM, examFromCatalog, type ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { PageSpinner, StatusScreen } from '@/shared/layout/status-screens';
@@ -276,9 +276,13 @@ export function Welcome() {
   const params = useSearchParams();
   const user = useCurrentUser();
   const catalog = useExamCatalog();
-  const design = getExam(params.get('exam')) ?? findExam(user.data?.targetExam) ?? getExam(DEFAULT_EXAM)!;
-  const fromBackend = catalog.data?.find((e) => e.examSlice === design.examSlice && e.category === design.category);
-  const exam = useMemo(() => (fromBackend ? { ...design, examId: fromBackend.examId } : null), [design, fromBackend]);
+  const exam = useMemo(
+    () =>
+      examFromCatalog(catalog.data, params.get('exam')) ??
+      examFromCatalog(catalog.data, user.data?.targetExam) ??
+      examFromCatalog(catalog.data, DEFAULT_EXAM),
+    [catalog.data, params, user.data?.targetExam],
+  );
 
   if (catalog.isError) return <StatusScreen title="We couldn't load your exams" description={userMessage(catalog.error)} />;
   if (!exam) return <PageSpinner />;

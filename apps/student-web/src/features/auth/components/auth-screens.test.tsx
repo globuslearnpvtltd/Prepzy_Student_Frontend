@@ -26,6 +26,8 @@ const EXAM_LIST = {
     { exam_id: 2, exam_name: 'NEET-UG', exam_slice: 'neet-ug', category: 'competitive' },
     { exam_id: 3, exam_name: 'JEE Main', exam_slice: 'jee-main', category: 'competitive' },
     { exam_id: 4, exam_name: 'Reference Books', exam_slice: 'reference-books', category: 'reference' },
+    // A slice that can't be a URL segment: no pages, so it's listed as coming soon.
+    { exam_id: 5, exam_name: 'Olympiad', exam_slice: 'olympiad 2027', category: 'board' },
   ],
 };
 
@@ -48,9 +50,11 @@ describe('ExamPicker', () => {
     expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
     expect(await screen.findByRole('radio', { name: /CBSE/ })).toBeEnabled();
     expect(screen.getByRole('radio', { name: /NEET-UG/ })).toBeEnabled();
-    const jee = screen.getByRole('radio', { name: /JEE Main/ });
-    expect(jee).toBeDisabled();
-    expect(jee).toHaveTextContent('Coming soon');
+    // An exam without a registry entry works by its category (DB rows only).
+    expect(screen.getByRole('radio', { name: /JEE Main/ })).toBeEnabled();
+    const olympiad = screen.getByRole('radio', { name: /Olympiad/ });
+    expect(olympiad).toBeDisabled();
+    expect(olympiad).toHaveTextContent('Coming soon');
     expect(screen.queryByRole('radio', { name: /Reference Books/ })).not.toBeInTheDocument();
     expect(navigation.replace).not.toHaveBeenCalled();
     // Nothing chosen yet.
@@ -260,7 +264,7 @@ describe('Onboarding step screens', () => {
     useOnboardingStore.getState().startOtp('+919876543210', 'signup');
     server.use(http.get(`${API}/api/v4/exams`, () => HttpResponse.json(EXAM_LIST)));
     renderWithProviders(<ExamPicker />);
-    expect(await screen.findByText('CBSE and NEET-UG are live. JEE Main is on the way.')).toBeInTheDocument();
+    expect(await screen.findByText('CBSE, NEET-UG and JEE Main are live. Olympiad is on the way.')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /CBSE/ })).toHaveTextContent('Class 6 to 12');
     expect(screen.getAllByText('Step 3')).toHaveLength(2);
   });
@@ -287,17 +291,45 @@ describe('Onboarding step screens', () => {
       ),
     );
     renderWithProviders(<SetupForm />);
-    expect(await screen.findByRole('radio', { name: 'Class 6' })).toHaveTextContent('NCERT · practice · Atlas AI');
+    expect(await screen.findByRole('button', { name: /Class 6/ })).toHaveTextContent('NCERT · practice · Atlas AI');
+    expect(screen.getByText('Your future starts here')).toBeInTheDocument();
     expect(screen.getByText('Foundation')).toBeInTheDocument();
     expect(screen.getByText('Secondary · Boards')).toBeInTheDocument();
-    expect(screen.getByText('2 streams inside')).toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'PCB' })).not.toBeInTheDocument();
-    const toggle = screen.getByRole('button', { name: /Class 11/ });
-    await userEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await userEvent.click(screen.getByRole('radio', { name: 'PCB' }));
-    expect(within(toggle).getByText('PCB')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+    expect(screen.getByText('Senior · Choose stream')).toBeInTheDocument();
+    const senior = screen.getByRole('button', { name: /Class 11/ });
+    expect(senior).toHaveTextContent('Pick a stream next');
+    expect(senior).toHaveTextContent('2 streams inside');
+    expect(screen.getByText('Step 4')).toBeInTheDocument();
+    // A class with streams opens "Choose your stream" (previous app), with each stream's subjects.
+    await userEvent.click(senior);
+    expect(screen.getByRole('heading', { name: 'Choose your stream' })).toBeInTheDocument();
+    expect(screen.getByText('Class 11 · Choose stream')).toBeInTheDocument();
+    const pcb = screen.getByRole('button', { name: /PCB/ });
+    expect(pcb).toHaveTextContent('Physics · Chemistry · Biology');
+    await userEvent.click(pcb);
+    expect(pcb).toHaveAttribute('aria-pressed', 'true');
+    // Back returns to the class list, where the class shows the chosen stream.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Back' })[0]!);
+    expect(screen.getByRole('button', { name: /Class 11/ })).toHaveTextContent('PCB');
+    expect(screen.getByRole('button', { name: /Class 11/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('button', { name: 'Continue' })[0]).toBeEnabled();
+    // Back from the class list goes to the exam choice.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Back' })[0]!);
+    expect(navigation.replace).toHaveBeenCalledWith('/exam-selection');
+  });
+
+  it('says so when the exam has no classes set up yet', async () => {
+    useOnboardingStore.getState().startOtp('+919876543210', 'signup');
+    useOnboardingStore.getState().selectExam(1, 'CBSE');
+    server.use(
+      http.get(`${API}/api/v4/billing/board/1/onboarding-options`, () =>
+        HttpResponse.json({ success: true, data: { choose: 'class', plan_lengths: [] } }),
+      ),
+      http.get(`${API}/api/v4/learn/board/1/classes`, () => HttpResponse.json({ success: true, data: { classes: [] } })),
+    );
+    renderWithProviders(<SetupForm />);
+    expect(await screen.findByRole('status')).toHaveTextContent('No classes are available for CBSE yet.');
+    for (const button of screen.getAllByRole('button', { name: 'Continue' })) expect(button).toBeDisabled();
   });
 });
 

@@ -1,14 +1,13 @@
 'use client';
 
 import { cx } from '@prepzy/design-system';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, useMemo } from 'react';
 import { AtlasHost } from '@/features/assistant/ui';
 import { rememberExam, usePurchasedExams } from '@/features/auth';
 import { ExamLanguageSync } from '@/features/language/ui';
-import { findExam, getExam, REFERENCE, type ExamConfig } from '@/shared/config/exams';
+import { examFromCatalog, REFERENCE, type ExamConfig, type ExamDesign } from '@/shared/config/exams';
 import { competitiveChrome } from '@/shared/config/navigation';
-import { routes } from '@/shared/config/routes';
 import { ExamProvider, useExam } from '@/shared/hooks/use-exam';
 import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { userMessage } from '@/shared/lib/errors';
@@ -16,19 +15,20 @@ import { AppHeader } from './app-header';
 import { BoardBottomBar, BoardSidebar } from './board-navigation';
 import { CompetitiveSidebar } from './competitive-navigation';
 import { PageSpinner, StatusScreen } from './status-screens';
+import { NoPlanModal } from './no-plan-modal';
 import { useAccountExam } from './use-account-exam';
 
 /** Wraps every /[exam]/… page: exam context, the exam's theme and the access check. */
-export function ExamFrame({ examSlug, children }: { examSlug: string; children: React.ReactNode }) {
-  const config = getExam(examSlug) as ExamConfig;
+export function ExamFrame({ design: config, children }: { design: ExamDesign; children: React.ReactNode }) {
   const catalog = useExamCatalog();
 
   useEffect(() => rememberExam(config.slug), [config.slug]);
 
-  // The exam id used for API calls comes from the backend (exam_table), matched by exam_slice and category.
+  // The exam id used for API calls comes from the backend (exam_table), matched by exam_slice and category. Until
+  // then (or for an exam that isn't active) only the design is used: the frame shows a spinner or a status screen.
   const fromBackend = catalog.data?.find((e) => e.examSlice === config.examSlice && e.category === config.category);
-  const exam = useMemo(
-    () => (fromBackend ? { ...config, examId: fromBackend.examId } : config),
+  const exam = useMemo<ExamConfig>(
+    () => (fromBackend ? { ...config, examId: fromBackend.examId } : (config as ExamConfig)),
     [config, fromBackend],
   );
 
@@ -139,30 +139,19 @@ export function ReferenceFrame({ children }: { children: React.ReactNode }) {
 }
 
 function AccessGate({ exam, children }: { exam: ExamConfig; children: React.ReactNode }) {
-  const router = useRouter();
   const purchased = usePurchasedExams();
   const owned = purchased.data?.some((p) => p.examSlice === exam.examSlice);
-  const fallback = purchased.data?.map((p) => findExam(p.examSlice)).find((e): e is ExamConfig => !!e);
-
-  // Students who land on an exam they don't have (old bookmark, default redirect) go to one they do have.
-  useEffect(() => {
-    if (purchased.isSuccess && !owned && fallback) router.replace(routes.dashboard(fallback.slug));
-  }, [purchased.isSuccess, owned, fallback, router]);
+  const catalog = useExamCatalog();
+  const ownedExam =
+    purchased.data?.map((p) => examFromCatalog(catalog.data, p.examSlice)).find((e): e is ExamConfig => !!e) ?? null;
 
   if (purchased.isPending) return <PageSpinner />;
   if (purchased.isError) {
     return <StatusScreen title="We couldn't load your account" description={userMessage(purchased.error)} />;
   }
-  if (!owned) {
-    return fallback ? (
-      <PageSpinner label="Opening your exam" />
-    ) : (
-      <StatusScreen
-        title={`${exam.label} isn't on your account`}
-        description="Choose a plan for this exam to start learning."
-      />
-    );
-  }
+  // No plan for this exam (old bookmark, a link, the default route after login): say so and offer the purchase page
+  // (previous app's upgrade block screen), plus the dashboard of an exam the student does own.
+  if (!owned) return <NoPlanModal exam={exam} ownedExam={ownedExam} />;
   return (
     <>
       <ExamLanguageSync exam={exam} />

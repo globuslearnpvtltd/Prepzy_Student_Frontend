@@ -5,7 +5,7 @@ import { BookOpen, CalendarDays, Check, GraduationCap, Target } from 'lucide-rea
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { rememberedExam, rememberExam, useCurrentUser } from '@/features/auth';
-import { getExam, type ExamCategory, type ExamRef } from '@/shared/config/exams';
+import { examSlugOf, type ExamCategory, type ExamRef } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { StatusScreen } from '@/shared/layout/status-screens';
 import { isApiError, userMessage } from '@/shared/lib/errors';
@@ -223,12 +223,13 @@ export function Checkout() {
   }, [coupon.applied, quoteError]);
 
   /**
-   * Fresh subscription state everywhere, then the purchased exam's dashboard. An exam the app has no pages for yet
-   * lands on the remembered exam's dashboard, else on Manage Plans (which lists the new plan).
+   * Fresh subscription state everywhere, then the purchased exam's dashboard (every board / competitive exam has
+   * one: its registry slug or its exam_slice). Only when the exam can't be matched: the remembered exam's dashboard,
+   * else Manage Plans (which lists the new plan).
    */
   const openDashboard = async (purchased: ExamRef | null) => {
     const own = purchased ? catalog.exams.find((exam) => sameExam(exam, purchased))?.slug : null;
-    const slug = own ?? getExam(rememberedExam())?.slug ?? null;
+    const slug = own ?? examSlugOf(rememberedExam());
     if (slug) rememberExam(slug);
     await queryClient.invalidateQueries();
     router.replace(slug ? routes.dashboard(slug) : routes.managePlans());

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { rememberedExam, usePurchasedExams } from '@/features/auth';
-import { findExam, type ExamConfig } from '@/shared/config/exams';
+import { examFromCatalog, type ExamConfig } from '@/shared/config/exams';
 import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 
 /**
@@ -15,9 +15,8 @@ export function useAccountExam() {
   const remembered = useMemo(() => rememberedExam(), []);
 
   const owned = (purchased.data ?? []).flatMap((p) => {
-    const design = findExam(p.examSlice);
-    const entry = design && catalog.data?.find((e) => e.examSlice === design.examSlice && e.category === design.category);
-    return design && entry ? [{ ...design, examId: entry.examId } as ExamConfig] : [];
+    const exam = examFromCatalog(catalog.data, p.examSlice);
+    return exam ? [exam] : [];
   });
   const exam: ExamConfig | null = owned.find((e) => e.slug === remembered) ?? owned[0] ?? null;
 

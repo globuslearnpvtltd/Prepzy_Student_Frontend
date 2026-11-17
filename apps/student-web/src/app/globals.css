@@ -5,6 +5,32 @@
 @source '../../../../packages/design-system/src';
 
 @layer base {
+  /* Hand cursor on everything clickable (Tailwind v4 dropped the v3 pointer default on buttons). Utilities still win. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab'],
+  [role='option'],
+  [role='menuitem'],
+  [role='menuitemradio'],
+  [role='menuitemcheckbox'],
+  [role='radio'],
+  [role='checkbox'],
+  [role='switch'],
+  a[href],
+  label[for],
+  summary,
+  select,
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='file'],
+  input[type='range'] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
   }

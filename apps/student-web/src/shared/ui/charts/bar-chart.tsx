@@ -23,11 +23,12 @@ export function BarChart({ data, caption, className }: { data: BarDatum[]; capti
           const last = index === data.length - 1;
           const dark = index % 2 === 0;
           return (
-            <div key={d.name} className="flex h-full w-[35px] min-w-0 items-end" title={`${d.name}: ${d.display}`}>
+            // Hover (or tap) a bar for its value, as in the previous app's chart tooltip.
+            <div key={d.name} tabIndex={-1} className="group flex h-full w-[35px] min-w-0 items-end outline-none">
               <div
                 data-testid="bar"
                 className={cx(
-                  'w-full rounded-t-[6px] border-[1.5px]',
+                  'relative w-full rounded-t-[6px] border-[1.5px]',
                   last
                     ? 'border-accent-400 bg-accent-400'
                     : dark
@@ -35,7 +36,18 @@ export function BarChart({ data, caption, className }: { data: BarDatum[]; capti
                       : 'border-brand-75 bg-brand-75',
                 )}
                 style={{ height: max > 0 ? `max(5px, ${(d.value / max) * 100}%)` : '5px' }}
-              />
+              >
+                <span
+                  data-testid="bar-tooltip"
+                  className={cx(
+                    'bg-surface border-line pointer-events-none absolute bottom-full z-10 mb-2 hidden rounded-md border p-3 text-center text-sm whitespace-nowrap shadow-lg group-hover:block group-focus:block',
+                    // Keep the edge bars' boxes inside the chart.
+                    index === 0 ? 'left-0' : last ? 'right-0' : 'left-1/2 -translate-x-1/2',
+                  )}
+                >
+                  <span className="text-brand font-semibold">{d.display}</span>
+                </span>
+              </div>
             </div>
           );
         })}

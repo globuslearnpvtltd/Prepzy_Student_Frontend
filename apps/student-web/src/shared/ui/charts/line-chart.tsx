@@ -44,32 +44,85 @@ export function LineChart({
   return (
     <figure className={cx('flex min-h-0 flex-col', className)}>
       <div className="relative min-h-0 flex-1 pt-5 pr-10 pb-2.5 pl-[30px]" aria-hidden="true">
-        <svg className="h-full w-full overflow-visible" role="presentation">
-          {grid.map((g) => (
-            <line key={`h${g}`} x1="0" x2="100%" y1={`${g}%`} y2={`${g}%`} className="stroke-line" strokeDasharray="3 3" />
-          ))}
-          {categories.map((c, i) => (
-            <line key={`v${c}`} x1={`${x(i)}%`} x2={`${x(i)}%`} y1="0" y2="100%" className="stroke-line" strokeDasharray="3 3" />
-          ))}
-          {series.map((s) => (
-            <g key={s.name} data-series={s.name}>
-              {s.values.slice(1).map((v, i) => (
-                <line
-                  key={i}
-                  x1={`${x(i)}%`}
-                  y1={`${y(s.values[i] ?? 0)}%`}
-                  x2={`${x(i + 1)}%`}
-                  y2={`${y(v)}%`}
-                  strokeWidth={4}
-                  className={TONE[s.tone].line}
-                />
-              ))}
-              {s.values.map((v, i) => (
-                <circle key={i} cx={`${x(i)}%`} cy={`${y(v)}%`} r={6} className={TONE[s.tone].dot} />
-              ))}
-            </g>
-          ))}
-        </svg>
+        <div className="relative h-full w-full">
+          <svg className="h-full w-full overflow-visible" role="presentation">
+            {grid.map((g) => (
+              <line
+                key={`h${g}`}
+                x1="0"
+                x2="100%"
+                y1={`${g}%`}
+                y2={`${g}%`}
+                className="stroke-line"
+                strokeDasharray="3 3"
+              />
+            ))}
+            {categories.map((c, i) => (
+              <line
+                key={`v${c}`}
+                x1={`${x(i)}%`}
+                x2={`${x(i)}%`}
+                y1="0"
+                y2="100%"
+                className="stroke-line"
+                strokeDasharray="3 3"
+              />
+            ))}
+            {series.map((s) => (
+              <g key={s.name} data-series={s.name}>
+                {s.values.slice(1).map((v, i) => (
+                  <line
+                    key={i}
+                    x1={`${x(i)}%`}
+                    y1={`${y(s.values[i] ?? 0)}%`}
+                    x2={`${x(i + 1)}%`}
+                    y2={`${y(v)}%`}
+                    strokeWidth={4}
+                    className={TONE[s.tone].line}
+                  />
+                ))}
+                {s.values.map((v, i) => (
+                  <circle key={i} cx={`${x(i)}%`} cy={`${y(v)}%`} r={6} className={TONE[s.tone].dot} />
+                ))}
+              </g>
+            ))}
+          </svg>
+          {/* Hover (or tap) a subject's column for its values, as in the previous app's chart tooltip. */}
+          {categories.map((c, i) => {
+            const last = categories.length - 1;
+            const start = i === 0 ? 0 : (x(i - 1) + x(i)) / 2;
+            const end = i === last ? 100 : (x(i) + x(i + 1)) / 2;
+            const peak = Math.min(...series.map((s) => y(s.values[i] ?? 0)));
+            return (
+              <div
+                key={c}
+                tabIndex={-1}
+                data-testid="line-hover"
+                className="group absolute inset-y-0 outline-none"
+                style={{ left: `${start}%`, width: `${end - start}%` }}
+              >
+                <div
+                  data-testid="line-tooltip"
+                  className="bg-surface border-line pointer-events-none absolute z-10 hidden flex-col gap-0.5 rounded-lg border p-2 whitespace-nowrap shadow-lg group-hover:flex group-focus:flex"
+                  style={{
+                    left: `${((x(i) - start) / (end - start || 100)) * 100}%`,
+                    top: `${peak}%`,
+                    transform: `translate(${categories.length > 1 && i === 0 ? '0' : i === last && i > 0 ? '-100%' : '-50%'}, calc(-100% - 12px))`,
+                  }}
+                >
+                  <span className="text-sm font-semibold text-neutral-800">Subject: {c}</span>
+                  {series.map((s) => (
+                    <span key={s.name} className="text-foreground flex items-center gap-1.5 text-sm">
+                      <span className={cx('size-2 rounded-full', TONE[s.tone].swatch)} />
+                      {s.name}: {Math.round(s.values[i] ?? 0)}
+                      {unit}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
       <div className="relative mr-10 ml-[30px] h-5" aria-hidden="true">
         {categories.map((c, i) => (
@@ -78,7 +131,12 @@ export function LineChart({
             className="text-foreground-muted absolute top-1 text-[10px] whitespace-nowrap"
             style={{
               left: `${x(i)}%`,
-              transform: categories.length > 1 && i === 0 ? 'none' : i === categories.length - 1 && i > 0 ? 'translateX(-100%)' : 'translateX(-50%)',
+              transform:
+                categories.length > 1 && i === 0
+                  ? 'none'
+                  : i === categories.length - 1 && i > 0
+                    ? 'translateX(-100%)'
+                    : 'translateX(-50%)',
             }}
           >
             {c}
@@ -87,7 +145,10 @@ export function LineChart({
       </div>
       <figcaption className="flex items-center justify-center gap-6 pt-3">
         {series.map((s) => (
-          <span key={s.name} className="text-foreground flex items-center gap-2 text-[10px] leading-[10px] font-semibold">
+          <span
+            key={s.name}
+            className="text-foreground flex items-center gap-2 text-[10px] leading-[10px] font-semibold"
+          >
             <span className={cx('size-3 rounded-full', TONE[s.tone].swatch)} />
             {s.name}
           </span>

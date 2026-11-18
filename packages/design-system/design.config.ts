@@ -248,6 +248,21 @@ export const designConfig = defineDesignConfig({
         error: '#FF0101', // login error box
       },
       // Doubt solver (Socrates) and Atlas chat.
+      // Board custom test: "Test Generated Successfully!" modal (previous app's CustomExamCreationSuccessModal).
+      generated: {
+        deep: '#2C2564', // header gradient end
+        ring: '#6158B1', // icon circles on the purple
+        tint: '#F3E8FF', // header subtitle
+        line: '#ECEAF5', // summary card border
+        soft: '#F9F8FC', // summary card background
+        label: '#6A7282', // small labels
+        primary: '#4F4793', // difficulty pill, Take Test Now
+        count: '#443E7B', // topics count
+        chip: '#F2F1F8', // topics icon circle
+        hint: '#E9D5FF', // Take Test Now subtitle
+        border: '#EBEAF5', // Save for Later border
+        scrim: '#000000', // backdrop behind the modal (30%, blurred)
+      },
       socrates: {
         page: '#F5F4FA', // solver page background
         ink: '#241D52', // headings

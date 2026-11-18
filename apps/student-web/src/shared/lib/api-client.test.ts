@@ -83,6 +83,11 @@ describe('apiClient', () => {
     expect(error).toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
     expect(userMessage(error)).toMatch(/offline/);
   });
+
+  it('says a timed-out request took too long, not that the student is offline', () => {
+    const timedOut = new ApiError({ status: 0, code: 'TIMEOUT', message: 'The request took too long.' });
+    expect(userMessage(timedOut)).toBe('This is taking longer than usual. Please try again.');
+  });
 });
 
 describe('helpers', () => {

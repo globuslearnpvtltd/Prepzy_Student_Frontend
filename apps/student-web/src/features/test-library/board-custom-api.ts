@@ -10,6 +10,9 @@ const num = (v: unknown): number => {
 };
 const str = (v: unknown) => (v === null || v === undefined ? '' : String(v));
 
+
+/** Generating a set picks questions per topic / competency; allow longer than the default 20 s. */
+const GENERATE_TIMEOUT_MS = 60_000;
 export const MAX_CUSTOM_TOPICS = 5;
 
 export interface BoardCustomCourse {
@@ -66,14 +69,14 @@ export const boardCustomApi = {
     }));
   },
 
-  /** Returns the new set id, or null when the chosen topics have no questions. */
+  /** Returns the new set id, or null when the chosen topics have no questions (picking can take a while: 60 s). */
   async generate(exam: ExamRef, input: { chapter: BoardCustomChapter; topicIds: number[]; difficulty: BoardDifficulty }) {
     const body = assertOk(
       await apiClient.post<{ data?: { set_id?: string | number | null; total?: number } }>(`${assessmentsApiBase(exam)}/custom/sets`, {
         module_id: input.chapter.id,
         topic_ids: input.topicIds,
         difficulty_level: input.difficulty,
-      }),
+      }, { timeout: GENERATE_TIMEOUT_MS }),
     );
     const setId = body.data?.set_id;
     return setId === null || setId === undefined || body.data?.total === 0 ? null : str(setId);

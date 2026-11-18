@@ -208,7 +208,10 @@ function BoardResultQuestion({ question, number }: { question: ResultQuestion; n
                 aria-hidden
                 className={cx('size-5 rounded-full border border-neutral-300', option.isSelected && 'border-info-700 border-[6px]')}
               />
-              <RichText html={option.html} />
+              <span className="flex flex-col gap-2">
+                {option.html && <RichText html={option.html} />}
+                <OptionImage src={option.image} />
+              </span>
               {(option.isSelected || option.isCorrect) && (
                 <span className="text-foreground-muted text-xs font-semibold">
                   {option.isSelected && option.isCorrect
@@ -344,8 +347,9 @@ function CompetitiveResult({ result, home }: { result: ExamResult; home: { label
                     >
                       {state === 'correct' ? <Check className="size-4" /> : state === 'incorrect' ? <X className="size-4" /> : String.fromCharCode(65 + i)}
                     </span>
-                    <span className="flex-1">
-                      <RichText html={option.html} />
+                    <span className="flex flex-1 flex-col gap-2 py-3">
+                      {option.html && <RichText html={option.html} />}
+                      <OptionImage src={option.image} />
                       <span className="sr-only">
                         {option.isCorrect && option.isSelected ? ' · Your answer · correct' : option.isCorrect ? ' · Correct answer' : option.isSelected ? ' · Your answer' : ''}
                       </span>
@@ -390,4 +394,11 @@ function CompetitiveResult({ result, home }: { result: ExamResult; home: { label
       )}
     </div>
   );
+}
+
+/** An option's picture on the result screens, under its text (an option can have text, a picture or both). */
+function OptionImage({ src }: { src: string | null | undefined }) {
+  if (!src) return null;
+  // eslint-disable-next-line @next/next/no-img-element -- backend images from arbitrary CDNs
+  return <img src={src} alt="" className="bg-surface max-h-40 w-auto max-w-full rounded-sm" loading="lazy" />;
 }

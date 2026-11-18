@@ -217,6 +217,18 @@
   --color-schools-logout-soft: #FFF1F1;
   --color-schools-logout-line: #FFD5D5;
   --color-schools-error: #FF0101;
+  --color-generated-deep: #2C2564;
+  --color-generated-ring: #6158B1;
+  --color-generated-tint: #F3E8FF;
+  --color-generated-line: #ECEAF5;
+  --color-generated-soft: #F9F8FC;
+  --color-generated-label: #6A7282;
+  --color-generated-primary: #4F4793;
+  --color-generated-count: #443E7B;
+  --color-generated-chip: #F2F1F8;
+  --color-generated-hint: #E9D5FF;
+  --color-generated-border: #EBEAF5;
+  --color-generated-scrim: #000000;
   --color-socrates-page: #F5F4FA;
   --color-socrates-ink: #241D52;
   --color-socrates-text: #1F1A4D;

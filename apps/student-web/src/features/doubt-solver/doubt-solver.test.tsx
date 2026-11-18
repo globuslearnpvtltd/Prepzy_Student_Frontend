@@ -85,6 +85,9 @@ describe('doubt solver api', () => {
     });
     expect(end).toMatchObject({ level: 'Medium', marks: 3, label: null });
     expect(pyq).toMatchObject({ level: 'Hard', label: 'Set A · 2024', options: ['x'] });
+    // A difficulty stored as the word "null" shows no chip.
+    const [unknown] = toBankQuestions({ data: { questions: [{ id: 3, question_text: 'S', difficulty_level: 'Null', year: 2025 }] } });
+    expect(unknown!.level).toBeNull();
     expect(
       toConceptCards({ concept_cards: [{ card_no: 2, title: 'B' }, { card_no: 1, title: 'A', explanation: 'e' }, { card_no: 3 }], sources: { Book: 'NCERT' } }),
     ).toMatchObject({ cards: [{ cardNo: 1 }, { cardNo: 2 }], sources: { book: 'NCERT', chapter: null } });

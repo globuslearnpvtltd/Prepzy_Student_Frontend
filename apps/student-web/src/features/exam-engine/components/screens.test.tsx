@@ -241,7 +241,7 @@ describe('ResultView', () => {
                 question_id: 1,
                 question_text: 'Q1',
                 question_image: 'https://cdn.test/q1.png',
-                options: [{ option_id: 5, text: 'A' }, { option_id: 6, text: 'B' }],
+                options: [{ option_id: 5, text: 'A', image: 'https://cdn.test/opt-a.png' }, { option_id: 6, text: '', option_image: 'https://cdn.test/opt-b.png' }],
                 selected_option_id: 5,
                 correct_option_id: 5,
                 is_correct: true,
@@ -260,6 +260,11 @@ describe('ResultView', () => {
     expect(screen.getByText(/2026/)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Explanation' })).toHaveAttribute('src', 'https://cdn.test/exp.png');
     expect(screen.getByText('Nailed it!')).toBeInTheDocument();
+    // Option pictures show with the text (A) or on their own (B).
+    const options = screen.getByRole('list', { name: 'Options' });
+    expect(within(options).getByText('A')).toBeInTheDocument();
+    expect(options.querySelector('img[src="https://cdn.test/opt-a.png"]')).not.toBeNull();
+    expect(options.querySelector('img[src="https://cdn.test/opt-b.png"]')).not.toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: /Discuss with Vedica/ }));
     expect(await screen.findByRole('dialog', { name: 'Review chat' })).toHaveTextContent('chat 1 77');

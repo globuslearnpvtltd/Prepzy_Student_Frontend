@@ -83,6 +83,10 @@ describe('assistant api', () => {
   it('keeps line breaks in plain-text replies and escapes them', () => {
     expect(toChatHtml('a < b\nc')).toBe('a &lt; b<br />c');
     expect(toChatHtml('<p>x</p>')).toBe('<p>x</p>');
+    // Formulas keep their line breaks (a <br /> inside one stops MathJax) and are escaped, never read as tags.
+    expect(toChatHtml('Use\n$$\nF = ma\n$$\ndone')).toBe('Use<br />$$\nF = ma\n$$<br />done');
+    expect(toChatHtml('\\[\na<b\n\\]')).toBe('\\[\na&lt;b\n\\]');
+    expect(toChatHtml('If $x<y$ and $y>z$\nthen')).toBe('If $x&lt;y$ and $y&gt;z$<br />then');
     const now = new Date('2026-11-07T12:00:00');
     expect(relativeDay('2026-11-07T08:00:00', now)).toBe('Today');
     expect(relativeDay('2026-11-06T08:00:00', now)).toBe('Yesterday');

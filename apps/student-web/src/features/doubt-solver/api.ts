@@ -160,10 +160,16 @@ export function toChapters(body: unknown): Chapter[] {
 
 const LEVELS: Record<string, string> = { '1': 'Easy', '2': 'Medium', '3': 'Hard' };
 
+/** A difficulty as text, or null when missing or stored as the words "null" / "undefined" (shown as no chip). */
+const levelText = (value: unknown): string | null => {
+  const text = str(value);
+  return text && !['null', 'undefined', 'none', 'n/a'].includes(text.trim().toLowerCase()) ? text : null;
+};
+
 /** End-of-chapter (`difficulty`: easy / medium / hard) and PYQ (`difficulty_level`) questions of a chapter. */
 export function toBankQuestions(body: unknown): BankQuestion[] {
   return toArray(asRaw(asRaw(body).data).questions).map((raw) => {
-    const difficulty = str(raw.difficulty) ?? str(raw.difficulty_level);
+    const difficulty = levelText(raw.difficulty) ?? levelText(raw.difficulty_level);
     const level = difficulty ? formatSubject(difficulty) : (LEVELS[String(raw.question_level)] ?? null);
     const setName = str(raw.set_name);
     const year = raw.year === null || raw.year === undefined ? null : String(raw.year);

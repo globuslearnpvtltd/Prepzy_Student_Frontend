@@ -11,11 +11,7 @@ import { useActivePlanName } from '@/features/plans';
 import { hasTestType } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { dashboardApi, type ContinueTest } from './api';
-import {
-  ProgressBar,
-  SectionError,
-  useDashboardContext,
-} from './widget-kit';
+import { ProgressBar, SectionError, useDashboardContext } from './widget-kit';
 
 const titleCase = (value: string) => value.toLowerCase().replace(/(^|\s)\w/g, (c) => c.toUpperCase());
 
@@ -50,61 +46,205 @@ export function planCopy(plan: ActivePlan, name: string, now = new Date()) {
   const state = planState(plan, daysLeft);
   const ends = formatDay(plan.expiryDate);
   const days = `${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
-  const copy: Record<PlanState, { pill: string; strip: string; headline: string; subline: string }> = {
+  // half*: the half-width card beside the journey card (previous app's WelcomeCard form="half").
+  const copy: Record<
+    PlanState,
+    { pill: string; strip: string; headline: string; subline: string; halfHeadline: string; halfSubline: string }
+  > = {
     basic: {
       pill: name,
       strip: 'Lower daily limits, resets 5 AM',
       headline: 'Welcome back! Basic has lower daily limits. Topper gives you much higher limits.',
       subline: 'Daily limit resets at 5 AM',
+      halfHeadline: 'Welcome back! Topper Plan gives you higher daily limits.',
+      halfSubline: 'Daily limit resets at 5 AM',
     },
     topper: {
       pill: name,
       strip: `High daily limits, valid till ${ends}`,
       headline: `Welcome back! ${name} is active, with high daily limits.`,
       subline: `Plan valid till ${ends}`,
+      halfHeadline: `Welcome back! ${name} is active, with high daily limits.`,
+      halfSubline: `Plan valid till ${ends}`,
     },
     expiring: {
       pill: `${days} left`,
       strip: `Ends ${ends}`,
       headline: `Your ${name} plan ends in ${days}, on ${ends}.`,
       subline: 'You can renew once it ends',
+      halfHeadline: `Your ${name} plan ends in ${days}.`,
+      halfSubline: `Ends ${ends}. You can renew once it ends.`,
     },
     lastday: {
       pill: `${name} · Last day`,
       strip: 'Basic limits are lower',
       headline: `Your ${name} plan ends tonight. Basic has lower daily limits.`,
       subline: 'You can renew from tomorrow',
+      halfHeadline: `Your ${name} plan ends tonight.`,
+      halfSubline: 'Basic has lower daily limits. You can renew from tomorrow.',
     },
     ended: {
       pill: plan.durationMonths === 1 ? 'Monthly plan ended' : 'Academic year plan ended',
       strip: "You're on Basic, lower limits",
       headline: `Your ${name} plan has ended. You're on Basic now, with lower daily limits.`,
       subline: `Ended ${ends}`,
+      halfHeadline: `Your ${name} plan has ended.`,
+      halfSubline: "You're on Basic now, with lower daily limits.",
     },
   };
   return { state, ...copy[state] };
 }
 
 const TONE: Record<PlanState, { card: string; ink: string; soft: string; pill: string }> = {
-  basic: { card: 'bg-brand', ink: 'text-on-brand', soft: 'text-on-brand/70', pill: 'bg-surface/10 border-surface/10 text-on-brand/80' },
-  topper: { card: 'bg-brand', ink: 'text-on-brand', soft: 'text-on-brand/70', pill: 'bg-surface/10 border-surface/10 text-on-brand/80' },
-  ended: { card: 'bg-brand', ink: 'text-on-brand', soft: 'text-on-brand/70', pill: 'bg-danger/20 border-danger/30 text-on-brand' },
-  expiring: { card: 'bg-accent-100', ink: 'text-foreground', soft: 'text-foreground/65', pill: 'bg-accent-400 border-accent-400 text-on-brand' },
-  lastday: { card: 'bg-danger-soft', ink: 'text-foreground', soft: 'text-foreground/65', pill: 'bg-danger border-danger text-on-brand' },
+  basic: {
+    card: 'bg-brand',
+    ink: 'text-on-brand',
+    soft: 'text-on-brand/70',
+    pill: 'bg-surface/10 border-surface/10 text-on-brand/80',
+  },
+  topper: {
+    card: 'bg-brand',
+    ink: 'text-on-brand',
+    soft: 'text-on-brand/70',
+    pill: 'bg-surface/10 border-surface/10 text-on-brand/80',
+  },
+  ended: {
+    card: 'bg-brand',
+    ink: 'text-on-brand',
+    soft: 'text-on-brand/70',
+    pill: 'bg-danger/20 border-danger/30 text-on-brand',
+  },
+  expiring: {
+    card: 'bg-accent-100',
+    ink: 'text-foreground',
+    soft: 'text-foreground/65',
+    pill: 'bg-accent-400 border-accent-400 text-on-brand',
+  },
+  lastday: {
+    card: 'bg-danger-soft',
+    ink: 'text-foreground',
+    soft: 'text-foreground/65',
+    pill: 'bg-danger border-danger text-on-brand',
+  },
 };
 
-/** Hero: the student's plan at a glance (collapsible), with the "link a parent" prompt on mobile. */
-export function PlanBanner() {
+/** Half form, per state (previous app's WelcomeCard TONE_STYLE: purple / amber / pink). */
+const HALF_TONE: Record<PlanState, { card: string; waves: string; pill: string; ink: string; soft: string }> = {
+  basic: {
+    card: 'bg-brand-700',
+    waves: 'welcome-waves-half.svg',
+    pill: 'bg-neutral-0/[0.0784] border-neutral-0/[0.1216] text-neutral-0/80',
+    ink: 'text-neutral-0',
+    soft: 'text-welcome-muted',
+  },
+  topper: {
+    card: 'bg-brand-700',
+    waves: 'welcome-waves-half.svg',
+    pill: 'bg-neutral-0/[0.0784] border-neutral-0/[0.1216] text-neutral-0/80',
+    ink: 'text-neutral-0',
+    soft: 'text-welcome-muted',
+  },
+  ended: {
+    card: 'bg-brand-700',
+    waves: 'welcome-waves-half.svg',
+    pill: 'bg-welcome-ended/20 border-welcome-ended-line/26 text-neutral-0',
+    ink: 'text-neutral-0',
+    soft: 'text-welcome-muted',
+  },
+  expiring: {
+    card: 'bg-accent-100',
+    waves: 'welcome-waves-amber-wide.svg',
+    pill: 'bg-accent-400 border-accent-400 text-neutral-0',
+    ink: 'text-neutral-900',
+    soft: 'text-neutral-900/64',
+  },
+  lastday: {
+    card: 'bg-welcome-pink',
+    waves: 'welcome-waves-pink-wide.svg',
+    pill: 'bg-welcome-alert border-welcome-alert text-neutral-0',
+    ink: 'text-neutral-900',
+    soft: 'text-neutral-900/64',
+  },
+};
+
+/** The plan card's data (null without a plan), shared by the banner and the dashboard hero row. */
+export function usePlanBanner() {
   const { exam } = useDashboardContext();
   const plan = useActivePlan(exam);
   const name = useActivePlanName(exam, plan.data);
-  const [expanded, setExpanded] = useState(false);
   if (!plan.data || !name) return null;
-  const { state, pill, strip, headline, subline } = planCopy(plan.data, name);
+  return { exam, copy: planCopy(plan.data, name) };
+}
+
+/**
+ * Plan card beside the journey card on wide screens (previous app's WelcomeCard form="half"): waves,
+ * state pill, short headline, and the upgrade button for Basic / ended plans.
+ */
+function HalfPlanCard({ className }: { className?: string }) {
+  const banner = usePlanBanner();
+  if (!banner) return null;
+  const { state, pill, halfHeadline, halfSubline } = banner.copy;
+  const tone = HALF_TONE[state];
+  const cta = state === 'basic' || state === 'ended';
+  return (
+    <section
+      aria-label="Your plan"
+      className={cx('relative h-full w-full flex-col overflow-hidden rounded-[20px]', tone.card, className)}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- decorative waves stretched to the card */}
+      <img
+        src={`/illustrations/dashboard/${tone.waves}`}
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full max-w-none"
+      />
+      <div className="relative flex flex-1 flex-col px-[24px] pt-[30px] pb-[30px]">
+        <span
+          className={cx(
+            'flex h-[32px] w-fit items-center rounded-full border px-[12px] font-sans text-[12px] leading-[16px] font-semibold',
+            tone.pill,
+          )}
+        >
+          {pill}
+        </span>
+        <p className={cx('mt-[18px] mb-0 font-sans text-[18px] leading-[24px] font-bold', tone.ink)}>{halfHeadline}</p>
+        <p
+          className={cx(
+            'mb-0 font-sans text-[14px] leading-[20px] font-medium',
+            cta ? 'mt-[16px]' : 'mt-auto',
+            tone.soft,
+          )}
+        >
+          {halfSubline}
+        </p>
+        {cta && (
+          <Link
+            href={routes.managePlans()}
+            className="bg-accent-400 text-on-brand shadow-welcome-cta mt-[16px] flex h-[38px] w-full shrink-0 items-center justify-center rounded-[14px] font-sans text-[14px] font-bold transition-opacity hover:opacity-90"
+          >
+            {state === 'ended' ? 'View plans' : 'Upgrade to Topper'}
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Hero: the student's plan at a glance (collapsible), with the "link a parent" prompt on mobile.
+ * `form="half"` is the half-width card of the dashboard hero row.
+ */
+export function PlanBanner({ form, className }: { form?: 'half'; className?: string } = {}) {
+  const banner = usePlanBanner();
+  const [expanded, setExpanded] = useState(false);
+  if (form === 'half') return <HalfPlanCard className={className} />;
+  if (!banner) return null;
+  const { exam } = banner;
+  const { state, pill, strip, headline, subline } = banner.copy;
   const tone = TONE[state];
   const cta = state === 'basic' || state === 'ended';
   return (
-    <section aria-label="Your plan" className={cx('relative w-full overflow-hidden rounded-xl', tone.card)}>
+    <section aria-label="Your plan" className={cx('relative w-full overflow-hidden rounded-xl', tone.card, className)}>
       {tone.card === 'bg-brand' && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -115,7 +255,12 @@ export function PlanBanner() {
         />
       )}
       <div className="relative p-6">
-        <span className={cx('flex w-fit items-center rounded-full border px-3 py-1.5 text-[14px] font-semibold md:min-h-[34px] md:py-1', tone.pill)}>
+        <span
+          className={cx(
+            'flex w-fit items-center rounded-full border px-3 py-1.5 text-[14px] font-semibold md:min-h-[34px] md:py-1',
+            tone.pill,
+          )}
+        >
           {pill}
         </span>
         <p className={cx('mt-4 pr-10 text-[18px] leading-6 font-bold', tone.ink)}>{expanded ? headline : strip}</p>
@@ -145,7 +290,9 @@ export function PlanBanner() {
         aria-expanded={expanded}
         className={cx(
           'absolute top-[25px] right-6 flex size-8 items-center justify-center rounded-full border',
-          tone.card === 'bg-brand' ? 'bg-surface/10 border-surface/10 text-on-brand' : 'bg-surface/55 border-foreground/10 text-foreground',
+          tone.card === 'bg-brand'
+            ? 'bg-surface/10 border-surface/10 text-on-brand'
+            : 'bg-surface/55 border-foreground/10 text-foreground',
         )}
       >
         <ChevronDown aria-hidden className={cx('size-4 transition-transform', expanded && 'rotate-180')} />
@@ -204,7 +351,9 @@ export function ContinueAssessment() {
           return (
             <li key={`${test.kind}-${test.setId}`}>
               <Link
-                href={playable ? routes.testPlayer(exam.slug, test.testType!, test.setId) : routes.assessments(exam.slug)}
+                href={
+                  playable ? routes.testPlayer(exam.slug, test.testType!, test.setId) : routes.assessments(exam.slug)
+                }
                 aria-label={`Resume ${TEST_LABEL[test.kind]} ${test.className}, ${test.percent}% done`}
                 className="border-line bg-canvas flex h-full items-center gap-5 rounded-lg border-2 p-2.5"
               >
@@ -213,11 +362,15 @@ export function ContinueAssessment() {
                 </span>
                 <span className="mb-3.5 flex flex-1 flex-col gap-1.5 md:gap-[13px]">
                   <span className="flex gap-3">
-                    <span className={cx(chip, 'bg-brand-75 text-brand border font-medium')}>{titleCase(test.className)}</span>
+                    <span className={cx(chip, 'bg-brand-75 text-brand border font-medium')}>
+                      {titleCase(test.className)}
+                    </span>
                     {test.kind === 'pyq' && (
                       <span className={cx(chip, 'bg-surface text-brand border-2 font-semibold')}>{test.setNumber}</span>
                     )}
-                    <span className={cx(chip, 'bg-surface text-brand border-2 font-semibold')}>{TEST_LABEL[test.kind]}</span>
+                    <span className={cx(chip, 'bg-surface text-brand border-2 font-semibold')}>
+                      {TEST_LABEL[test.kind]}
+                    </span>
                   </span>
                   <span className="text-neutral-850 text-[16px] leading-6 font-semibold md:text-[20px] md:leading-5">
                     {test.className}
@@ -242,9 +395,12 @@ export function SolverDiscovery() {
   return (
     <section
       aria-labelledby="solver-title"
-      className="group border-brand-100 hover:border-brand-300 bg-brand/30 flex w-full flex-col overflow-hidden rounded-[15px] border-2 shadow-card"
+      className="group border-brand-100 hover:border-brand-300 bg-brand/30 shadow-card flex w-full flex-col overflow-hidden rounded-[15px] border-2"
     >
-      <div className="from-brand-400 to-brand relative h-[130px] w-full overflow-hidden bg-linear-to-b" aria-hidden="true">
+      <div
+        className="from-brand-400 to-brand relative h-[130px] w-full overflow-hidden bg-linear-to-b"
+        aria-hidden="true"
+      >
         <p className="text-on-brand/90 absolute top-2 left-4 text-[13px] leading-[18px] font-semibold">
           One concept card for every step
         </p>
@@ -257,19 +413,36 @@ export function SolverDiscovery() {
             )}
             style={{ left: `${[2.5, 25, 47, 69][index]}%`, zIndex: index + 1 }}
           >
-            <p className={cx('text-[13px] leading-4 font-semibold whitespace-nowrap', index === 0 ? 'text-brand' : 'text-foreground-subtle')}>
+            <p
+              className={cx(
+                'text-[13px] leading-4 font-semibold whitespace-nowrap',
+                index === 0 ? 'text-brand' : 'text-foreground-subtle',
+              )}
+            >
               {concept}
             </p>
             {[100, 100, 55].map((width, line) => (
-              <div key={line} className={cx('mt-1 h-1 rounded-full', index === 0 ? 'bg-brand-100' : 'bg-brand-50')} style={{ width: `${width}%` }} />
+              <div
+                key={line}
+                className={cx('mt-1 h-1 rounded-full', index === 0 ? 'bg-brand-100' : 'bg-brand-50')}
+                style={{ width: `${width}%` }}
+              />
             ))}
           </div>
         ))}
       </div>
       <div className="bg-surface flex w-full flex-col px-[18px] py-4">
         <div className="flex items-center gap-2">
-          <Image src="/illustrations/dashboard/socrates.jpg" alt="" width={24} height={24} className="size-6 rounded-full object-cover" />
-          <span className="text-brand text-[13px] leading-4 font-semibold tracking-[0.2px]">Socrates · Step by Step</span>
+          <Image
+            src="/illustrations/dashboard/socrates.jpg"
+            alt=""
+            width={24}
+            height={24}
+            className="size-6 rounded-full object-cover"
+          />
+          <span className="text-brand text-[13px] leading-4 font-semibold tracking-[0.2px]">
+            Socrates · Step by Step
+          </span>
         </div>
         <h2 id="solver-title" className="font-display text-ink mt-5 text-[22px] leading-6 font-bold">
           Get it solved step by step
@@ -279,7 +452,7 @@ export function SolverDiscovery() {
         </p>
         <Link
           href={routes.doubtSolver(exam.slug)}
-          className="from-brand-450 to-brand text-on-brand mt-3.5 flex w-full items-center justify-center rounded-[15px] bg-linear-to-b py-[9px] text-[15px] font-semibold shadow-raised"
+          className="from-brand-450 to-brand text-on-brand shadow-raised mt-3.5 flex w-full items-center justify-center rounded-[15px] bg-linear-to-b py-[9px] text-[15px] font-semibold"
         >
           Start Solving
         </Link>
@@ -301,7 +474,10 @@ export function SolverDiscovery() {
 export function LinkParentCard() {
   const { exam } = useDashboardContext();
   return (
-    <section aria-labelledby="parent-title" className="border-line bg-surface flex w-full flex-col gap-4 rounded-lg border p-5 md:p-6">
+    <section
+      aria-labelledby="parent-title"
+      className="border-line bg-surface flex w-full flex-col gap-4 rounded-lg border p-5 md:p-6"
+    >
       <div className="flex items-start gap-3">
         <span className="bg-accent-50 flex size-11 shrink-0 items-center justify-center rounded-[10px]">
           <Users aria-hidden className="size-7 fill-current text-neutral-950" />
@@ -310,7 +486,7 @@ export function LinkParentCard() {
           <h2 id="parent-title" className="text-ink text-[16px] leading-[22px] font-bold">
             Link your parent&apos;s details
           </h2>
-          <p className="text-neutral-400 text-[14px] leading-5">
+          <p className="text-[14px] leading-5 text-neutral-400">
             Add a parent so they can follow your progress report and analytics on the Parent Dashboard.
           </p>
         </div>

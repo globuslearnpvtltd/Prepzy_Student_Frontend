@@ -69,10 +69,10 @@ describe('Learn page', () => {
       http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () =>
         ok({ subjects: [{ subject_id: 1, subject_name: 'SCIENCE', course_count: 2, subject_description: 'All about science' }, { subject_id: 4, subject_name: 'HINDI', course_count: 0 }] }),
       ),
-      http.get(`${API}/api/v4/learn/classes/12/subjects/1/courses`, () =>
+      http.get(`${API}/api/v4/learn/board/1/classes/12/subjects/1/courses`, () =>
         ok({ courses: [{ course_id: 5, title: 'Science Part 1', class: 'Class 10', unique_lecture: 12, assessment_count: 3 }] }),
       ),
-      http.get(`${API}/api/v4/learn/classes/12/subjects/4/courses`, () => ok({ courses: [] })),
+      http.get(`${API}/api/v4/learn/board/1/classes/12/subjects/4/courses`, () => ok({ courses: [] })),
     );
     renderWithProviders(<LearnScreen aside={<p>Aside</p>} />, { exam: cbse });
 

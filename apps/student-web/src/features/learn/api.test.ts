@@ -90,13 +90,13 @@ describe('learnApi', () => {
           data: { courses: [{ course_id: 5, course_name: 'Optics', progress_percentage: 33.6, upcoming_learn_item: { category: 'lecture', id: 8, module: 2 } }] },
         }),
       ),
-      http.get(`${API}/api/v4/learn/classes/12/subjects/1/courses`, () =>
+      http.get(`${API}/api/v4/learn/board/1/classes/12/subjects/1/courses`, () =>
         HttpResponse.json({ success: true, data: { courses: [{ course_id: 5, title: 'Optics', unique_lecture: 4, assessment_count: 2, module_count: 3 }] } }),
       ),
     );
     expect(await learnApi.subjects(BOARD, 12)).toEqual([{ id: '1', name: 'PHYSICS', courseCount: 2, image: null, description: null }]);
     expect((await learnApi.continueCourses(BOARD, 12))[0]).toMatchObject({ percent: 34, next: { id: '8', moduleId: '2' } });
-    expect((await learnApi.subjectCourses(12, '1'))[0]).toMatchObject({ lectureCount: 4, testCount: 2, chapterCount: 3 });
+    expect((await learnApi.subjectCourses(BOARD, 12, '1'))[0]).toMatchObject({ lectureCount: 4, testCount: 2, chapterCount: 3 });
   });
 
   it('reads the outline and a chapter', async () => {

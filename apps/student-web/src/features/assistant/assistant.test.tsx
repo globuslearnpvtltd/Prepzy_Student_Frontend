@@ -99,8 +99,8 @@ describe('assistant api', () => {
     expect(showsAtlasLauncher('/cbse/learn/3/4/lecture/9')).toBe(false);
     expect(showsAtlasLauncher('/neet/learn/3/4/video-lectures')).toBe(false);
     expect(showsAtlasLauncher('/neet/doubt-solver')).toBe(false);
-    // No Atlas on the diagnostic and study plan pages (user decision).
-    for (const path of ['/cbse/diagnostic', '/cbse/diagnostic-result', '/neet/diagnostic-test/7', '/cbse/study-plan', '/cbse/study-plan/chapters', '/neet/study-plan/create']) {
+    // No Atlas on the diagnostic, study plan and custom test pages (user decisions).
+    for (const path of ['/cbse/diagnostic', '/cbse/diagnostic-result', '/neet/diagnostic-test/7', '/cbse/study-plan', '/cbse/study-plan/chapters', '/neet/study-plan/create', '/cbse/custom-test', '/neet/custom-test/create']) {
       expect(showsAtlasLauncher(path)).toBe(false);
       expect(hidesAtlas(path)).toBe(true);
     }

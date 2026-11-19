@@ -187,6 +187,65 @@ describe('board dashboard (CBSE)', () => {
   });
 });
 
+describe('board dashboard hero row', () => {
+  const journey = (data: Record<string, unknown>) =>
+    http.get(`${API}/api/v4/study-plan/classes/12/dashboard`, () => HttpResponse.json({ success: true, data }));
+
+  it('puts the half plan card beside a half-width journey card', async () => {
+    server.use(...boardHandlers(), journey({ state: 'take_diagnostic', width: 'half' }));
+    renderWithProviders(<Dashboard />, { exam: cbse });
+    await screen.findAllByRole('link', { name: 'Start Diagnostic Test' });
+    const row = screen.getByTestId('hero-row');
+    expect(row).toHaveAttribute('data-layout', 'side');
+    expect(row).toHaveClass('md:flex-row');
+    // half form (wide screens) + the collapsible banner (phones), then the journey card on the right
+    const plans = within(row).getAllByRole('region', { name: 'Your plan' });
+    expect(plans).toHaveLength(2);
+    expect(plans[0]).toHaveClass('hidden', 'md:flex');
+    expect(plans[0]).toHaveTextContent('Welcome back! Topper CBSE Academic is active, with high daily limits.');
+    expect(plans[0]).toHaveTextContent('Plan valid till 31 Mar 2099');
+    expect(plans[0]!.querySelector('img')).toHaveAttribute('src', '/illustrations/dashboard/welcome-waves-half.svg');
+    expect(within(row).getByRole('region', { name: 'Your study journey' })).toHaveClass('md:flex-[553_1_0%]', 'md:self-start');
+  });
+
+  it('stacks the plan card and a full-width journey card', async () => {
+    server.use(...boardHandlers(), journey({ state: 'rest_day', width: 'full' }));
+    renderWithProviders(<Dashboard />, { exam: cbse });
+    await screen.findAllByRole('link', { name: 'Preview tomorrow' });
+    const row = screen.getByTestId('hero-row');
+    expect(row).toHaveAttribute('data-layout', 'stacked');
+    expect(within(row).getAllByRole('region', { name: 'Your plan' })).toHaveLength(1);
+  });
+
+  it.each([
+    [{ duration_months: 0 }, 'Upgrade to Topper', 'welcome-waves-half.svg'],
+    [{ expiry_date: '2020-01-01' }, 'View plans', 'welcome-waves-half.svg'],
+  ])('offers the plans page from the half card (%o)', async (extra, cta, waves) => {
+    server.use(plan(12, extra), ...boardHandlers(), journey({ state: 'plan_ended', width: 'half' }));
+    renderWithProviders(<Dashboard />, { exam: cbse });
+    await screen.findAllByRole('link', { name: 'Open My Plan' });
+    const half = screen.getAllByRole('region', { name: 'Your plan' })[0]!;
+    expect(within(half).getByRole('link', { name: cta })).toHaveAttribute('href', '/manage-plans');
+    expect(half.querySelector('img')).toHaveAttribute('src', `/illustrations/dashboard/${waves}`);
+  });
+
+  it.each([
+    [5, 'welcome-waves-amber-wide.svg', 'Ends '],
+    [0, 'welcome-waves-pink-wide.svg', 'Basic has lower daily limits. You can renew from tomorrow.'],
+  ])('uses the amber / pink half card when the plan ends soon (%i days)', async (days, waves, subline) => {
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + days);
+    const iso = `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, '0')}-${String(expiry.getDate()).padStart(2, '0')}`;
+    server.use(plan(12, { expiry_date: iso }), ...boardHandlers(), journey({ state: 'resume_diagnostic', width: 'half' }));
+    renderWithProviders(<Dashboard />, { exam: cbse });
+    await screen.findAllByRole('link', { name: 'Resume Test' });
+    const half = screen.getAllByRole('region', { name: 'Your plan' })[0]!;
+    expect(half.querySelector('img')).toHaveAttribute('src', `/illustrations/dashboard/${waves}`);
+    expect(half).toHaveTextContent(subline);
+    expect(within(half).queryByRole('link')).not.toBeInTheDocument();
+  });
+});
+
 function neetHandlers(dpp: unknown = { dpp: { dpp_id: 9, dpp_name: 'DPP #14' }, question_count: 15, attempted_questions: 3, subjects: [{ subject_name: 'NEET-PHYSICS' }], attempt: null }) {
   return [
     plan(20),

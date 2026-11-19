@@ -119,7 +119,8 @@ export function CompetitivePlayer({ session, attempt, question, secondsLeft, cou
           {marked ? 'Marked for review' : 'Mark for review'}
         </button>
         <button type="button" onClick={onNext} className={cx(pill, 'bg-brand text-on-brand hover:bg-brand-hover max-lg:order-last max-lg:h-12 max-lg:w-full')}>
-          Save &amp; Next
+          {/* Previous app: the last question's button submits. */}
+          {index === attempt.total - 1 ? 'Submit' : 'Save & Next'}
         </button>
       </div>
     </>

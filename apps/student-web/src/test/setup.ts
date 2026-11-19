@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
+import { resetWelcomeVisit } from '@/shared/lib/welcome-visit';
 import { server } from './server';
 
 // Layout APIs jsdom lacks; ProseMirror (the written-answer editor) calls them on clicks and selection.
@@ -57,6 +58,8 @@ afterEach(() => {
   server.resetHandlers();
   cleanup();
   sessionStorage.clear();
+  // The welcome page's once-per-session decision lives in memory.
+  resetWelcomeVisit();
   // Cookies the app sets (e.g. the remembered exam) must not leak into the next test.
   for (const cookie of document.cookie.split('; ').filter(Boolean)) {
     document.cookie = `${cookie.split('=')[0]}=; path=/; max-age=0`;

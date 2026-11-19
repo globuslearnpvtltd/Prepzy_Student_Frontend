@@ -18,5 +18,5 @@ export {
 } from './api';
 export type { DiagnosticRules, Journey, PlanDay, PlanHeader, PlanStatus, PlanTask, SyllabusSubject } from './api';
 export { useStudyPlanDraft } from './draft-store';
-export { studyPlanKeys, useClassContext, usePlanStatus, useSyllabus } from './hooks';
+export { studyPlanKeys, useClassContext, useDashboardJourney, usePlanStatus, useSyllabus } from './hooks';
 export { JourneyCard } from './components/journey-card';

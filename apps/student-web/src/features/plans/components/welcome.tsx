@@ -18,10 +18,11 @@ import { planKeys } from '../hooks';
 import { formatInr, formatShortDate } from '../money';
 import { Confetti } from './confetti';
 import { useModalBehaviour } from './modal';
+import { shouldShowWelcome } from '@/shared/lib/welcome-visit';
 
 /** Same keys as the previous app, so a code from a referral link or a first visit there carries over. */
 export const REFERRAL_CODE_KEY = 'prepzy_referral_code';
-export const FIRST_VISIT_KEY = 'first_visit_pre_dashboard';
+export { FIRST_VISIT_KEY } from '@/shared/lib/welcome-visit';
 
 const read = (key: string) => {
   try {
@@ -304,13 +305,9 @@ function WelcomeContent({ exam }: { exam: ExamConfig }) {
   const [benefit, setBenefit] = useState<{ referrerName: string; joiningCredit: number } | null>(null);
   const [dialog, setDialog] = useState<'limits' | 'pricing' | null>(null);
 
-  // Second visit: straight to the dashboard (the previous app's behaviour).
-  const checked = useRef(false);
+  // Shown once, right after sign-up; a later visit goes straight to the dashboard (see shared/lib/welcome-visit).
   useEffect(() => {
-    if (checked.current) return;
-    checked.current = true;
-    if (read(FIRST_VISIT_KEY)) router.replace(dashboard);
-    else write(FIRST_VISIT_KEY, 'true');
+    if (!shouldShowWelcome()) router.replace(dashboard);
   }, [router, dashboard]);
 
   // Back button leaves onboarding for the dashboard.

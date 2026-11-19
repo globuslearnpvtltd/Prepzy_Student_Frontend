@@ -144,6 +144,29 @@ export function BoardPlayer(props: ExamPlayerLayout) {
   const { session, attempt, question, secondsLeft, onSubmit, onExit, onNext } = props;
   const [statusOpen, setStatusOpen] = useState(false);
   const { index } = attempt;
+  // Multipart questions (case based, unseen passage …) show one sub-question at a time; Previous / Skip / Save & Next
+  // step through the sub-questions before moving to another question. Another question starts at its first part.
+  const [partOf, setPartOf] = useState({ questionId: question.id, part: 0 });
+  const part = partOf.questionId === question.id ? partOf.part : 0;
+  const goToPart = (next: number) => setPartOf({ questionId: question.id, part: next });
+  const lastPart = question.kind === 'multipart' ? question.parts.length - 1 : 0;
+  const nextQuestion = () => {
+    attempt.leave(question.id);
+    attempt.goTo(index + 1);
+  };
+  const previous = () => (part > 0 ? goToPart(part - 1) : attempt.goTo(index - 1));
+  const saveAndNext = () => (part < lastPart ? goToPart(part + 1) : onNext());
+  const skip = () => {
+    if (question.kind !== 'multipart' || question.parts.length === 0) return attempt.skip();
+    // Clears this sub-question's answer only; the question counts as skipped if it's left with no answer at all.
+    const answer = attempt.snapshot.answers[question.id];
+    const parts = { ...(answer?.kind === 'parts' ? answer.parts : {}) };
+    delete parts[question.parts[part]!.id];
+    attempt.answer(question.id, { kind: 'parts', parts });
+    if (part < lastPart) goToPart(part + 1);
+    else if (index < attempt.total - 1) nextQuestion();
+    else attempt.leave(question.id);
+  };
   const select = (i: number) => {
     attempt.goTo(i);
     setStatusOpen(false);
@@ -197,14 +220,15 @@ export function BoardPlayer(props: ExamPlayerLayout) {
                 answer={attempt.snapshot.answers[question.id]}
                 onAnswer={(value) => attempt.answer(question.id, value)}
                 draftKey={`answer:${session.key}:${question.id}`}
+                partIndex={question.kind === 'multipart' ? part : undefined}
               />
             </section>
           </div>
           <footer className="flex shrink-0 items-center gap-[5px] md:gap-[18px]">
             <button
               type="button"
-              disabled={index === 0}
-              onClick={() => attempt.goTo(index - 1)}
+              disabled={index === 0 && part === 0}
+              onClick={previous}
               className="border-info-700 text-info-700 disabled:bg-neutral-350 disabled:text-on-brand flex items-center justify-center rounded-[14px] border-[1.5px] px-[18px] py-[13px] text-[16px] leading-[22px] font-semibold disabled:cursor-not-allowed disabled:border-transparent"
             >
               <ChevronLeft aria-hidden className="size-4" />
@@ -212,14 +236,14 @@ export function BoardPlayer(props: ExamPlayerLayout) {
             </button>
             <button
               type="button"
-              onClick={attempt.skip}
+              onClick={skip}
               className="border-info-700 text-info-700 bg-surface ml-auto flex items-center justify-center rounded-[14px] border-[1.5px] px-[18px] py-[13px] text-[16px] leading-[22px] font-semibold hover:ring-2 hover:ring-inset"
             >
               Skip
             </button>
             <button
               type="button"
-              onClick={onNext}
+              onClick={saveAndNext}
               className="bg-info-700 border-info-700 text-on-brand flex items-center justify-center rounded-[14px] border-[1.5px] px-[18px] py-[13px] text-[16px] leading-[22px] font-semibold hover:opacity-90"
             >
               Save &amp; Next

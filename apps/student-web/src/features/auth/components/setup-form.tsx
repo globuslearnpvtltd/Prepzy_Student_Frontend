@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { BookOpen, CalendarCheck, Flag, Layers, Trophy, type LucideIcon } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { examFromCatalog, type ExamConfig } from '@/shared/config/exams';
+import { startWelcomeVisit } from '@/shared/lib/welcome-visit';
 import { routes } from '@/shared/config/routes';
 import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { userMessage } from '@/shared/lib/errors';
@@ -68,7 +69,9 @@ export function SetupForm() {
       completed.current = true;
       queryClient.setQueryData(authKeys.me, student);
       rememberExam(target.slug);
-      // Welcome screen first (free Topper month, coupon / referral code), then the dashboard.
+      // Welcome screen first (free Topper month, coupon / referral code), then the dashboard. A new sign-up always
+      // sees it, even on a browser that has shown it before.
+      startWelcomeVisit();
       router.replace(routes.welcome(target.slug));
       reset();
     },

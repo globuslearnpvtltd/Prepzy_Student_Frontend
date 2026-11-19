@@ -9,7 +9,28 @@ import { testExam } from '@/test/exams';
 
 const cbse = testExam('cbse');
 
-function mockBoardPaper(onSubmit: (body: unknown) => void = () => undefined) {
+const MCQ_AND_SHORT = [
+  {
+    question_id: 1,
+    question_type: 'mcq',
+    question_text: 'SI unit of charge?',
+    marks: 1,
+    options: [
+      { option_id: 11, option_text: 'Ampere' },
+      { option_id: 12, option_text: 'Coulomb' },
+    ],
+    sub_questions: [],
+  },
+  {
+    question_id: 2,
+    question_type: 'short_answer',
+    question_text: 'State Gauss law.',
+    marks: 3,
+    sub_questions: [],
+  },
+];
+
+function mockBoardPaper(onSubmit: (body: unknown) => void = () => undefined, questions: unknown[] = MCQ_AND_SHORT) {
   server.use(
     http.get(`${API}/api/v4/student/plans/active`, () =>
       HttpResponse.json({
@@ -23,26 +44,7 @@ function mockBoardPaper(onSubmit: (body: unknown) => void = () => undefined) {
         data: {
           attempt_id: 61,
           time_left: 3600,
-          questions: [
-            {
-              question_id: 1,
-              question_type: 'mcq',
-              question_text: 'SI unit of charge?',
-              marks: 1,
-              options: [
-                { option_id: 11, option_text: 'Ampere' },
-                { option_id: 12, option_text: 'Coulomb' },
-              ],
-              sub_questions: [],
-            },
-            {
-              question_id: 2,
-              question_type: 'short_answer',
-              question_text: 'State Gauss law.',
-              marks: 3,
-              sub_questions: [],
-            },
-          ],
+          questions,
         },
       }),
     ),
@@ -106,7 +108,12 @@ describe('board player', () => {
     expect(dialog).toHaveTextContent('You have answered 1 of 2 questions.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Submit' }));
 
-    const done = await screen.findByRole('dialog', { name: 'Test Completed!' });
+    // One step at a time: the confirm dialog closes, the submitting screen shows, and only then the score.
+    expect(screen.queryByRole('dialog', { name: 'Submit your test?' })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Your answers are submitted/ })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Test Completed!' })).not.toBeInTheDocument();
+    const done = await screen.findByRole('dialog', { name: 'Test Completed!' }, { timeout: 3000 });
+    expect(screen.queryByRole('heading', { name: /Your answers are submitted/ })).not.toBeInTheDocument();
     expect(within(done).getByLabelText('Score 3 out of 4')).toBeInTheDocument();
     expect(done).toHaveTextContent('Partially Correct');
     expect(onSubmit).toHaveBeenCalledWith(
@@ -229,5 +236,73 @@ describe('board player', () => {
     );
     expect(contentType).toMatch(/multipart\/form-data/);
     vi.unstubAllGlobals();
+  });
+
+  it('shows a case based question one sub-question at a time and counts only skipped questions', async () => {
+    const onSubmit = vi.fn();
+    mockBoardPaper(onSubmit, [
+      {
+        question_id: 7,
+        question_type: 'case_based',
+        question_text: 'Read the case about charges.',
+        marks: 3,
+        sub_questions: [
+          { id: 71, sub_question_text: 'Define flux.', mark: 1 },
+          { id: 72, sub_question_text: 'Define field.', mark: 1 },
+          { id: 73, sub_question_text: 'Define potential.', mark: 1 },
+        ],
+      },
+      MCQ_AND_SHORT[0],
+      MCQ_AND_SHORT[1],
+    ]);
+    renderWithProviders(<ExamPlayer testType="mid" setId="5" />, { exam: cbse });
+    const skipped = () => screen.getAllByText('Skipped')[0]!.nextElementSibling!;
+
+    // The passage stays on top; only the first sub-question shows.
+    expect(await screen.findByText('Read the case about charges.')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Sub-question 1 of 3' })).toHaveTextContent('Define flux.');
+    expect(screen.queryByText('Define field.')).not.toBeInTheDocument();
+    expect(skipped()).toHaveTextContent('0');
+
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Answer for sub-question 1' }), 'Field lines');
+    await userEvent.click(screen.getByRole('button', { name: 'Save & Next' }));
+    expect(await screen.findByRole('region', { name: 'Sub-question 2 of 3' })).toHaveTextContent('Define field.');
+    expect(screen.getByText('Read the case about charges.')).toBeInTheDocument();
+
+    // Skip and Previous move between sub-questions of the same question.
+    await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(await screen.findByRole('region', { name: 'Sub-question 3 of 3' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    expect(await screen.findByRole('region', { name: 'Sub-question 2 of 3' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save & Next' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save & Next' }));
+
+    // Next question; the case question has an answer, and opening a question doesn't count it as skipped.
+    expect(await screen.findByText('SI unit of charge?')).toBeInTheDocument();
+    expect(skipped()).toHaveTextContent('0');
+    // Leaving it blank with Save & Next does.
+    await userEvent.click(screen.getByRole('button', { name: 'Save & Next' }));
+    expect(await screen.findByText('State Gauss law.')).toBeInTheDocument();
+    expect(skipped()).toHaveTextContent('1');
+    // Back to the blank MCQ and Skip it: still one skipped question (Previous alone never counts).
+    await userEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(await screen.findByText('State Gauss law.')).toBeInTheDocument();
+    expect(skipped()).toHaveTextContent('1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Finish Quiz' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Submit your test?' })).getByRole('button', { name: 'Submit' }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    const { answers } = onSubmit.mock.calls[0]![0] as { answers: { question_id: number; status: string; sub_answers?: unknown[] }[] };
+    expect(answers.map((a) => [a.question_id, a.status])).toEqual([
+      [7, 'saved'],
+      [1, 'skipped'],
+      [2, 'unanswered'],
+    ]);
+    expect(answers[0]!.sub_answers).toEqual([
+      { id: 71, selected_answer: { text: '<p>Field lines</p>', images: [] } },
+      { id: 72, selected_answer: { text: null, images: [] } },
+      { id: 73, selected_answer: { text: null, images: [] } },
+    ]);
   });
 });

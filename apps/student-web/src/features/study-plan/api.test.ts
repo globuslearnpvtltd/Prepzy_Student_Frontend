@@ -34,6 +34,8 @@ describe('study plan mapping edge cases', () => {
     const journey = toJourney({ state: 'halfway', week: [{ plan_date: '2026-03-02', day: 'Mon', total: 3, done: 1, is_today: 1 }] });
     expect(journey?.week).toEqual([{ date: '2026-03-02', label: 'Mon', total: 3, done: 1, isToday: true, isRest: false }]);
     expect(journey?.assessmentId).toBeNull();
+    expect(journey?.width).toBe('full');
+    expect(toJourney({ state: 'take_diagnostic', width: 'half' })?.width).toBe('half');
     expect(toJourney({ state: 'unknown' })).toBeNull();
     expect(toJourney(null)).toBeNull();
   });

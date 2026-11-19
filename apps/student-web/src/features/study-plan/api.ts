@@ -90,6 +90,8 @@ export type JourneyState =
 
 export interface Journey {
   state: JourneyState;
+  /** 'half': the card sits beside the plan card on wide screens (dashboard hero row); 'full': below it. */
+  width: 'half' | 'full';
   assessmentId: number | null;
   taskCount: number;
   completedCount: number;
@@ -228,6 +230,7 @@ export function toJourney(raw: unknown): Journey | null {
   if (!state) return null;
   return {
     state,
+    width: row.width === 'half' ? 'half' : 'full',
     assessmentId: row.assessment_id ? num(row.assessment_id) : null,
     taskCount: num(row.task_count),
     completedCount: num(row.completed_count),

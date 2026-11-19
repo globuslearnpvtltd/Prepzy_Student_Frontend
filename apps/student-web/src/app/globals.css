@@ -301,3 +301,42 @@
     }
   }
 }
+
+/*
+ * Floating chatbot launchers (Atlas, lecture tutor): the previous app's ripple — two brand rings expanding out of the
+ * button, half a cycle apart (chat-wave). Its shake and pulsing glow are left out (user decision). Off when the
+ * student asks for reduced motion.
+ */
+@layer components {
+  @keyframes chat-ripple {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(2.4);
+      opacity: 0;
+    }
+  }
+  .chat-wave::before,
+  .chat-wave::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-brand) 45%, transparent);
+    animation: chat-ripple 2.5s ease-out infinite;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .chat-wave::after {
+    animation-delay: 1.25s;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chat-wave::before,
+    .chat-wave::after {
+      animation: none;
+      opacity: 0;
+    }
+  }
+}

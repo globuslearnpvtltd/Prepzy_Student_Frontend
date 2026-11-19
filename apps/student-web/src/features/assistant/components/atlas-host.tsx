@@ -24,9 +24,12 @@ export function showsAtlasLauncher(pathname: string): boolean {
   return !/^\/[^/]+\/(learn\/[^/]+\/[^/]+|doubt-solver)(\/|$)/.test(pathname) && !hidesAtlas(pathname);
 }
 
-/** Pages without Atlas at all (user decision): the diagnostic test and its result, and the study plan. */
+/**
+ * Pages without Atlas at all (user decisions): the diagnostic test and its result, the study plan, and the custom
+ * test pages (list and create).
+ */
 export function hidesAtlas(pathname: string): boolean {
-  return /^\/[^/]+\/(diagnostic|diagnostic-result|diagnostic-test|study-plan)(\/|$)/.test(pathname);
+  return /^\/[^/]+\/(diagnostic|diagnostic-result|diagnostic-test|study-plan|custom-test)(\/|$)/.test(pathname);
 }
 
 /** A chat panel over the page: right-hand card on desktop (or full screen when expanded), full screen on mobile. */
@@ -57,7 +60,10 @@ export function ChatOverlay({
   );
 }
 
-/** Round floating button with the tutor's face (bottom-right). */
+/**
+ * Round floating button with the tutor's face (bottom-right), with the previous app's ripple rings
+ * (`chat-wave` in globals.css). The picture is clipped inside, so the rings can spread outside.
+ */
 export function ChatLauncher({
   label,
   image,
@@ -75,12 +81,14 @@ export function ChatLauncher({
       aria-label={label}
       onClick={onOpen}
       className={cx(
-        'bg-brand shadow-brand-glow fixed right-6 bottom-[80px] z-10 size-[60px] overflow-hidden rounded-full md:right-10 md:bottom-10',
+        'chat-wave bg-brand shadow-brand-glow fixed right-6 bottom-[80px] z-10 size-[60px] rounded-full md:right-10 md:bottom-10',
         className,
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image ?? ATLAS_IMAGE} alt="" className="size-full object-cover object-top" />
+      <span className="block size-full overflow-hidden rounded-full">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image ?? ATLAS_IMAGE} alt="" className="size-full object-cover object-top" />
+      </span>
     </button>
   );
 }

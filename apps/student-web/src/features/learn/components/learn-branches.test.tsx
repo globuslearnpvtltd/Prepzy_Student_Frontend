@@ -52,7 +52,7 @@ describe('Learn page toggles and the subject dialog', () => {
         ok({ courses: [{ course_id: 5, course_name: 'Science Part 1', subject_name: 'SCIENCE', progress_percentage: 40 }] }),
       ),
       http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () => ok({ subjects })),
-      http.get(`${API}/api/v4/learn/classes/12/subjects/1/courses`, () => {
+      http.get(`${API}/api/v4/learn/board/1/classes/12/subjects/1/courses`, () => {
         bookCalls += 1;
         return HttpResponse.json({ message: 'down' }, { status: 500 });
       }),

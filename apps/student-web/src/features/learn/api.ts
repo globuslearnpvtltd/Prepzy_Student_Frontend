@@ -419,9 +419,12 @@ export const learnApi = {
     }));
   },
 
-  async subjectCourses(classId: number, subjectId: string): Promise<SubjectCourse[]> {
+  /** A subject's books for this exam: only the courses of the exam's mapping rows, in the student's language. */
+  async subjectCourses(exam: ExamRef, classId: number, subjectId: string): Promise<SubjectCourse[]> {
     const body = assertOk(
-      await apiClient.get<Envelope<{ courses?: Raw[] }>>(`${LEARN_API}/classes/${classId}/subjects/${subjectId}/courses`),
+      await apiClient.get<Envelope<{ courses?: Raw[] }>>(
+        `${learnApiBase(exam)}/classes/${classId}/subjects/${subjectId}/courses`,
+      ),
     );
     const rows = Array.isArray(body.data?.courses) ? body.data.courses : [];
     return rows.map((c) => ({

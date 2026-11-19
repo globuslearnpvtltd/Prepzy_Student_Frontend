@@ -10,7 +10,8 @@ export const learnKeys = {
   subjects: (classId: number | null) => ['learn', 'subjects', classId] as const,
   freeCourses: (exam: string) => ['learn', 'free-courses', exam] as const,
   continue: (classId: number | null) => ['learn', 'continue', classId] as const,
-  subjectCourses: (classId: number | null, subjectId: string) => ['learn', 'subject-courses', classId, subjectId] as const,
+  subjectCourses: (exam: string, classId: number | null, subjectId: string) =>
+    ['learn', 'subject-courses', exam, classId, subjectId] as const,
   outline: (courseId: string) => ['learn', 'outline', courseId] as const,
   module: (courseId: string, moduleId: string) => ['learn', 'module', courseId, moduleId] as const,
   pyqs: (moduleId: string) => ['learn', 'pyqs', moduleId] as const,
@@ -44,9 +45,10 @@ export function useSubjects(classId: number | null) {
 }
 
 export function useSubjectCourses(classId: number | null, subjectId: string | null) {
+  const exam = useExam();
   return useQuery({
-    queryKey: learnKeys.subjectCourses(classId, subjectId ?? ''),
-    queryFn: () => learnApi.subjectCourses(classId!, subjectId!),
+    queryKey: learnKeys.subjectCourses(exam.slug, classId, subjectId ?? ''),
+    queryFn: () => learnApi.subjectCourses(exam, classId!, subjectId!),
     enabled: classId !== null && !!subjectId,
   });
 }

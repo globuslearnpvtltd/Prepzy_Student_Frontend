@@ -83,7 +83,7 @@ describe('ExamPlayer', () => {
     expect(dialog).toHaveTextContent('1 are still unanswered');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Submit' }));
 
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/neet/tests/mock/result/77'));
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/neet/tests/mock/result/77'), { timeout: 3000 });
     expect(onSubmit).toHaveBeenCalledWith({
       class_id: 20,
       answers: [

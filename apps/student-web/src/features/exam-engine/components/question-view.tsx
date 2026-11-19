@@ -27,6 +27,7 @@ export function QuestionView({
   onAnswer,
   look = 'competitive',
   draftKey,
+  partIndex,
 }: {
   question: ExamQuestion;
   number: number;
@@ -35,6 +36,11 @@ export function QuestionView({
   look?: Exclude<ExamCategory, 'reference'>;
   /** This attempt + question: handwriting drafts of written answers are kept per question. */
   draftKey?: string;
+  /**
+   * Multipart (case based, unseen passage …): show only this sub-question under the passage, the previous app's
+   * board player (one sub-question at a time). Without it every part is listed.
+   */
+  partIndex?: number;
 }) {
   const headingId = useId();
   const board = look === 'board';
@@ -134,7 +140,19 @@ export function QuestionView({
           />
         )}
 
+        {question.kind === 'multipart' && partIndex !== undefined && question.parts[partIndex] && (
+          <SubQuestion
+            key={question.parts[partIndex].id}
+            question={question}
+            index={partIndex}
+            answer={answer}
+            onAnswer={onAnswer}
+            draftKey={draftKey}
+          />
+        )}
+
         {question.kind === 'multipart' &&
+          partIndex === undefined &&
           question.parts.map((part, i) => {
             const parts = answer?.kind === 'parts' ? answer.parts : {};
             const letter = String.fromCharCode(97 + i);
@@ -162,5 +180,55 @@ export function QuestionView({
           })}
       </div>
     </article>
+  );
+}
+
+/** One sub-question of a multipart question (previous app's CaseBasedAnswerBox): "1. text", its picture and the answer. */
+function SubQuestion({
+  question,
+  index,
+  answer,
+  onAnswer,
+  draftKey,
+}: {
+  question: ExamQuestion;
+  index: number;
+  answer: Answer | undefined;
+  onAnswer: (answer: Answer | null) => void;
+  draftKey?: string;
+}) {
+  const part = question.parts[index]!;
+  const parts = answer?.kind === 'parts' ? answer.parts : {};
+  return (
+    <section aria-label={`Sub-question ${index + 1} of ${question.parts.length}`} className="flex flex-col gap-4">
+      <div
+        className={cx(
+          'border-info-50 text-neutral-850 flex flex-col gap-2 border-[1.5px] border-b-2 p-6 font-bold',
+          question.typeLabel === 'Case based' ? 'bg-surface' : 'bg-info-25',
+        )}
+      >
+        <div className="flex items-baseline gap-2">
+          <span className="text-[20px] leading-5" aria-hidden>
+            {index + 1}.
+          </span>
+          <RichText html={part.html} className="min-w-0 flex-1 text-[18px] leading-6 md:text-[20px] md:leading-[26px]" />
+        </div>
+        {part.marks !== null && (
+          <p className="m-0 pl-[26px] text-[13px] leading-4 font-medium text-neutral-500">
+            {part.marks} {part.marks === 1 ? 'mark' : 'marks'}
+          </p>
+        )}
+      </div>
+      {part.image && (
+        // eslint-disable-next-line @next/next/no-img-element -- backend images from arbitrary CDNs
+        <img src={part.image} alt="" className="max-h-[100px] max-w-[150px] object-contain" loading="lazy" />
+      )}
+      <AnswerBox
+        label={`Answer for sub-question ${index + 1}`}
+        inkDraftKey={draftKey && `${draftKey}:${part.id}`}
+        value={parts[part.id] ?? EMPTY_WRITTEN}
+        onChange={(value) => onAnswer({ kind: 'parts', parts: { ...parts, [part.id]: value } })}
+      />
+    </section>
   );
 }

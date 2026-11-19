@@ -7,6 +7,7 @@ import { navigation } from '@/test/setup';
 import { billingError, billingOk, billingUrl } from '@/test/billing';
 import { testExam } from '@/test/exams';
 import { FIRST_VISIT_KEY, REFERRAL_CODE_KEY, Welcome } from './components/welcome';
+import { startWelcomeVisit } from '@/shared/lib/welcome-visit';
 
 type Handlers = Parameters<typeof server.use>;
 
@@ -78,6 +79,25 @@ describe('Welcome', () => {
     expect(navigation.replace).not.toHaveBeenCalled();
     fireEvent(window, new PopStateEvent('popstate'));
     expect(navigation.replace).toHaveBeenCalledWith('/cbse/dashboard');
+  });
+
+  it('stays after a new sign-up even when this browser saw it before, and across remounts', async () => {
+    localStorage.setItem(FIRST_VISIT_KEY, 'true'); // an earlier sign-up on this browser
+    startWelcomeVisit();
+    server.use(...base());
+    const first = renderWithProviders(<Welcome />);
+    expect(await screen.findByText('Topper plan active')).toBeInTheDocument();
+    first.unmount();
+    renderWithProviders(<Welcome />);
+    expect(await screen.findByText('Topper plan active')).toBeInTheDocument();
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it('a later visit (no sign-up in this session) goes straight to the dashboard', async () => {
+    localStorage.setItem(FIRST_VISIT_KEY, 'true');
+    server.use(...base());
+    renderWithProviders(<Welcome />);
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/cbse/dashboard'));
   });
 
   it('shows the plan end date from the active plan', async () => {

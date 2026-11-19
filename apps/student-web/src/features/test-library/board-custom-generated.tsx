@@ -8,7 +8,7 @@ const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, (c) => c.t
 
 /**
  * "Test Generated Successfully!" after a board custom test is generated (previous app's CustomExamCreationSuccessModal):
- * blurred page behind (as before), purple header with a trophy, a summary card (course, difficulty, selected topics), then "Take Test Now" (opens the
+ * blurred page behind (as before; z 52/53 so it sits above the custom-test dialog at 51 and blurs it too), purple header with a trophy, a summary card (course, difficulty, selected topics), then "Take Test Now" (opens the
  * test) or "Save for Later" (back to Assessments, where it is listed under Saved Tests). Closing it saves for later.
  */
 export function BoardCustomGenerated({
@@ -30,8 +30,8 @@ export function BoardCustomGenerated({
     <Dialog open={open} onOpenChange={(next) => !next && onSaveForLater()}>
       <DialogContent
         onPointerDownOutside={(event) => event.preventDefault()}
-        overlayClassName="bg-generated-scrim/30 backdrop-blur-sm"
-        className="flex max-h-[90%] w-[95%] max-w-[512px] flex-col gap-6 overflow-y-auto rounded-[24px] p-0 font-sans md:w-[512px]"
+        overlayClassName="z-[52] bg-generated-scrim/30 backdrop-blur-sm"
+        className="z-[53] flex max-h-[90%] w-[95%] max-w-[512px] flex-col gap-6 overflow-y-auto rounded-[24px] p-0 font-sans md:w-[512px]"
       >
         <div className="from-brand-700 to-generated-deep flex flex-col items-center gap-[14px] rounded-t-[24px] bg-linear-to-r p-8 text-center">
           <span className="bg-generated-ring hidden size-16 items-center justify-center rounded-full md:flex">

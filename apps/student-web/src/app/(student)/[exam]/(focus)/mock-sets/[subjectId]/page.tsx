@@ -6,6 +6,6 @@ export const metadata: Metadata = { title: 'Mock Exams' };
 
 export default async function MockSetsPage({ params }: { params: Promise<{ exam: string; subjectId: string }> }) {
   const { exam, subjectId } = await params;
-  examForCategory(exam, 'board');
+  await examForCategory(exam, 'board');
   return <BoardPaperSets kind="mock" subjectId={subjectId} />;
 }

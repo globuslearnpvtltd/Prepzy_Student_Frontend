@@ -43,7 +43,7 @@ async function buildTest(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('board custom test builder', () => {
-  it('builds course → chapter → topics → difficulty and opens the new set in the player', async () => {
+  it('builds course → chapter → topics → difficulty, shows "Test Generated Successfully!" and opens the set', async () => {
     let body: unknown;
     server.use(...builderApi({ set_id: 77, total: 20 }, (b) => (body = b)));
     const user = userEvent.setup();
@@ -52,9 +52,27 @@ describe('board custom test builder', () => {
     await user.click(await screen.findByRole('button', { name: /Next/ }));
     expect(screen.getByPlaceholderText('Search courses...')).toBeInTheDocument();
     await buildTest(user);
+    const done = await screen.findByRole('dialog', { name: 'Test Generated Successfully!' });
+    expect(within(done).getByText('Hard')).toBeInTheDocument();
+    expect(within(done).getByText('5')).toBeInTheDocument();
+    expect(navigation.push).not.toHaveBeenCalled();
+    await user.click(within(done).getByRole('button', { name: /Take Test Now/ }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/cbse/tests/custom/77'));
     expect(body).toEqual({ module_id: 101, topic_ids: [1, 2, 3, 4, 5], difficulty_level: 'hard' });
-    expect(within(screen.getByRole('complementary', { name: 'Selection Summary' })).getByText('5')).toBeInTheDocument();
+    expect(within(screen.getByRole('complementary', { name: 'Selection Summary', hidden: true })).getByText('5')).toBeInTheDocument();
+  });
+
+  it('"Save for Later" closes the builder and keeps the test for Saved Tests', async () => {
+    server.use(...builderApi({ set_id: 78, total: 20 }));
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<BoardCustomTestBuilder open onOpenChange={onOpenChange} />, { exam: cbse });
+    await buildTest(user);
+    const done = await screen.findByRole('dialog', { name: 'Test Generated Successfully!' });
+    await user.click(within(done).getByRole('button', { name: /Save for Later/ }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(navigation.push).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Test Generated Successfully!' })).not.toBeInTheDocument());
   });
 
   it('explains when the chosen topics have no questions', async () => {

@@ -61,8 +61,9 @@ export function BookCover({ book, className }: { book: Pick<SolverBook, 'title' 
 }
 
 /**
- * Step 1: pick a textbook. Tap the centre book to select it, then Next. "Question Bank" in the header
- * (`questionBankRequest` changes) opens the bank for the selected book, or asks to select one first.
+ * Step 1: pick a textbook. The centre book is always selected (the first book, or the one chosen earlier, when the
+ * list loads); swiping or the arrows select the next one. "Question Bank" in the header (`questionBankRequest`
+ * changes) opens the bank for the selected book, or asks to select one first when there are no books.
  */
 export function SubjectPicker({ onNext, onQuestionBank, questionBankRequest }: { onNext: () => void; onQuestionBank: () => void; questionBankRequest: number }) {
   const exam = useExam();
@@ -72,7 +73,6 @@ export function SubjectPicker({ onNext, onQuestionBank, questionBankRequest }: {
   const list = books.data ?? [];
   const compact = useCompact();
   const [active, setActive] = useState(0);
-  const [selected, setSelected] = useState(false);
   const [needsPick, setNeedsPick] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null);
   const handled = useRef(questionBankRequest);
@@ -87,6 +87,7 @@ export function SubjectPicker({ onNext, onQuestionBank, questionBankRequest }: {
   }, [books.data]);
 
   const activeBook = list[active];
+  const selected = Boolean(activeBook);
   useEffect(() => {
     if (questionBankRequest === handled.current) return;
     handled.current = questionBankRequest;
@@ -100,7 +101,6 @@ export function SubjectPicker({ onNext, onQuestionBank, questionBankRequest }: {
   }, [selected]);
 
   const move = (delta: number) => {
-    setSelected(false);
     setActive((i) => (i + delta + list.length) % list.length);
   };
   const dotsStart = Math.min(Math.max(active - 2, 0), Math.max(list.length - 5, 0));
@@ -159,7 +159,7 @@ export function SubjectPicker({ onNext, onQuestionBank, questionBankRequest }: {
                 type="button"
                 aria-label={`${formatSubject(book.subjectName)}, ${book.title}`}
                 aria-pressed={offset === 0 ? selected : undefined}
-                onClick={() => (offset === 0 ? setSelected((s) => !s) : (setSelected(false), setActive(index)))}
+                onClick={() => (offset === 0 ? undefined : setActive(index))}
                 style={{
                   transform: bookTransform(offset, compact),
                   zIndex: 10 - distance,

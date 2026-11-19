@@ -23,7 +23,6 @@ import {
 import { ChapterScreen } from './components/chapter-screen';
 import { CourseScreen } from './components/course-screen';
 import { NotesLibrary } from './components/notes-library';
-import { isYouTubeEnded } from './components/video-player';
 import { adjacentSteps, isChapterStep } from './steps';
 import { testExam } from '@/test/exams';
 
@@ -124,14 +123,10 @@ describe('competitive learn normalisers', () => {
     expect(toSummaryVideo({ new_video_link: { en: { P: { video_link: 'https://v' } } }, summary_video_status: 'completed' })?.completed).toBe(true);
   });
 
-  it('detects YouTube links and their end event', () => {
+  it('detects YouTube links', () => {
     expect(youTubeId('https://www.youtube.com/watch?v=abcdef12345')).toBe('abcdef12345');
     expect(youTubeId('https://youtu.be/abcdef12345?t=1')).toBe('abcdef12345');
     expect(youTubeId('https://cdn.example.com/v.mp4')).toBeNull();
-    expect(isYouTubeEnded('{"event":"onStateChange","info":0}')).toBe(true);
-    expect(isYouTubeEnded({ event: 'infoDelivery', info: { playerState: 0 } })).toBe(true);
-    expect(isYouTubeEnded({ event: 'onStateChange', info: 1 })).toBe(false);
-    expect(isYouTubeEnded('nope')).toBe(false);
   });
 
   it('reads study notes and attempts', () => {

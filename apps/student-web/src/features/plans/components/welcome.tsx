@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useActivePlan, useCurrentUser } from '@/features/auth';
-import { DEFAULT_EXAM, findExam, getExam, type ExamConfig } from '@/shared/config/exams';
+import { DEFAULT_EXAM, examFromCatalog, type ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { useExamCatalog } from '@/shared/hooks/use-exam-catalog';
 import { PageSpinner, StatusScreen } from '@/shared/layout/status-screens';
@@ -18,10 +18,11 @@ import { planKeys } from '../hooks';
 import { formatInr, formatShortDate } from '../money';
 import { Confetti } from './confetti';
 import { useModalBehaviour } from './modal';
+import { shouldShowWelcome } from '@/shared/lib/welcome-visit';
 
 /** Same keys as the previous app, so a code from a referral link or a first visit there carries over. */
 export const REFERRAL_CODE_KEY = 'prepzy_referral_code';
-export const FIRST_VISIT_KEY = 'first_visit_pre_dashboard';
+export { FIRST_VISIT_KEY } from '@/shared/lib/welcome-visit';
 
 const read = (key: string) => {
   try {
@@ -276,9 +277,13 @@ export function Welcome() {
   const params = useSearchParams();
   const user = useCurrentUser();
   const catalog = useExamCatalog();
-  const design = getExam(params.get('exam')) ?? findExam(user.data?.targetExam) ?? getExam(DEFAULT_EXAM)!;
-  const fromBackend = catalog.data?.find((e) => e.examSlice === design.examSlice && e.category === design.category);
-  const exam = useMemo(() => (fromBackend ? { ...design, examId: fromBackend.examId } : null), [design, fromBackend]);
+  const exam = useMemo(
+    () =>
+      examFromCatalog(catalog.data, params.get('exam')) ??
+      examFromCatalog(catalog.data, user.data?.targetExam) ??
+      examFromCatalog(catalog.data, DEFAULT_EXAM),
+    [catalog.data, params, user.data?.targetExam],
+  );
 
   if (catalog.isError) return <StatusScreen title="We couldn't load your exams" description={userMessage(catalog.error)} />;
   if (!exam) return <PageSpinner />;
@@ -300,13 +305,9 @@ function WelcomeContent({ exam }: { exam: ExamConfig }) {
   const [benefit, setBenefit] = useState<{ referrerName: string; joiningCredit: number } | null>(null);
   const [dialog, setDialog] = useState<'limits' | 'pricing' | null>(null);
 
-  // Second visit: straight to the dashboard (the previous app's behaviour).
-  const checked = useRef(false);
+  // Shown once, right after sign-up; a later visit goes straight to the dashboard (see shared/lib/welcome-visit).
   useEffect(() => {
-    if (checked.current) return;
-    checked.current = true;
-    if (read(FIRST_VISIT_KEY)) router.replace(dashboard);
-    else write(FIRST_VISIT_KEY, 'true');
+    if (!shouldShowWelcome()) router.replace(dashboard);
   }, [router, dashboard]);
 
   // Back button leaves onboarding for the dashboard.

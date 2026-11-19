@@ -1,5 +1,16 @@
 import { availableTestTypes } from '@/features/exam-engine';
-import { examList, findExam, getExam, hasTestType, REFERENCE } from './exams';
+import {
+  catalogExams,
+  CATEGORY_DEFAULTS,
+  examDesignFor,
+  examFromCatalog,
+  examList,
+  examSlugOf,
+  findExam,
+  getExam,
+  hasTestType,
+  REFERENCE,
+} from './exams';
 import {
   isActivePath,
   isNavLocked,
@@ -33,6 +44,48 @@ describe('exam registry', () => {
   it('knows which test types each exam has', () => {
     expect(hasTestType(getExam('neet')!, 'dpp')).toBe(true);
     expect(hasTestType(getExam('cbse')!, 'dpp')).toBe(false);
+  });
+});
+
+describe('exams from the backend catalog (DB rows only)', () => {
+  const CATALOG = [
+    { examId: 1, name: 'CBSE', examSlice: 'cbse', category: 'board' as const },
+    { examId: 2, name: 'NEET-UG', examSlice: 'neet-ug', category: 'competitive' as const },
+    { examId: 8, name: 'ICSE', examSlice: 'icse', category: 'board' as const },
+    { examId: 9, name: 'JEE Main', examSlice: 'jee-main', category: 'competitive' as const },
+    { examId: 10, name: 'Reference Books', examSlice: 'reference', category: 'reference' as const },
+    { examId: 11, name: 'Olympiad', examSlice: 'olympiad 2027', category: 'board' as const },
+    // A registry slice listed under another category: not this app's exam.
+    { examId: 12, name: 'JAC', examSlice: 'jac', category: 'competitive' as const },
+    // A slice that is another exam's registry slug would shadow it.
+    { examId: 13, name: 'Neet Crash', examSlice: 'neet', category: 'competitive' as const },
+  ];
+
+  it('keeps the registry polish and gives other exams their category defaults', () => {
+    expect(examDesignFor(CATALOG[1]!)).toBe(getExam('neet'));
+    expect(examDesignFor(CATALOG[2]!)).toEqual({ slug: 'icse', examSlice: 'icse', label: 'ICSE', category: 'board', ...CATEGORY_DEFAULTS.board });
+    expect(examDesignFor(CATALOG[3]!)).toMatchObject({ slug: 'jee-main', label: 'JEE Main', theme: 'competitive', onboarding: { kind: 'choose-target-year' } });
+    expect(CATALOG.slice(4).map(examDesignFor)).toEqual([null, null, null, null]);
+    expect(availableTestTypes(examDesignFor(CATALOG[3]!)!)).toEqual(CATEGORY_DEFAULTS.competitive.testTypes);
+  });
+
+  it('lists and finds catalog exams by slug, slice, name or id', () => {
+    expect(catalogExams(CATALOG).map((e) => `${e.slug}:${e.examId}`)).toEqual(['cbse:1', 'neet:2', 'icse:8', 'jee-main:9']);
+    expect(examFromCatalog(CATALOG, 'neet')?.examId).toBe(2);
+    expect(examFromCatalog(CATALOG, 'NEET-UG')?.slug).toBe('neet');
+    expect(examFromCatalog(CATALOG, 'jee-main')?.examId).toBe(9);
+    expect(examFromCatalog(CATALOG, 'JEE Main')?.slug).toBe('jee-main');
+    expect(examFromCatalog(CATALOG, 8)?.slug).toBe('icse');
+    expect(examFromCatalog(CATALOG, 'olympiad 2027')).toBeNull();
+    expect(examFromCatalog(CATALOG, '')).toBeNull();
+    expect(examFromCatalog(undefined, 'cbse')).toBeNull();
+  });
+
+  it('turns any exam value into a URL segment without the catalog', () => {
+    expect(examSlugOf('neet-ug')).toBe('neet');
+    expect(examSlugOf('JEE-Main')).toBe('jee-main');
+    expect(examSlugOf('a b')).toBeNull();
+    expect(examSlugOf(null)).toBeNull();
   });
 });
 

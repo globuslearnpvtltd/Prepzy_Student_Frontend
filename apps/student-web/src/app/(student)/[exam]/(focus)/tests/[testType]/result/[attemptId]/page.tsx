@@ -11,7 +11,7 @@ export default async function TestResultPage({
   params: Promise<{ exam: string; testType: string; attemptId: string }>;
 }) {
   const { exam, testType, attemptId } = await params;
-  const type = resolveTestType(exam, testType);
+  const type = await resolveTestType(exam, testType);
   if (!type) notFound();
   return <ResultView testType={type} attemptId={attemptId} />;
 }

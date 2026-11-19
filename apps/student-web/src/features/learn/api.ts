@@ -283,7 +283,7 @@ export function resolveVideoSource(link: string | null | undefined): VideoSource
   const value = link?.trim();
   if (!value) return null;
   const youtubeId = YOUTUBE_ID.exec(value)?.[1];
-  if (youtubeId) return { kind: 'youtube', id: youtubeId, url: `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&modestbranding=1` };
+  if (youtubeId) return { kind: 'youtube', id: youtubeId, url: `https://www.youtube.com/watch?v=${youtubeId}` };
   if (/^https?:\/\//i.test(value)) return { kind: 'file', url: value };
   return { kind: 'file', url: `https://resource2.heygen.ai/video/${value}/1280x720.mp4` };
 }
@@ -419,9 +419,12 @@ export const learnApi = {
     }));
   },
 
-  async subjectCourses(classId: number, subjectId: string): Promise<SubjectCourse[]> {
+  /** A subject's books for this exam: only the courses of the exam's mapping rows, in the student's language. */
+  async subjectCourses(exam: ExamRef, classId: number, subjectId: string): Promise<SubjectCourse[]> {
     const body = assertOk(
-      await apiClient.get<Envelope<{ courses?: Raw[] }>>(`${LEARN_API}/classes/${classId}/subjects/${subjectId}/courses`),
+      await apiClient.get<Envelope<{ courses?: Raw[] }>>(
+        `${learnApiBase(exam)}/classes/${classId}/subjects/${subjectId}/courses`,
+      ),
     );
     const rows = Array.isArray(body.data?.courses) ? body.data.courses : [];
     return rows.map((c) => ({

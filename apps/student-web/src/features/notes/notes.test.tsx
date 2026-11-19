@@ -63,8 +63,8 @@ describe('Notes page', () => {
       http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () =>
         ok({ subjects: [{ subject_id: 1, subject_name: 'Science' }, { subject_id: 2, subject_name: 'Maths' }] }),
       ),
-      http.get(`${API}/api/v4/learn/classes/12/subjects/1/courses`, () => ok({ courses: [{ course_id: 5, title: 'Science Part 1', module_count: 13 }] })),
-      http.get(`${API}/api/v4/learn/classes/12/subjects/2/courses`, () => ok({ courses: [{ course_id: 6, title: 'Maths Book', module_count: 15 }] })),
+      http.get(`${API}/api/v4/learn/board/1/classes/12/subjects/1/courses`, () => ok({ courses: [{ course_id: 5, title: 'Science Part 1', module_count: 13 }] })),
+      http.get(`${API}/api/v4/learn/board/1/classes/12/subjects/2/courses`, () => ok({ courses: [{ course_id: 6, title: 'Maths Book', module_count: 15 }] })),
     );
     renderWithProviders(<NotesScreen aside={<p>Aside</p>} />, { exam: cbse });
     expect(screen.getByRole('heading', { name: 'Notes', level: 1 })).toBeInTheDocument();

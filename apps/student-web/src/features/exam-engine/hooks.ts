@@ -20,7 +20,7 @@ export const examKeys = {
 export function useTestContext(): { context: TestContext | null; isPending: boolean; error: unknown } {
   const exam = useExam();
   const plan = useActivePlan(exam);
-  const fallbackClass = exam.onboarding.kind === 'choose-target-year' ? exam.onboarding.classId : null;
+  const fallbackClass = exam.onboarding.kind === 'choose-target-year' ? (exam.onboarding.classId ?? null) : null;
   const classId = plan.data?.classId ?? fallbackClass;
   return {
     context: classId ? { exam, classId } : null,
@@ -94,10 +94,13 @@ export function useExamAttempt(
     0,
     session.questions.findIndex((q) => !isAnswered(session.initial.answers[q.id])),
   );
+  // Board papers (previous app's mock exam) count a question as skipped only when the student leaves it blank with
+  // Skip or Save & Next; competitive papers (NTA-style palette) count every question opened as visited.
+  const visitOnArrival = context.exam.category !== 'board';
   const [index, setIndex] = useState(firstOpen);
   const [snapshot, setSnapshot] = useState<AttemptSnapshot>(() => {
     const first = session.questions[firstOpen];
-    return first ? withVisit(session.initial, first.id) : session.initial;
+    return first && visitOnArrival ? withVisit(session.initial, first.id) : session.initial;
   });
   const latest = useRef(snapshot);
   latest.current = snapshot;
@@ -163,21 +166,26 @@ export function useExamAttempt(
     goTo: (next: number) => {
       const target = session.questions[next];
       if (!target) return;
-      update((snap) => withVisit(snap, target.id));
+      if (visitOnArrival) update((snap) => withVisit(snap, target.id));
       setIndex(next);
     },
     answer: (questionId: string, value: Answer | null) => update((snap) => withAnswer(snap, questionId, value)),
-    /** Leaves the current question unanswered and moves on (it shows as "not answered"). */
+    /** Leaves the current question unanswered and moves on (it counts as skipped). */
     skip: () => {
       const current = session.questions[index];
       const target = session.questions[index + 1];
       if (!current) return;
       update((snap) => {
-        const cleared = withAnswer(snap, current.id, null);
-        return target ? withVisit(cleared, target.id) : cleared;
+        const cleared = withVisit(withAnswer(snap, current.id, null), current.id);
+        return target && visitOnArrival ? withVisit(cleared, target.id) : cleared;
       });
       if (target) setIndex(index + 1);
     },
+    /**
+     * The student moves on from a question with Save & Next: left blank, it now counts as skipped (an answered one
+     * stays answered).
+     */
+    leave: (questionId: string) => update((snap) => withVisit(snap, questionId)),
     toggleMark: (questionId: string) => update((snap) => withMarkToggled(snap, questionId)),
     saveNow: () => {
       dirty.current = true;

@@ -85,43 +85,197 @@ function Option({ index, html, image, selected, onSelect }: { index: number; htm
   );
 }
 
-function QuestionView({ question, number, dispatch }: { question: DiagnosticQuestion; number: number; dispatch: (action: AttemptAction) => void }) {
-  const picked = !isCase(question) && question.selected_answer && !Array.isArray(question.selected_answer) ? question.selected_answer.option_index : null;
-  const subPicks = Array.isArray(question.selected_answer) ? question.selected_answer : [];
+/** Footer of the question card (previous app's DiagnosticQuestionFooter): Skip Question · Mark for review · Save & Next. */
+function QuestionFooter({
+  primaryLabel,
+  marked,
+  hasPrevious,
+  onSkip,
+  onMark,
+  onPrevious,
+  onPrimary,
+}: {
+  primaryLabel: string;
+  marked: boolean;
+  hasPrevious: boolean;
+  onSkip: () => void;
+  onMark: () => void;
+  onPrevious: () => void;
+  onPrimary: () => void;
+}) {
+  const review = cx(
+    'flex items-center justify-center gap-2 rounded-[16px] border px-6 py-3 font-semibold transition-colors',
+    marked ? 'bg-brand-50 border-brand text-brand' : 'bg-surface border-neutral-150 text-neutral-700 hover:bg-neutral-50',
+  );
+  const reviewLabel = marked ? 'Unmark review' : 'Mark for review';
   return (
-    <div className="bg-surface flex flex-col gap-5 rounded-2xl p-5 shadow-[0px_0px_25px_-5px_rgba(30,30,30,0.15)] md:p-8">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-brand text-[14px] font-bold">Question {number}</span>
-        <span className="bg-brand-50 text-brand rounded-full px-3 py-1 text-[12px] font-semibold">{question.subject_name}</span>
+    <>
+      {/* Phones: full width at the bottom of the screen (the negative margins cancel the page padding). */}
+      <div className="bg-neutral-50 border-neutral-150 sticky bottom-0 z-10 -mx-6 -mb-6 mt-auto flex flex-col gap-3 border-t px-5 py-4 md:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <button type="button" onClick={onMark} aria-pressed={marked} className={cx(review, 'text-[14px]')}>
+            {reviewLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onSkip}
+            className="bg-surface border-neutral-150 rounded-[16px] border px-6 py-3 text-[14px] font-semibold text-neutral-700"
+          >
+            Skip
+          </button>
+        </div>
+        <div className="bg-surface border-neutral-150 flex items-center gap-3 rounded-[20px] border p-3 shadow-[0px_-2px_12px_rgba(30,30,30,0.08)]">
+          <button
+            type="button"
+            onClick={onPrevious}
+            disabled={!hasPrevious}
+            className="bg-surface border-neutral-150 text-brand flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[16px] border px-4 text-[14px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ArrowLeft aria-hidden className="size-4" />
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={onPrimary}
+            className="bg-brand text-on-brand flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[16px] px-4 text-[14px] font-semibold"
+          >
+            {primaryLabel}
+            <ArrowRight aria-hidden className="size-4" />
+          </button>
+        </div>
       </div>
-      <div className="text-[16px] leading-[1.6] font-medium text-neutral-900">
-        <RichText html={question.question_text} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {question.question_image && <img src={question.question_image} alt="" className="mt-3 max-h-64 rounded-sm" />}
+
+      {/* Tablet and desktop: inside the card's bottom edge. */}
+      <div className="bg-neutral-50 border-neutral-150 sticky bottom-0 z-10 mt-auto hidden items-center justify-between gap-4 rounded-b-[20px] border-t px-8 py-[18px] md:flex">
+        <button type="button" onClick={onSkip} className="text-brand text-[13px] font-semibold transition-opacity hover:opacity-70">
+          Skip Question
+        </button>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={onMark} aria-pressed={marked} className={cx(review, 'h-11 text-[13px]')}>
+            <Bookmark aria-hidden className="size-4" />
+            {reviewLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onPrimary}
+            className="bg-brand text-on-brand flex h-11 items-center gap-2 rounded-[16px] px-8 text-[13px] font-semibold shadow-[0px_10px_15px_-3px_rgba(61,52,139,0.1)] transition-opacity hover:opacity-90"
+          >
+            {primaryLabel}
+          </button>
+        </div>
       </div>
-      {isCase(question) ? (
-        question.sub_questions.map((sub, n) => (
-          <div key={sub.sub_index} className="border-neutral-150 flex flex-col gap-3 rounded-lg border bg-neutral-50 p-4">
-            <div className="text-[15px] font-medium text-neutral-900">
-              <span className="text-brand mr-1 font-bold">({String.fromCharCode(97 + n)})</span>
-              <RichText html={sub.sub_question_text} className="inline" />
-            </div>
-            <div role="radiogroup" aria-label={`Part ${n + 1}`} className="flex flex-col gap-3">
-              {sub.options.map((option, i) => (
-                <Option
-                  key={option.option_index}
-                  index={i}
-                  html={option.option_text}
-                  image={option.option_image}
-                  selected={subPicks.some((p) => p.sub_index === sub.sub_index && p.option_index === option.option_index)}
-                  onSelect={() => dispatch({ type: 'select-sub', questionId: question.question_id, subIndex: sub.sub_index, optionIndex: option.option_index })}
-                />
+    </>
+  );
+}
+
+/**
+ * One question card (previous app's DiagnosticQuestionView): a case study shows its passage, then one part at a time
+ * with part tabs ("4a", "4b" …); the primary button reads "Next part" until the last part, then Save & Next / Submit Test.
+ */
+function QuestionView({
+  question,
+  number,
+  isLast,
+  hasPrevious,
+  dispatch,
+  onSkip,
+  onMark,
+  onPrevious,
+  onNext,
+  onSubmit,
+}: {
+  question: DiagnosticQuestion;
+  number: number;
+  isLast: boolean;
+  hasPrevious: boolean;
+  dispatch: (action: AttemptAction) => void;
+  onSkip: () => void;
+  onMark: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSubmit: () => void;
+}) {
+  const [part, setPart] = useState(0);
+  const caseBased = isCase(question);
+  const marked = question.status === 'marked_for_review';
+  const picked = !caseBased && question.selected_answer && !Array.isArray(question.selected_answer) ? question.selected_answer.option_index : null;
+  const subPicks = Array.isArray(question.selected_answer) ? question.selected_answer : [];
+  const pickedFor = (subIndex: number) => subPicks.find((p) => p.sub_index === subIndex)?.option_index ?? null;
+  const subs = caseBased ? question.sub_questions : [];
+  const sub = subs[part];
+  const hasNextPart = caseBased && part < subs.length - 1;
+  const primaryLabel = hasNextPart ? 'Next part' : isLast ? 'Submit Test' : 'Save & Next';
+  const onPrimary = () => (hasNextPart ? setPart(part + 1) : isLast ? onSubmit() : onNext());
+  const back = () => (caseBased && part > 0 ? setPart(part - 1) : onPrevious());
+
+  return (
+    <div className="bg-surface flex flex-col rounded-[20px] shadow-[0px_0px_25px_-5px_rgba(30,30,30,0.15)]">
+      <div className="flex flex-col gap-3 px-5 pt-4 pb-4 md:gap-[18px] md:px-8 md:pt-8">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="bg-brand-50 text-brand rounded-sm px-2 py-1 text-[10px] font-semibold md:text-[12px]">Question {number}</span>
+          {caseBased && <span className="rounded-sm bg-neutral-50 px-3 py-1.5 text-[11px] font-semibold text-neutral-700">Case based</span>}
+          {marked && <span className="bg-brand text-on-brand rounded-sm px-3 py-1.5 text-[11px] font-semibold">Marked for review</span>}
+          <span className="bg-brand-50 text-brand ml-auto rounded-full px-3 py-1 text-[12px] font-semibold">{question.subject_name}</span>
+        </div>
+        {caseBased ? (
+          <div className="border-neutral-150 flex max-h-[280px] flex-col gap-3 overflow-y-auto rounded-[16px] border bg-neutral-50 p-5">
+            <span className="text-[11px] font-semibold tracking-[0.08em] text-neutral-500 uppercase">Case study</span>
+            <RichText html={question.question_text} className="text-[15px] leading-[1.6] text-neutral-900" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {question.question_image && <img src={question.question_image} alt="" className="max-w-full rounded-md" />}
+          </div>
+        ) : (
+          <div className="text-[16px] leading-[1.6] font-medium text-neutral-900">
+            <RichText html={question.question_text} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {question.question_image && <img src={question.question_image} alt="" className="mt-3 max-h-64 rounded-md" />}
+          </div>
+        )}
+      </div>
+
+      {caseBased && sub ? (
+        <div className="flex flex-col gap-5 px-5 pt-4 pb-6 md:px-8 md:pb-8">
+          <div className="border-neutral-150 flex items-end justify-between border-b">
+            <div role="tablist" aria-label="Parts" className="flex items-center gap-7">
+              {subs.map((item, i) => (
+                <button
+                  key={item.sub_index}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === part}
+                  aria-label={`Part ${i + 1} of ${subs.length}${pickedFor(item.sub_index) !== null ? ', answered' : ''}`}
+                  onClick={() => setPart(i)}
+                  className={cx('relative flex h-[46px] items-center gap-2 text-[15px] font-semibold', i === part ? 'text-brand' : 'text-neutral-500')}
+                >
+                  {number}
+                  {String.fromCharCode(97 + i)}
+                  {pickedFor(item.sub_index) !== null && <Check aria-hidden strokeWidth={3} className="text-success-400 size-3.5" />}
+                  <span aria-hidden className={cx('absolute right-0 bottom-[-1px] left-0 h-0.5 rounded-full', i === part ? 'bg-brand' : 'bg-transparent')} />
+                </button>
               ))}
             </div>
+            <span className="pb-3.5 text-[12px] font-medium text-neutral-500">
+              {subs.filter((item) => pickedFor(item.sub_index) !== null).length} of {subs.length} answered
+            </span>
           </div>
-        ))
+          <div className="text-[15px] font-medium text-neutral-900">
+            <RichText html={sub.sub_question_text} />
+          </div>
+          <div role="radiogroup" aria-label={`Part ${part + 1}`} className="flex flex-col gap-3">
+            {sub.options.map((option, i) => (
+              <Option
+                key={option.option_index}
+                index={i}
+                html={option.option_text}
+                image={option.option_image}
+                selected={pickedFor(sub.sub_index) === option.option_index}
+                onSelect={() => dispatch({ type: 'select-sub', questionId: question.question_id, subIndex: sub.sub_index, optionIndex: option.option_index })}
+              />
+            ))}
+          </div>
+        </div>
       ) : (
-        <div role="radiogroup" aria-label="Options" className="flex flex-col gap-3">
+        <div role="radiogroup" aria-label="Options" className="flex flex-col gap-3 px-5 pt-4 pb-6 md:gap-4 md:px-8 md:pb-8">
           {question.options.map((option, i) => (
             <Option
               key={option.option_index}
@@ -134,6 +288,16 @@ function QuestionView({ question, number, dispatch }: { question: DiagnosticQues
           ))}
         </div>
       )}
+
+      <QuestionFooter
+        primaryLabel={primaryLabel}
+        marked={marked}
+        hasPrevious={hasPrevious || (caseBased && part > 0)}
+        onSkip={onSkip}
+        onMark={onMark}
+        onPrevious={back}
+        onPrimary={onPrimary}
+      />
     </div>
   );
 }
@@ -297,11 +461,16 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
   const current = state.questions[state.index];
   if (!current) return <Notice title="Couldn't load this test" body="No questions found for this diagnostic." action={{ label: 'Go back', href: routes.dashboard(exam.slug) }} />;
   const isLast = state.index === state.questions.length - 1;
-  const marked = current.status === 'marked_for_review';
   const jump = (i: number) => act({ type: 'go', index: i }, true);
 
+  const submitNow = () => {
+    dispatch({ type: 'leave', questionId: current.question_id });
+    handleSubmit();
+  };
+
   return (
-    <div className="w-full py-4">
+    // Previous app's diagnostic layout: max 1440px, 24px padding on phones and 32px from tablets up.
+    <div className="mx-auto flex min-h-[calc(100dvh-76px)] w-full max-w-[1440px] flex-col p-6 md:p-8">
       <div className="border-neutral-150 flex items-center justify-between gap-4 md:mb-6 md:h-20 md:rounded-2xl md:border md:bg-surface md:px-5 md:shadow-[0px_16px_40px_rgba(61,52,139,0.08)]">
         <div className="flex min-w-0 items-center gap-3">
           <BackButton href={routes.dashboard(exam.slug)} label="Back to dashboard" />
@@ -317,10 +486,7 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
           {session.data?.timeLeft !== null && session.data?.timeLeft !== undefined && <Timer seconds={session.data.timeLeft} onExpire={handleSubmit} />}
           <button
             type="button"
-            onClick={() => {
-              dispatch({ type: 'leave', questionId: current.question_id });
-              handleSubmit();
-            }}
+            onClick={submitNow}
             className="bg-brand border-brand text-on-brand flex items-center gap-2 rounded-lg border px-3 py-2 text-[14px] font-semibold hover:opacity-90 md:h-9 md:px-[15px] md:text-[13px]"
           >
             Submit Test
@@ -332,46 +498,22 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
       <div className="mb-5 min-w-0 lg:hidden">
         <Palette questions={state.questions} index={state.index} onJump={jump} scroll />
       </div>
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <QuestionView question={current} number={state.index + 1} dispatch={(action) => act(action)} />
-          <div className="border-neutral-150 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-neutral-50 p-4">
-            <button
-              type="button"
-              disabled={state.index === 0}
-              onClick={() => act({ type: 'go', index: state.index - 1 }, true)}
-              className="text-brand flex items-center gap-2 text-[14px] font-semibold disabled:opacity-40"
-            >
-              <ArrowLeft aria-hidden className="size-4" /> Previous
-            </button>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => act({ type: 'toggle-review', questionId: current.question_id })}
-                aria-pressed={marked}
-                className={cx('flex items-center gap-2 rounded-md border px-4 py-2 text-[14px] font-semibold', marked ? 'bg-brand-50 border-brand text-brand' : 'bg-surface border-neutral-150 text-neutral-700')}
-              >
-                <Bookmark aria-hidden className="size-4" />
-                {marked ? 'Unmark review' : 'Mark for review'}
-              </button>
-              {isLast ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    dispatch({ type: 'leave', questionId: current.question_id });
-                    handleSubmit();
-                  }}
-                  className="bg-brand text-on-brand rounded-md px-5 py-2 text-[14px] font-semibold"
-                >
-                  Submit Test
-                </button>
-              ) : (
-                <button type="button" onClick={() => act({ type: 'go', index: state.index + 1 }, true)} className="bg-brand text-on-brand flex items-center gap-2 rounded-md px-5 py-2 text-[14px] font-semibold">
-                  Save &amp; Next <ArrowRight aria-hidden className="size-4" />
-                </button>
-              )}
-            </div>
-          </div>
+      <div className="flex flex-1 flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <QuestionView
+            key={current.question_id}
+            question={current}
+            number={state.index + 1}
+            isLast={isLast}
+            hasPrevious={state.index > 0}
+            dispatch={(action) => act(action)}
+            // Skip and Save & Next both leave the question (an unanswered one turns "skipped") and move on.
+            onSkip={() => (isLast ? dispatch({ type: 'leave', questionId: current.question_id }) : act({ type: 'go', index: state.index + 1 }, true))}
+            onNext={() => act({ type: 'go', index: state.index + 1 }, true)}
+            onPrevious={() => act({ type: 'go', index: state.index - 1 }, true)}
+            onMark={() => act({ type: 'toggle-review', questionId: current.question_id })}
+            onSubmit={submitNow}
+          />
         </div>
         <div className="hidden w-full shrink-0 flex-col gap-6 lg:flex lg:w-[413px]">
           <Legend questions={state.questions} />

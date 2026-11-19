@@ -1,6 +1,6 @@
 'use client';
 
-import { findExam, REFERENCE, type ExamConfig } from '@/shared/config/exams';
+import { examDesignFor, REFERENCE, type ExamConfig } from '@/shared/config/exams';
 import { ExamProvider } from '@/shared/hooks/use-exam';
 import { AppHeader } from '@/shared/layout/app-header';
 import { PageSpinner } from '@/shared/layout/status-screens';
@@ -16,9 +16,8 @@ import { useCheckoutExam } from '../hooks';
 export function CheckoutChrome({ children }: { children: React.ReactNode }) {
   const selection = useCheckoutExam();
   const account = useAccountExam();
-  const design = selection.exam ? findExam(selection.exam.examSlice) : null;
-  const selected: ExamConfig | null =
-    selection.exam && design && design.category === selection.exam.category ? { ...design, examId: selection.exam.examId } : null;
+  const design = selection.exam ? examDesignFor(selection.exam) : null;
+  const selected: ExamConfig | null = selection.exam && design ? { ...design, examId: selection.exam.examId } : null;
   const exam = selected ?? account.exam;
 
   // The checkout shows its own error screen when the exam list fails.

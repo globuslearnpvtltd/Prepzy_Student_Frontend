@@ -83,8 +83,10 @@ export const designConfig = defineDesignConfig({
       info: {
         50: '#E3EDFC',
         25: '#F6F9FE', // board exam player: status tiles, question header
+        200: '#91B1FA', // "no plan for this exam" modal: sparkles
         400: '#4285F4', // course progress gradient end
         600: '#1363DF',
+        650: '#3367D6', // "no plan for this exam" modal: Upgrade Now hover
         700: '#1158C5', // board exam player: section pills, Save & Next
       },
       // Dark "Ask Socrates" card (NEET dashboard).
@@ -93,6 +95,13 @@ export const designConfig = defineDesignConfig({
         800: '#171029',
         900: '#0C0918',
         950: '#0A0A0D', // learn: video player backdrop
+      },
+      // Lecture video player (previous app's LectureVideoPlayer): stage, scrims, centre icon, menus.
+      player: {
+        stage: '#0A0A0D', // frame behind the 16:9 stage
+        ink: '#000000', // video letterbox, scrims, menus, duration pill
+        accent: '#4338CA', // centre play / pause / replay icon, "Try again"
+        active: '#A5B4FC', // selected language in the menu
       },
       // proposed status colours
       success: { 50: '#ECFDF3', 100: '#DCFCE7', 300: '#32D583', 350: '#25D366', 400: '#22C55E', 450: '#2FA36B', 500: '#10B981', 600: '#039855', 700: '#16A34A' },
@@ -239,6 +248,65 @@ export const designConfig = defineDesignConfig({
         error: '#FF0101', // login error box
       },
       // Doubt solver (Socrates) and Atlas chat.
+      // NEET dashboard "Today's DPP" card (previous app's DailyDPPCard).
+      dpp: {
+        card: '#F7F7FB', // card background
+        glow: '#6A5FC3', // pencil circle gradient end
+        title: '#0F172A', // "Today's DPP"
+        muted: '#64748B', // "Day n", "Questions answered"
+        count: '#94A3B8', // "3 / 20"
+        track: '#E2E8F0', // progress track
+        timer: '#EA580C', // timer icon tile, digits, progress fill (50%)
+        'timer-soft': '#FDE7D9', // timer pill
+        left: '#F26419', // "Left" (80%)
+        done: '#16A34A', // "Attempted"
+        'done-soft': '#DCFCE7',
+        chip: '#ECEAFB', // subject chips
+        dot: '#C9C3ED', // decorative dots
+        hover: '#332B75', // Start Now: hover
+        active: '#2A2361', // Start Now: pressed
+      },
+      // Board custom test: "Test Generated Successfully!" modal (previous app's CustomExamCreationSuccessModal).
+      generated: {
+        deep: '#2C2564', // header gradient end
+        ring: '#6158B1', // icon circles on the purple
+        tint: '#F3E8FF', // header subtitle
+        line: '#ECEAF5', // summary card border
+        soft: '#F9F8FC', // summary card background
+        label: '#6A7282', // small labels
+        primary: '#4F4793', // difficulty pill, Take Test Now
+        count: '#443E7B', // topics count
+        chip: '#F2F1F8', // topics icon circle
+        hint: '#E9D5FF', // Take Test Now subtitle
+        border: '#EBEAF5', // Save for Later border
+        scrim: '#000000', // backdrop behind the modal (30%, blurred)
+      },
+      // Dashboard diagnostic journey card (previous app's DiagnosticCardArt + MobileNotebookCard).
+      journey: {
+        paper: '#E7E5F5', // ruled lines, back clipboard sheet
+        ink: '#FF9A1A', // margin line, underline, ticks, sparkles
+        check: '#E0DEF3', // clipboard answer bars
+        clip: '#9790D5', // clipboard clip, star doodle
+        hole: '#F1F1F8', // binder holes
+        'hole-ring': '#EEECF8', // binder hole outline
+        doodle: '#DCDAF1', // zig-zag doodles
+        star: '#BAB5E3', // star doodle, jelly bean
+        border: '#F1F0F9', // card outline
+        rule: '#E7E6F5', // slim card B: doodle strokes
+        warm: '#FFE2BD', // slim cards: amber scribbles
+        'warm-soft': '#FFF4E6', // slim card B: pale amber shapes
+        range: '#474747', // weekly progress: date range
+        line: '#DBDBF0', // weekly progress: card border
+        tile: '#EAE9F7', // weekly progress: day tile border
+      },
+      // Dashboard welcome / plan card, half form (previous app's WelcomeCard + WelcomeCardArt tones).
+      welcome: {
+        pink: '#FFEBEB', // last-day card
+        alert: '#EF4444', // last-day pill
+        muted: '#94A3B8', // subline on the purple card
+        ended: '#FF0000', // "plan ended" pill fill (20%)
+        'ended-line': '#F00000', // "plan ended" pill border (26%)
+      },
       socrates: {
         page: '#F5F4FA', // solver page background
         ink: '#241D52', // headings
@@ -363,6 +431,15 @@ export const designConfig = defineDesignConfig({
         'notice-soft': '#FEF3E7', // info banner
         'notice-text': '#92400E',
         'notice-icon': '#B45309', // banner icon, "SOON" badge
+        // Class setup (previous app's CbseSetupComponent): page, top bar, picked card, captions, stream icons.
+        'class-page': '#F9F8FE',
+        'class-bar': '#EEEDF5', // top bar bottom border
+        'class-pick': '#ECE8FB', // selected class / stream card
+        'class-muted': '#6B6B85', // step label, subtitle
+        'class-radio': '#C9C9D6', // unselected stream radio
+        'stream-pcm': '#3B9BE0',
+        'stream-pcb': '#2FA36B',
+        'stream-humanities': '#5B4FD6',
       },
       // My Account (profile), parent, help and support, delete account (previous app's profile pages).
       account: {
@@ -420,8 +497,13 @@ export const designConfig = defineDesignConfig({
       mono: "ui-monospace, SFMono-Regular, Menlo, monospace",
       // Partners portal sign-in / sign-up body text (loaded by app/partners/layout.tsx).
       partner: "var(--font-source-sans), 'Source Sans 3', ui-sans-serif, system-ui, sans-serif",
+      // Board test player (previous app's font-gilroy; loaded by app/(student)/[exam]/(focus)/layout.tsx, which re-declares it).
+      gilroy: "var(--font-gilroy-face), 'Gilroy', var(--font-poppins), ui-sans-serif, sans-serif",
       // Parents portal sign-in: the previous app rendered it in the browser's default sans face.
       plain: 'Arial, Helvetica, sans-serif',
+      // Dashboard journey card (previous app's font-dmSans / font-patrickHand; loaded by the dashboard layout, which re-declares them).
+      notebook: "var(--font-dm-sans-face), 'DM Sans', ui-sans-serif, system-ui, sans-serif",
+      hand: "var(--font-patrick-hand-face), 'Patrick Hand', cursive",
     },
     // [font-size, line-height]
     fontSizes: {
@@ -472,6 +554,11 @@ export const designConfig = defineDesignConfig({
       'bar-up': '0 -2px 10px rgb(0 0 0 / 0.1)',
       raised: '0 6px 14px rgb(61 52 139 / 0.35)',
       'cta-dark': '0 6px 24px 0 rgb(0 0 0 / 0.33)',
+      // Lecture video player
+      'player-button': '0 10px 25px rgb(0 0 0 / 0.35)', // big centre play button
+      'player-spinner': '0 0 20px rgb(0 0 0 / 0.35)',
+      'player-thumb': '0 0 0 3px rgb(67 56 202 / 0.35)', // seek thumb ring
+      'player-frame': '0 25px 60px -20px rgb(0 0 0 / 0.7)', // competitive (NEET) frame
       'socrates-card': '0 8px 25px rgb(61 51 140 / 0.10)', // doubt solver cards
       'socrates-book': '0 8px 18px rgb(31 26 77 / 0.25)', // centred textbook
       'socrates-pick': '0 11px 42px rgb(240 178 64 / 0.55), 0 14px 22px rgb(89 56 10 / 0.26)', // selected textbook
@@ -485,12 +572,23 @@ export const designConfig = defineDesignConfig({
       'voice-cta': '0 6px 14px -8px rgb(79 70 229 / 0.9)', // Vedica "Talk live"
       'voice-live': '0 4px 12px rgb(61 52 139 / 0.25)', // Atlas "Live chat" pill
       'schools-pop': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', // profile dropdown
+      'journey-card': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', // dashboard journey card (previous app's shadow-xl)
+      'journey-cta': '0 8px 18px rgb(255 170 62 / 0.25)', // journey card amber pill
+      'journey-slim': '0 20px 33px -5px rgb(30 30 30 / 0.1), 0 8px 10px -6px rgb(30 30 30 / 0.1)', // phone slim journey card
+      'welcome-cta': '0 4px 12px 0 rgb(0 0 0 / 0.18)', // welcome card (half) upgrade button
       // Student sign-in / onboarding (ported from the previous app)
       'onboarding-form': '0 16px 48px rgb(0 0 0 / 0.175)', // floating form card
+      // NEET "Today's DPP" card (previous app's Tailwind shadow-sm on the card, shadow-md on the pencil circle).
+      'dpp-card': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+      'dpp-icon': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
       'onboarding-field': '0 4px 24px rgb(61 52 139 / 0.18)', // phone field
       'onboarding-field-error': '0 4px 24px rgb(239 68 68 / 0.18)',
       'onboarding-cta': '0 6px 20px rgb(61 52 139 / 0.35)', // mobile submit
       'onboarding-continue': '0 6px 20px rgb(61 52 139 / 0.3)', // exam / setup continue
+      'onboarding-continue-hover': '0 10px 28px rgb(61 52 139 / 0.35)',
+      'onboarding-class-card': '0 6px 18px rgb(61 52 139 / 0.08)', // class card hover
+      'onboarding-class-continue': '0 8px 24px rgb(61 52 139 / 0.25)', // class setup continue
+      'onboarding-class-continue-hover': '0 12px 32px rgb(61 52 139 / 0.35)',
       'onboarding-verify': '0 6px 20px rgb(18 4 120 / 0.28)', // OTP verify
       'onboarding-card': '0 10px 40px rgb(26 18 64 / 0.05)', // OTP card (desktop)
       'onboarding-card-float': '0 12px 32px rgb(26 18 64 / 0.14)', // OTP card over the hero (mobile)

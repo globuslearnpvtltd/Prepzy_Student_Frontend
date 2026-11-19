@@ -63,3 +63,45 @@ describe('ProgressRing', () => {
     expect(screen.getByRole('img', { name: 'Botany: 100%' })).toHaveTextContent('100%');
   });
 });
+
+describe('chart tooltips (previous app: the value on hover)', () => {
+  it('shows each bar\'s value above it, keeping the edge boxes inside the chart', () => {
+    render(
+      <BarChart
+        data={[
+          { name: 'Monday', label: 'M', value: 1.5, display: '1h 30m' },
+          { name: 'Tuesday', label: 'T', value: 0.5, display: '0h 30m' },
+          { name: 'Wednesday', label: 'W', value: 2, display: '2h 0m' },
+        ]}
+        caption="Hours"
+      />,
+    );
+    const tips = screen.getAllByTestId('bar-tooltip');
+    expect(tips.map((t) => t.textContent)).toEqual(['1h 30m', '0h 30m', '2h 0m']);
+    expect(tips[0]!.className).toContain('group-hover:block');
+    expect(tips[0]!.className).toContain('left-0');
+    expect(tips[2]!.className).toContain('right-0');
+  });
+
+  it('shows the subject and every series value for a hovered column', () => {
+    render(
+      <LineChart
+        categories={['Physics', 'Chemistry']}
+        series={[
+          { name: 'Previous Attempt', values: [40, 55], tone: 'light' },
+          { name: 'Current Attempt', values: [60, 70.4], tone: 'strong' },
+        ]}
+        caption="Scores"
+      />,
+    );
+    const zones = screen.getAllByTestId('line-hover');
+    expect(zones).toHaveLength(2);
+    expect(zones[0]!.style.left).toBe('0%');
+    expect(zones[1]!.style.width).toBe('50%');
+    const tips = screen.getAllByTestId('line-tooltip');
+    expect(tips[1]).toHaveTextContent('Subject: Chemistry');
+    expect(tips[1]).toHaveTextContent('Previous Attempt: 55%');
+    expect(tips[1]).toHaveTextContent('Current Attempt: 70%');
+    expect(tips[1]!.className).toContain('group-hover:flex');
+  });
+});

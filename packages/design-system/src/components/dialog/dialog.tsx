@@ -8,10 +8,18 @@ export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
-export function DialogContent({ className, children, ...props }: ComponentProps<typeof DialogPrimitive.Content>) {
+export function DialogContent({
+  className,
+  overlayClassName,
+  children,
+  ...props
+}: ComponentProps<typeof DialogPrimitive.Content> & {
+  /** Extra classes for the backdrop (e.g. `backdrop-blur-sm` to blur the page behind). */
+  overlayClassName?: string;
+}) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className={componentClass('dialog', 'overlay')} />
+      <DialogPrimitive.Overlay className={cx(componentClass('dialog', 'overlay'), overlayClassName)} />
       <DialogPrimitive.Content className={cx(componentClass('dialog', 'content'), className)} {...props}>
         {children}
       </DialogPrimitive.Content>

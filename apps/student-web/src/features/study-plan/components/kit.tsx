@@ -17,7 +17,12 @@ export function Notice({
   const button = 'bg-brand text-on-brand hover:bg-brand-hover rounded-md px-6 py-2.5 text-sm font-semibold';
   return (
     <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
-      <span className={cx('flex size-16 items-center justify-center rounded-full', tone === 'danger' ? 'bg-danger-soft' : 'bg-neutral-100')}>
+      <span
+        className={cx(
+          'flex size-16 items-center justify-center rounded-full',
+          tone === 'danger' ? 'bg-danger-soft' : 'bg-neutral-100',
+        )}
+      >
         <AlertTriangle aria-hidden className={cx('size-7', tone === 'danger' ? 'text-danger' : 'text-neutral-350')} />
       </span>
       <h1 className="text-lg font-bold text-neutral-950">{title}</h1>
@@ -48,8 +53,17 @@ export function ScreenLoader({ message, sub }: { message: string; sub: string })
 }
 
 /** Round back button: outlined chevron on phones, soft purple arrow on desktop. */
-export function BackButton({ onClick, href, label = 'Go back' }: { onClick?: () => void; href?: string; label?: string }) {
-  const mobile = 'border-info-50 bg-surface text-neutral-850 flex size-10 shrink-0 items-center justify-center rounded-full border-2 hover:opacity-80 md:hidden';
+export function BackButton({
+  onClick,
+  href,
+  label = 'Go back',
+}: {
+  onClick?: () => void;
+  href?: string;
+  label?: string;
+}) {
+  const mobile =
+    'border-info-50 bg-surface text-neutral-850 flex size-10 shrink-0 items-center justify-center rounded-full border-2 hover:opacity-80 md:hidden';
   const desktop =
     'border-brand-175 bg-brand-125 text-brand hidden size-10 shrink-0 items-center justify-center rounded-full border shadow-[0px_8px_20px_rgba(61,52,139,0.06)] hover:opacity-80 md:flex';
   const content = (
@@ -81,9 +95,23 @@ export function BackButton({ onClick, href, label = 'Go back' }: { onClick?: () 
   );
 }
 
-export function Breadcrumb({ dashboardHref, current, className }: { dashboardHref: string; current: string; className?: string }) {
+export function Breadcrumb({
+  dashboardHref,
+  current,
+  className,
+}: {
+  dashboardHref: string;
+  current: string;
+  className?: string;
+}) {
   return (
-    <nav aria-label="Breadcrumb" className={cx('border-neutral-150 bg-surface flex w-full items-center gap-[10px] rounded-md border px-[21px] py-[18px]', className)}>
+    <nav
+      aria-label="Breadcrumb"
+      className={cx(
+        'border-neutral-150 bg-surface flex w-full items-center gap-[10px] rounded-md border px-[21px] py-[18px]',
+        className,
+      )}
+    >
       <Link href={dashboardHref} className="text-brand text-[14px] font-bold hover:opacity-70">
         Dashboard
       </Link>
@@ -94,7 +122,17 @@ export function Breadcrumb({ dashboardHref, current, className }: { dashboardHre
 }
 
 /** Count inside a ring that fills with progress (0–1). */
-export function ProgressRing({ value, progress, size, stroke }: { value: number; progress: number; size: number; stroke: number }) {
+export function ProgressRing({
+  value,
+  progress,
+  size,
+  stroke,
+}: {
+  value: number;
+  progress: number;
+  size: number;
+  stroke: number;
+}) {
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   return (

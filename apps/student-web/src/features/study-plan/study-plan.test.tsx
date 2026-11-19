@@ -214,6 +214,11 @@ describe('creating a study plan', () => {
     expect(screen.getByRole('button', { name: 'Build my Plan' })).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Target/), '01011999');
     expect(screen.getByText(/That date isn't valid/)).toBeInTheDocument();
+    // The calendar opens above the wizard (portalled to <body>), so the wizard's scroll area can't clip it.
+    await userEvent.click(screen.getByRole('button', { name: 'Open calendar' }));
+    expect(screen.getByRole('dialog', { name: 'Choose a date' }).closest('[aria-modal="true"]')).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Choose a date' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Open calendar' }));
     const picker = screen.getByRole('dialog', { name: 'Choose a date' });
     await userEvent.click(within(picker).getByRole('button', { name: 'Next month' }));
@@ -298,8 +303,9 @@ describe('JourneyCard', () => {
       ),
     );
     renderWithProviders(<JourneyCard />, { exam: cbse });
-    expect(await screen.findByRole('link', { name: /Start today's tasks/ })).toHaveAttribute('href', '/cbse/study-plan');
-    expect(screen.getByText('1/2')).toBeInTheDocument();
+    const start = await screen.findAllByRole('link', { name: "Start today's task" });
+    for (const link of start) expect(link).toHaveAttribute('href', '/cbse/study-plan');
+    expect(screen.getByText('1 of 2 tasks Left')).toBeInTheDocument();
   });
 
   it('renders nothing without journey data', async () => {

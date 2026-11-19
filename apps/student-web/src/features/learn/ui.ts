@@ -6,3 +6,5 @@ export { ModuleScreen } from './components/module-screen';
 export { LectureScreen } from './components/lecture-screen';
 export { ChapterPyqsScreen, NcertQuestionsScreen } from './components/question-screens';
 export { CourseDetailScreen, CoursesScreen } from './components/courses-screens';
+export { LectureVideoPlayer } from './components/lazy-video-player';
+export type { LectureVideoPlayerProps, PlayerVariant } from './components/lecture-video-player';

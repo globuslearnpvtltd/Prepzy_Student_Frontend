@@ -22,6 +22,9 @@ describe('middleware', () => {
     expect(run('/login', { accessToken: 't', prepzy_exam: 'neet' })).toBe('https://app.prepzy.ai/neet/dashboard');
     expect(run('/login', { accessToken: 't' })).toBe('https://app.prepzy.ai/cbse/dashboard');
     expect(run('/login?exam=neet-ug', { accessToken: 't' })).toBe('https://app.prepzy.ai/neet/dashboard');
+    // Any exam's slice works (the exam layout 404s one that is not active); junk falls back to the default exam.
+    expect(run('/login', { accessToken: 't', prepzy_exam: 'jee-main' })).toBe('https://app.prepzy.ai/jee-main/dashboard');
+    expect(run('/login', { accessToken: 't', prepzy_exam: '../x' })).toBe('https://app.prepzy.ai/cbse/dashboard');
   });
 
   it('keeps onboarding steps reachable while the session is being created', () => {

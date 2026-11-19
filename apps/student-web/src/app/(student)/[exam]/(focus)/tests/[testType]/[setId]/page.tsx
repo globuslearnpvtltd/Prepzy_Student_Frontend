@@ -11,7 +11,7 @@ export default async function TestPlayerPage({
   params: Promise<{ exam: string; testType: string; setId: string }>;
 }) {
   const { exam, testType, setId } = await params;
-  const type = resolveTestType(exam, testType);
+  const type = await resolveTestType(exam, testType);
   if (!type) notFound();
   return <ExamPlayer testType={type} setId={setId} />;
 }

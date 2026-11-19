@@ -9,9 +9,12 @@ import { RichText } from './rich-text';
 
 const EMPTY_WRITTEN: WrittenAnswer = { text: '', images: [] };
 
-/** Option tiles in the board player: light blue cards with a radio circle (previous app's McqOptions). */
+/**
+ * Option tiles in the board player (previous app's McqOptions): light blue cards with a 24px radio circle; the chosen one
+ * turns solid blue with white bold text and a white ringed circle.
+ */
 const boardOption =
-  'bg-info-25 border-info-50 min-h-[70px] rounded-[10px] px-6 data-[state=checked]:border-info-700 data-[state=checked]:bg-info-50 [&>span:first-child]:size-5 [&>span:first-child]:border [&>span:first-child]:border-neutral-300 [&>span:first-child]:bg-surface data-[state=checked]:[&>span:first-child]:border-[6px] data-[state=checked]:[&>span:first-child]:border-info-700';
+  'bg-info-25 border-info-50 text-neutral-850 rounded-[14px] border-[1.5px] px-6 py-[22px] text-[16px] leading-4 font-medium transition-all duration-300 ease-in-out data-[state=checked]:border-info-700 data-[state=checked]:bg-info-600 data-[state=checked]:text-on-brand data-[state=checked]:font-bold [&>span:first-child]:size-6 [&>span:first-child]:border-[1.5px] [&>span:first-child]:border-neutral-300 [&>span:first-child]:bg-surface data-[state=checked]:[&>span:first-child]:border-[6px] data-[state=checked]:[&>span:first-child]:border-surface data-[state=checked]:[&>span:first-child]:bg-info-700';
 
 /**
  * One question. `look` follows the exam category's player: board papers show "1. question" on a blue header
@@ -24,6 +27,7 @@ export function QuestionView({
   onAnswer,
   look = 'competitive',
   draftKey,
+  partIndex,
 }: {
   question: ExamQuestion;
   number: number;
@@ -32,24 +36,39 @@ export function QuestionView({
   look?: Exclude<ExamCategory, 'reference'>;
   /** This attempt + question: handwriting drafts of written answers are kept per question. */
   draftKey?: string;
+  /**
+   * Multipart (case based, unseen passage …): show only this sub-question under the passage, the previous app's
+   * board player (one sub-question at a time). Without it every part is listed.
+   */
+  partIndex?: number;
 }) {
   const headingId = useId();
   const board = look === 'board';
   return (
     <article aria-labelledby={headingId} className="flex flex-col">
       {board ? (
-        <header className="bg-info-25 border-info-50 flex flex-col gap-3 border-b px-6 py-6">
+        <header
+          className={cx(
+            'border-info-50 flex flex-col gap-3 border-b-2 p-6',
+            question.typeLabel === 'Case based' ? 'bg-surface' : 'bg-info-25',
+          )}
+        >
           <h2 id={headingId} className="sr-only">
             Question {number}
           </h2>
-          <div className="flex gap-2 text-[16px] leading-6">
-            <span className="text-foreground font-semibold" aria-hidden>
+          {/* Previous app's ExamQuestionCard heading: "1." and the question in 20px bold (18px on phones). */}
+          <div className="text-neutral-850 flex items-baseline gap-2 font-bold">
+            <span className="text-[20px] leading-5" aria-hidden>
               {number}.
             </span>
-            <RichText html={question.html} className="text-brand-950 min-w-0 flex-1" />
+            <RichText
+              html={question.html}
+              className="min-w-0 flex-1 text-[18px] leading-6 md:text-[20px] md:leading-[26px]"
+            />
           </div>
+          {/* Question type and marks (kept from the rebuild, user decision), lined up under the question text. */}
           {question.marks !== null && (
-            <p className="text-foreground-muted text-xs font-medium">
+            <p className="m-0 pl-[26px] text-[13px] leading-4 font-medium text-neutral-500">
               {question.typeLabel} · {question.marks} {question.marks === 1 ? 'mark' : 'marks'}
             </p>
           )}
@@ -79,13 +98,15 @@ export function QuestionView({
         {question.kind === 'mcq' && (
           <>
             {!board && (
-              <p className="text-sm font-medium text-neutral-800">Choose the correct answer from the options given below:</p>
+              <p className="text-sm font-medium text-neutral-800">
+                Choose the correct answer from the options given below:
+              </p>
             )}
             <OptionGroup
               aria-labelledby={headingId}
               value={answer?.kind === 'option' ? answer.optionId : ''}
               onValueChange={(optionId) => onAnswer({ kind: 'option', optionId })}
-              className={board ? 'gap-[18px]' : 'gap-4'}
+              className={board ? 'gap-[17px]' : 'gap-4'}
             >
               {question.options.map((option, i) => (
                 <OptionTile
@@ -119,7 +140,19 @@ export function QuestionView({
           />
         )}
 
+        {question.kind === 'multipart' && partIndex !== undefined && question.parts[partIndex] && (
+          <SubQuestion
+            key={question.parts[partIndex].id}
+            question={question}
+            index={partIndex}
+            answer={answer}
+            onAnswer={onAnswer}
+            draftKey={draftKey}
+          />
+        )}
+
         {question.kind === 'multipart' &&
+          partIndex === undefined &&
           question.parts.map((part, i) => {
             const parts = answer?.kind === 'parts' ? answer.parts : {};
             const letter = String.fromCharCode(97 + i);
@@ -127,7 +160,9 @@ export function QuestionView({
               <section key={part.id} className="border-info-50 flex flex-col gap-3 rounded-[14px] border-[1.5px] p-4">
                 <p className="text-sm font-semibold">
                   Part {letter}
-                  {part.marks !== null && <span className="text-foreground-muted font-normal"> · {part.marks} marks</span>}
+                  {part.marks !== null && (
+                    <span className="text-foreground-muted font-normal"> · {part.marks} marks</span>
+                  )}
                 </p>
                 <RichText html={part.html} />
                 {part.image && (
@@ -145,5 +180,55 @@ export function QuestionView({
           })}
       </div>
     </article>
+  );
+}
+
+/** One sub-question of a multipart question (previous app's CaseBasedAnswerBox): "1. text", its picture and the answer. */
+function SubQuestion({
+  question,
+  index,
+  answer,
+  onAnswer,
+  draftKey,
+}: {
+  question: ExamQuestion;
+  index: number;
+  answer: Answer | undefined;
+  onAnswer: (answer: Answer | null) => void;
+  draftKey?: string;
+}) {
+  const part = question.parts[index]!;
+  const parts = answer?.kind === 'parts' ? answer.parts : {};
+  return (
+    <section aria-label={`Sub-question ${index + 1} of ${question.parts.length}`} className="flex flex-col gap-4">
+      <div
+        className={cx(
+          'border-info-50 text-neutral-850 flex flex-col gap-2 border-[1.5px] border-b-2 p-6 font-bold',
+          question.typeLabel === 'Case based' ? 'bg-surface' : 'bg-info-25',
+        )}
+      >
+        <div className="flex items-baseline gap-2">
+          <span className="text-[20px] leading-5" aria-hidden>
+            {index + 1}.
+          </span>
+          <RichText html={part.html} className="min-w-0 flex-1 text-[18px] leading-6 md:text-[20px] md:leading-[26px]" />
+        </div>
+        {part.marks !== null && (
+          <p className="m-0 pl-[26px] text-[13px] leading-4 font-medium text-neutral-500">
+            {part.marks} {part.marks === 1 ? 'mark' : 'marks'}
+          </p>
+        )}
+      </div>
+      {part.image && (
+        // eslint-disable-next-line @next/next/no-img-element -- backend images from arbitrary CDNs
+        <img src={part.image} alt="" className="max-h-[100px] max-w-[150px] object-contain" loading="lazy" />
+      )}
+      <AnswerBox
+        label={`Answer for sub-question ${index + 1}`}
+        inkDraftKey={draftKey && `${draftKey}:${part.id}`}
+        value={parts[part.id] ?? EMPTY_WRITTEN}
+        onChange={(value) => onAnswer({ kind: 'parts', parts: { ...parts, [part.id]: value } })}
+      />
+    </section>
   );
 }

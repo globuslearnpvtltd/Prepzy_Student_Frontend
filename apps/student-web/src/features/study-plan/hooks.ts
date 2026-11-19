@@ -35,6 +35,12 @@ export function useJourney(classId: number | null) {
   return useQuery({ queryKey: studyPlanKeys.journey(classId), queryFn: () => studyPlanApi.journey(classId!), enabled: !!classId });
 }
 
+/** The dashboard journey card of the current class (shared by the card and the dashboard hero row). */
+export function useDashboardJourney() {
+  const { classId } = useClassContext();
+  return useJourney(classId);
+}
+
 /** Chapters of the class. The exam's category comes from the class context (callers pass that context's exam id). */
 export function useSyllabus(classId: number | null, examId: number) {
   const { exam } = useClassContext();

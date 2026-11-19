@@ -1,52 +1,97 @@
 'use client';
 
-import { cx } from '@prepzy/design-system';
-import { ArrowRight, ClipboardCheck, Flag } from 'lucide-react';
-import Link from 'next/link';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
-import type { Journey } from '../api';
-import { useClassContext, useJourney } from '../hooks';
+import type { Journey, JourneyState } from '../api';
+import { useDashboardJourney } from '../hooks';
+import { DiagnosticCardArt } from './diagnostic-card-art';
+import { FinishLineCard } from './finish-line-card';
+import { MobileNotebookCard, MobileSlimCard } from './mobile-notebook-card';
+import { SlimCardShellA, SlimCardShellB } from './slim-card-shells';
+import { WeeklyProgressCard } from './weekly-progress-card';
 
 interface CardCopy {
   lead: string;
   hand: string;
   body?: string;
+  /** The body as the desktop artwork breaks it into lines (previous app's DiagnosticCardArt). */
+  bodyLines?: string[];
   cta: string;
   href: string;
   art?: 'clipboard' | 'finish';
   secondary?: { label: string; href: string };
 }
 
+const lines = (...bodyLines: string[]) => ({ body: bodyLines.join(' '), bodyLines });
+
+/** States the previous app drew as the notebook artwork (desktop DiagnosticCardArt, phone MobileNotebookCard). */
+const NOTEBOOK_STATES = new Set<JourneyState>(['take_diagnostic', 'resume_diagnostic', 'plan_ended']);
+
+/** Slim cards: shell A (inline on phones) for task counts, shell B (stacked on phones) for the rest. */
+const SLIM_A = new Set<JourneyState>(['tasks_partial', 'tasks_done', 'catch_up']);
+const SLIM_B = new Set<JourneyState>(['build_plan', 'rest_day', 'halfway']);
+
 /** Copy and destination for each journey state (previous dashboard JourneyCard). */
 export function journeyCopy(data: Journey, exam: string): CardCopy | null {
   const plan = routes.studyPlan(exam);
   switch (data.state) {
     case 'take_diagnostic':
-      return { lead: 'Take a', hand: 'Diagnostic Test', body: 'Find your current level and get a personalized study plan', cta: 'Start Diagnostic Test', href: routes.diagnostic(exam), art: 'clipboard' };
+      return {
+        lead: 'Take a',
+        hand: 'Diagnostic Test',
+        ...lines('Find your current level and get a', 'personalized study plan'),
+        cta: 'Start Diagnostic Test',
+        href: routes.diagnostic(exam),
+        art: 'clipboard',
+      };
     case 'resume_diagnostic':
       return {
         lead: 'Finish your',
         hand: 'Diagnostic Test',
-        body: 'The timer is still running — pick up exactly where you left off',
+        ...lines('The timer is still running — pick up', 'exactly where you left off'),
         cta: 'Resume Test',
         href: data.assessmentId ? routes.diagnosticTest(exam, data.assessmentId) : routes.diagnostic(exam),
         art: 'clipboard',
       };
     case 'build_plan':
-      return { lead: 'Your next steps just got clearer', hand: 'STUDY PLAN IS READY!', cta: 'Build My Plan', href: routes.studyPlanChapters(exam) };
+      return {
+        lead: 'Your next steps just got clearer',
+        hand: 'STUDY PLAN IS READY!',
+        cta: 'Build My Plan',
+        href: routes.studyPlanChapters(exam),
+      };
     case 'weekly_progress':
-      return { lead: 'This week', hand: 'Your study plan', cta: "Start today's tasks", href: plan };
+      return { lead: 'This week', hand: 'Your study plan', cta: "Start today's task", href: plan };
     case 'tasks_partial':
-      return { lead: 'You have completed', hand: `${data.completedCount} of ${data.taskCount} tasks`, cta: 'Continue task', href: plan };
+      return {
+        lead: 'You have completed',
+        hand: `${data.completedCount} of ${data.taskCount} tasks`,
+        cta: 'Continue task',
+        href: plan,
+      };
     case 'tasks_done':
-      return { lead: 'You have completed all', hand: `${data.taskCount} tasks for today`, cta: 'View next day', href: plan };
+      return {
+        lead: 'You have completed all',
+        hand: `${data.taskCount} tasks for today`,
+        cta: 'View next day',
+        href: plan,
+      };
     case 'rest_day':
       return { lead: 'Nothing scheduled today', hand: 'ENJOY YOUR REST DAY!', cta: 'Preview tomorrow', href: plan };
     case 'catch_up':
-      return { lead: 'Waiting from earlier days', hand: `${data.missedTasks} tasks to catch up`, cta: 'Catch up now', href: plan };
+      return {
+        lead: 'Waiting from earlier days',
+        hand: `${data.missedTasks} tasks to catch up`,
+        cta: 'Catch up now',
+        href: plan,
+      };
     case 'halfway':
-      return { lead: 'You’ve already covered', hand: 'HALF THE PLAN for your study plan!', cta: 'Keep Going', href: plan };
+      return {
+        lead: 'You’ve already covered',
+        hand: 'HALF THE PLAN for your study plan!',
+        cta: 'Keep Going',
+        href: plan,
+      };
     case 'plan_complete':
       return {
         lead: 'You’ve Reached',
@@ -55,13 +100,15 @@ export function journeyCopy(data: Journey, exam: string): CardCopy | null {
         cta: 'Keep Going',
         href: plan,
         art: 'finish',
-        secondary: data.canRetakeDiagnostic ? { label: 'Retake Diagnostic Test', href: routes.diagnostic(exam) } : undefined,
+        secondary: data.canRetakeDiagnostic
+          ? { label: 'Retake Diagnostic Test', href: routes.diagnostic(exam) }
+          : undefined,
       };
     case 'plan_ended':
       return {
         lead: 'Your plan has ended',
         hand: `${data.remainingTasks} tasks left`,
-        body: 'Finish what is left, or start fresh with a new diagnostic test',
+        ...lines('Finish what is left, or start fresh', 'with a new diagnostic test'),
         cta: 'Open My Plan',
         href: plan,
         art: 'clipboard',
@@ -72,70 +119,93 @@ export function journeyCopy(data: Journey, exam: string): CardCopy | null {
 }
 
 /** Ruled notebook paper with a red margin line, as on the previous journey cards. */
-const paper =
-  'bg-surface bg-[repeating-linear-gradient(to_bottom,transparent_0_34px,var(--color-brand-75)_34px_35px)] relative overflow-hidden rounded-2xl border border-neutral-150 shadow-lg';
-
-function WeekStrip({ week }: { week: Journey['week'] }) {
-  if (!week.length) return null;
-  return (
-    <div className="flex gap-2">
-      {week.map((day) => (
-        <span
-          key={day.date || day.label}
-          className={cx(
-            'flex min-w-0 flex-1 flex-col items-center gap-1 rounded-md border py-2 text-[11px] font-semibold',
-            day.isToday ? 'border-brand bg-brand-50 text-brand' : 'border-neutral-150 text-neutral-500',
-          )}
-        >
-          {day.label}
-          <span className={cx('text-[12px] font-bold', day.total > 0 && day.done >= day.total ? 'text-success-700' : 'text-neutral-900')}>
-            {day.isRest ? '—' : `${day.done}/${day.total}`}
-          </span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/** Dashboard card that sends the student to the next step of the diagnostic → study plan journey. */
-export function JourneyCard() {
+/**
+ * Dashboard card that sends the student to the next step of the diagnostic → study plan journey, drawn as the
+ * previous app's JourneyCard did. Phone and desktop versions are both rendered and switched by CSS (md, the
+ * previous useIsMobile breakpoint), so there is no hydration flash.
+ */
+export function JourneyCard({ className }: { className?: string }) {
   const exam = useExam();
-  const { classId } = useClassContext();
-  const journey = useJourney(classId);
+  const journey = useDashboardJourney();
   if (!journey.data) return null;
   const copy = journeyCopy(journey.data, exam.slug);
   if (!copy) return null;
-  const Art = copy.art === 'finish' ? Flag : ClipboardCheck;
-  return (
-    <section aria-label="Your study journey" className={paper}>
-      <span aria-hidden className="bg-danger/40 absolute inset-y-0 left-10 w-[2px]" />
-      <div className="relative flex flex-col gap-4 py-6 pr-6 pl-14 md:flex-row md:items-center md:justify-between">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-[14px] font-medium text-neutral-650">{copy.lead}</span>
-          <span className="font-display text-brand text-[28px] leading-8 font-bold tracking-[1px]">{copy.hand}</span>
-          {copy.body && <span className="max-w-[360px] text-[13px] leading-5 text-neutral-600">{copy.body}</span>}
-          {journey.data.state === 'weekly_progress' && <WeekStrip week={journey.data.week} />}
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Link
+  const { state } = journey.data;
+
+  const body = (() => {
+    if (NOTEBOOK_STATES.has(state)) {
+      return (
+        <>
+          <MobileNotebookCard
+            art="clipboard"
+            lead={copy.lead}
+            hand={copy.hand}
+            body={copy.body ?? ''}
+            ctaLabel={copy.cta}
+            href={copy.href}
+            className="md:hidden"
+          />
+          <div className="shadow-journey-card hidden w-full max-w-[553px] rounded-[24px] md:block">
+            <DiagnosticCardArt
+              className="block h-auto w-full"
+              lead={copy.lead}
+              hand={copy.hand}
+              bodyLines={copy.bodyLines ?? []}
+              ctaLabel={copy.cta}
               href={copy.href}
-              className="bg-accent-400 text-on-brand flex items-center gap-2 rounded-full px-5 py-2.5 text-[14px] font-semibold shadow-[0px_8px_18px_rgba(255,170,62,0.25)] hover:opacity-90"
-            >
-              {copy.cta}
-              <ArrowRight aria-hidden className="size-4" />
-            </Link>
-            {copy.secondary && (
-              <Link href={copy.secondary.href} className="border-accent-400 text-accent-700 rounded-full border px-5 py-2.5 text-[14px] font-semibold hover:bg-accent-50">
-                {copy.secondary.label}
-              </Link>
-            )}
+            />
           </div>
+        </>
+      );
+    }
+    if (SLIM_A.has(state) || SLIM_B.has(state)) {
+      const Shell = SLIM_A.has(state) ? SlimCardShellA : SlimCardShellB;
+      return (
+        <>
+          <MobileSlimCard
+            layout={SLIM_A.has(state) ? 'inline' : 'stacked'}
+            lead={copy.lead}
+            hand={copy.hand}
+            ctaLabel={copy.cta}
+            href={copy.href}
+            className="md:hidden"
+          />
+          <div className="shadow-journey-card hidden w-full rounded-[24px] md:block">
+            <Shell
+              className="block h-auto w-full"
+              lead={copy.lead}
+              hand={copy.hand}
+              ctaLabel={copy.cta}
+              href={copy.href}
+            />
+          </div>
+        </>
+      );
+    }
+    if (state === 'weekly_progress') return <WeeklyProgressCard week={journey.data.week} href={copy.href} />;
+    // plan_complete
+    return (
+      <>
+        <MobileNotebookCard
+          art="finish"
+          lead={copy.lead}
+          hand={copy.hand}
+          body={copy.body ?? ''}
+          ctaLabel={copy.cta}
+          href={copy.href}
+          secondary={copy.secondary}
+          className="md:hidden"
+        />
+        <div className="hidden w-full md:block">
+          <FinishLineCard href={copy.href} retakeHref={copy.secondary?.href} />
         </div>
-        {copy.art && (
-          <span aria-hidden className="bg-brand-100 text-brand hidden size-24 shrink-0 rotate-6 items-center justify-center rounded-md md:flex">
-            <Art className="size-12" />
-          </span>
-        )}
-      </div>
+      </>
+    );
+  })();
+
+  return (
+    <section aria-label="Your study journey" className={className}>
+      {body}
     </section>
   );
 }

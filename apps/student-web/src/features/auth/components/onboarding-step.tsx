@@ -7,18 +7,30 @@ import { HERO_GRADIENT, Waves } from './auth-screen';
 /** Steps of the sign-up flow (phone, OTP, exam, setup, …) shown by the progress dashes. */
 export const SIGNUP_STEPS = 5;
 
-/** "‹ Back" link at the top of an onboarding step: grey on the page, white on the mobile hero. */
-export function BackLink({ href, onBrand = false }: { href: string; onBrand?: boolean }) {
-  return (
-    <Link
-      href={href}
-      replace
-      className={`flex items-center gap-1 text-[13px] font-semibold ${
-        onBrand ? 'text-on-brand' : 'text-foreground-soft hover:text-brand transition-colors'
-      }`}
-    >
+/**
+ * "‹ Back" at the top of an onboarding step: grey on the page, white on the mobile hero. A link to the previous page,
+ * or a button (`onClick`) for a step inside the same page (e.g. back from the bundle choice to the target year).
+ */
+export function BackLink({ href, onClick, onBrand = false }: { href?: string; onClick?: () => void; onBrand?: boolean }) {
+  const className = `flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-[13px] font-semibold ${
+    onBrand ? 'text-on-brand' : 'text-foreground-soft hover:text-brand transition-colors'
+  }`;
+  const content = (
+    <>
       <ChevronLeft aria-hidden size={16} strokeWidth={2.5} />
       Back
+    </>
+  );
+  if (onClick || !href) {
+    return (
+      <button type="button" onClick={onClick} className={className}>
+        {content}
+      </button>
+    );
+  }
+  return (
+    <Link href={href} replace className={className}>
+      {content}
     </Link>
   );
 }
@@ -62,45 +74,40 @@ export function StepLabel({ step, className }: { step: number; className: string
 }
 
 /**
- * The original's two step layouts (spacing is what it rendered, its Bootstrap utilities included):
- * - `cards`: exam selection and target-year setup — tinted page, centred cards, a 360px Continue button.
- * - `classes`: class setup — white page, left-aligned class cards, a full-width Continue button.
+ * The previous app's two layouts of these steps (exam-selection page and NeetSetupComponent):
+ * - `exam`: exam selection — the page fills the screen on desktop (the cards scroll), 1040px content, the Continue bar
+ *   stays at the bottom.
+ * - `cards`: target-year / bundle setup — 960px content, the Continue button inline on desktop.
  */
 const LAYOUT = {
-  cards: {
-    page: 'bg-onboarding-page',
-    header: 'px-12 py-6',
-    label: 'text-[11px] font-semibold',
-    labelGap: 'gap-2',
-    main: 'items-center px-6 pt-12 pb-32 lg:pb-5',
-    content: 'w-full max-w-[960px] text-center',
-    title: 'text-[34px] leading-[1.2] font-bold',
-    subtitle: 'text-foreground-subtle mt-2 mb-7',
-    footer: 'border-line shadow-onboarding-bar-soft fixed inset-x-0 bottom-0 z-10 border-t p-6 lg:static lg:border-0 lg:shadow-none',
-  },
-  classes: {
-    page: 'bg-surface',
-    header: 'px-10 py-6',
-    label: 'text-[12px] font-bold',
-    labelGap: 'gap-2.5',
-    main: 'px-4 pt-4 pb-24 lg:flex-none lg:pb-0',
-    content: 'w-full lg:mx-auto lg:max-w-[960px]',
-    title: 'text-center text-[38px] leading-[1.18] font-black',
-    subtitle: 'text-onboarding-gold mt-1.5 mb-6 text-center leading-[1.5]',
+  exam: {
+    page: 'bg-onboarding-page min-h-dvh lg:h-dvh lg:min-h-0',
+    main: 'items-center px-4 pt-5 pb-32 lg:min-h-0 lg:overflow-y-auto lg:pt-4 lg:pb-6',
+    content: 'w-full max-w-[1040px] text-center',
+    subtitle: 'mb-7',
     footer:
-      'border-line bg-surface shadow-onboarding-bar-soft fixed inset-x-0 bottom-0 z-10 border-t p-4 lg:static lg:mx-auto lg:w-full lg:max-w-[960px] lg:border-0 lg:bg-transparent lg:px-0 lg:pt-4 lg:pb-6 lg:shadow-none',
+      'border-line bg-surface shadow-onboarding-bar-soft fixed inset-x-0 bottom-0 z-20 border-t px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] lg:static lg:shrink-0 lg:bg-onboarding-page lg:py-5 lg:shadow-none',
+  },
+  cards: {
+    page: 'bg-onboarding-page min-h-dvh',
+    main: 'items-center px-4 pt-5 pb-32 lg:pt-6 lg:pb-8',
+    content: 'w-full max-w-[960px] text-center',
+    subtitle: 'mb-6',
+    footer:
+      'border-line bg-surface shadow-onboarding-bar-soft fixed inset-x-0 bottom-0 z-10 border-t p-4 lg:static lg:border-0 lg:bg-transparent lg:pb-10 lg:shadow-none',
   },
 } as const;
 
 export type StepLayout = keyof typeof LAYOUT;
 
 /**
- * Exam selection and setup steps: a back link and progress dashes above a centred title on desktop, a rounded
+ * Exam selection and target-year steps: a back link and progress dashes above a centred title on desktop, a rounded
  * gradient hero on mobile, then the choices and a Continue button (pinned to the bottom on mobile).
  */
 export function OnboardingStep({
   step,
   backHref,
+  onBack,
   title,
   subtitle,
   mobileSubtitle = subtitle,
@@ -109,7 +116,9 @@ export function OnboardingStep({
   children,
 }: {
   step: number;
-  backHref: string;
+  backHref?: string;
+  /** Back inside the page (instead of `backHref`). */
+  onBack?: () => void;
   title: string;
   subtitle: string;
   mobileSubtitle?: string;
@@ -119,11 +128,11 @@ export function OnboardingStep({
 }) {
   const ui = LAYOUT[layout];
   return (
-    <div className={`flex min-h-dvh flex-col leading-[1.75] ${ui.page}`}>
-      <header className={`hidden items-center justify-between lg:flex ${ui.header}`}>
-        <BackLink href={backHref} />
-        <span className={`flex items-center ${ui.labelGap}`}>
-          <StepLabel step={step} className={`text-foreground-subtle ${ui.label}`} />
+    <div className={`flex flex-col leading-[1.75] ${ui.page}`}>
+      <header className="hidden shrink-0 items-center justify-between px-10 py-4 lg:flex">
+        <BackLink href={backHref} onClick={onBack} />
+        <span className="flex items-center gap-2">
+          <StepLabel step={step} className="text-foreground-subtle text-[11px] font-semibold" />
           <StepDashes
             current={step}
             active="bg-brand w-6 rounded-full"
@@ -133,10 +142,10 @@ export function OnboardingStep({
         </span>
       </header>
 
-      <div className={`${HERO_GRADIENT} relative overflow-hidden rounded-b-[28px] lg:hidden`}>
-        <div className="relative z-10 px-[22px] pt-9 pb-6">
-          <div className="mb-12 flex items-center justify-between">
-            <BackLink href={backHref} onBrand />
+      <div className={`${HERO_GRADIENT} relative shrink-0 overflow-hidden rounded-b-[28px] lg:hidden`}>
+        <div className="relative z-10 px-[22px] pt-9 pb-4">
+          <div className="mb-5 flex items-center justify-between">
+            <BackLink href={backHref} onClick={onBack} onBrand />
             <StepLabel step={step} className="sr-only" />
             <StepDashes
               current={step}
@@ -145,22 +154,18 @@ export function OnboardingStep({
               todo="bg-on-brand/30 w-4 rounded-full"
             />
           </div>
-          <h1
-            className={`font-display text-on-brand text-[26px] leading-[1.2] tracking-[-0.4px] ${
-              layout === 'classes' ? 'mt-1 font-black' : 'font-extrabold'
-            }`}
-          >
-            {title}
-          </h1>
-          <p className="font-plain text-on-brand/75 mt-2 mb-[15px] text-[13px] font-medium">{mobileSubtitle}</p>
+          <h1 className="font-display text-on-brand text-[26px] leading-[1.2] font-extrabold tracking-[-0.4px]">{title}</h1>
+          <p className="text-on-brand/75 mt-2 text-[13px] font-medium">{mobileSubtitle}</p>
         </div>
-        <Waves className={layout === 'classes' ? 'h-[90px]' : 'h-[110px]'} lines={2} />
+        <Waves className="h-[110px]" lines={2} />
       </div>
 
       <main id="main" className={`flex flex-1 flex-col ${ui.main}`}>
         <div className={ui.content}>
-          <h1 className={`font-display text-ink hidden tracking-[-0.5px] lg:block ${ui.title}`}>{title}</h1>
-          <p className={`font-plain hidden text-[14px] font-medium lg:block ${ui.subtitle}`}>{subtitle}</p>
+          <h1 className="font-display text-ink hidden text-[34px] leading-[1.2] font-bold tracking-[-0.5px] lg:block">
+            {title}
+          </h1>
+          <p className={`text-foreground-subtle mt-2 hidden text-[14px] font-medium lg:block ${ui.subtitle}`}>{subtitle}</p>
           {children}
         </div>
       </main>
@@ -170,18 +175,16 @@ export function OnboardingStep({
   );
 }
 
-/** Continue button of an onboarding step (`classes`: the class step's full-width version). */
+/** Continue button of the exam and target-year steps (previous app: 54px, 360px wide on desktop). */
 export function ContinueButton({
   disabled,
   loading,
   onClick,
-  layout = 'cards',
   children = 'Continue',
 }: {
   disabled?: boolean;
   loading?: boolean;
   onClick: () => void;
-  layout?: StepLayout;
   children?: ReactNode;
 }) {
   return (
@@ -189,11 +192,7 @@ export function ContinueButton({
       disabled={disabled}
       loading={loading}
       onClick={onClick}
-      className={`bg-brand hover:bg-brand text-on-brand flex w-full rounded-lg border-none font-bold ${
-        layout === 'classes'
-          ? 'shadow-onboarding-continue lg:shadow-brand-glow lg:font-display h-auto p-4 text-[14px] leading-[1.75] lg:py-2.5 lg:text-[18px]'
-          : 'shadow-onboarding-continue h-[54px] text-[15px] leading-[1.75] lg:mx-auto lg:max-w-[360px]'
-      }`}
+      className="bg-brand hover:bg-brand text-on-brand shadow-onboarding-continue hover:shadow-onboarding-continue-hover flex h-[54px] w-full rounded-[16px] border-none text-[15px] leading-[1.75] font-bold transition-all active:scale-[0.99] disabled:active:scale-100 lg:mx-auto lg:max-w-[360px]"
     >
       {children}
     </Button>
@@ -203,7 +202,7 @@ export function ContinueButton({
 /** Amber info banner under the choices. */
 export function OnboardingNotice({ children }: { children: ReactNode }) {
   return (
-    <div className="bg-onboarding-notice-soft mx-auto mt-6 flex w-full items-start gap-2.5 rounded-[14px] p-3.5 lg:w-fit">
+    <div className="bg-onboarding-notice-soft mx-auto mt-4 flex w-full items-start gap-2.5 rounded-[14px] p-3.5 lg:w-fit">
       <ShieldCheck aria-hidden size={16} className="text-onboarding-notice-icon mt-0.5 shrink-0" />
       <p className="text-onboarding-notice-text text-left text-[12px] leading-[1.5] font-medium lg:text-[13px]">
         {children}

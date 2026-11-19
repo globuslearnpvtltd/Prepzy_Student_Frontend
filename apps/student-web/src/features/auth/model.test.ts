@@ -27,6 +27,8 @@ describe('toStudent', () => {
   it('picks the target exam by its slice, so exams named differently from their slug resolve (JHARKHAND BOARD → jac)', () => {
     expect(toStudent({ account_id: 1, target_exam: 'JHARKHAND BOARD', target_exam_slice: 'jac' })).toMatchObject({ targetExam: 'jac' });
     expect(toStudent({ account_id: 1, target_exam: 'NEET-UG', target_exam_slice: 'neet-ug' })).toMatchObject({ targetExam: 'neet' });
+    // An exam without a registry entry: its slice is its URL segment.
+    expect(toStudent({ account_id: 1, target_exam: 'JEE Main', target_exam_slice: 'jee-main' })).toMatchObject({ targetExam: 'jee-main' });
   });
 
   it('falls back to a generic name and unknown exam', () => {

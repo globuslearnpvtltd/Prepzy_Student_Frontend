@@ -3,12 +3,13 @@
 import { cx } from '@prepzy/design-system';
 import { useState } from 'react';
 import { LectureAtlas } from '@/features/assistant/ui';
+import { LectureVideoPlayer } from '@/features/learn/ui';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { useChapter, useMarkComplete, useSummaryVideo } from '../hooks';
 import type { ChapterProps } from './chapter-screen';
 import { Breadcrumb, ComingSoon, ErrorCard, StepNav } from './kit';
-import { VideoPlayer } from './video-player';
+import { FormulaBackdrop } from './formula-backdrop';
 
 /** Step 1: the chapter's summary video, in parts and languages, with "Mark As Completed". */
 export function VideoStep({ courseId, moduleId, step }: ChapterProps) {
@@ -19,6 +20,8 @@ export function VideoStep({ courseId, moduleId, step }: ChapterProps) {
   const parts = video.data?.parts ?? [];
   const [pickedPart, setPickedPart] = useState<string | null>(null);
   const [pickedLanguage, setPickedLanguage] = useState<string | null>(null);
+  // The previous app paused the video while a live voice call with the tutor was running.
+  const [voiceActive, setVoiceActive] = useState(false);
 
   const part = parts.find((p) => p.label === pickedPart) ?? parts[0];
   const source = part?.sources.find((s) => s.language === pickedLanguage) ?? part?.sources[0];
@@ -92,14 +95,17 @@ export function VideoStep({ courseId, moduleId, step }: ChapterProps) {
         <div aria-busy="true" aria-label="Loading" className="bg-neutral-100 mt-4 aspect-video w-full max-w-[1200px] animate-pulse rounded-lg" />
       ) : part && source ? (
         <div className="mx-auto mt-4 aspect-square w-[380px] max-w-full md:mx-0 md:aspect-video md:w-full md:max-w-[1200px]">
-          <VideoPlayer
+          <LectureVideoPlayer
             key={part.label}
-            url={source.url}
+            variant="competitive"
+            backdrop={<FormulaBackdrop />}
+            videos={part.sources.map((s) => ({ language: s.language, link: s.url }))}
             title={source.title}
-            languages={part.sources.map((s) => s.language)}
             language={source.language}
             onLanguageChange={setPickedLanguage}
             onEnded={markDone}
+            chatActive={voiceActive}
+            analytics={{ examId: exam.slug, subject: chapter?.subject ?? null, chapterName: chapter?.title ?? '', lectureTitle: source.title }}
           />
         </div>
       ) : (
@@ -120,7 +126,7 @@ export function VideoStep({ courseId, moduleId, step }: ChapterProps) {
         </ComingSoon>
       )}
       {/* The chapter tutor (Atlas scoped to the course), as on the previous app's video step. */}
-      <LectureAtlas courseId={courseId} moduleId={moduleId} />
+      <LectureAtlas courseId={courseId} moduleId={moduleId} onActivity={(activity) => setVoiceActive(activity.voiceActive)} />
     </div>
   );
 }

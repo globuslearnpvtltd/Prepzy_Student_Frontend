@@ -6,15 +6,29 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RichText } from '@/features/exam-engine/ui';
 import type { HistoryItem } from '../api';
+import { restoreStrippedLatex } from './stripped-latex';
 
 export const ATLAS_IMAGE = '/illustrations/assistant/atlas.png';
 export const SOCRATES_IMAGE = '/illustrations/assistant/socrates.png';
 
 const escapeHtml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** Model replies are HTML or plain text with LaTeX; plain text keeps its line breaks. */
-export function toChatHtml(text: string): string {
-  return /<\/?[a-z][\s\S]*>/i.test(text) ? text : escapeHtml(text).replace(/\n/g, '<br />');
+/** LaTeX in a reply: $$…$$, \[…\], \(…\) (may span lines) and $…$ (one line). */
+const MATH_SEGMENT = /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+?\$)/g;
+
+/**
+ * Model replies are HTML or plain text with LaTeX. Plain text keeps its line breaks, except inside formulas: a
+ * `<br />` inside $$…$$ or \[…\] splits the formula and MathJax leaves it as raw LaTeX. Formulas are only escaped
+ * (so `a < b` stays maths, not a tag), and are left out when deciding whether the reply is HTML.
+ */
+export function toChatHtml(raw: string): string {
+  // Replies whose LaTeX lost its backslashes ("(int_0^{pi/4} sec^4 x \, dx)") get them back first.
+  const text = restoreStrippedLatex(raw);
+  if (/<\/?[a-z][\s\S]*>/i.test(text.replace(MATH_SEGMENT, ''))) return text;
+  return text
+    .split(MATH_SEGMENT)
+    .map((part, i) => (i % 2 === 1 ? escapeHtml(part) : escapeHtml(part).replace(/\n/g, '<br />')))
+    .join('');
 }
 
 /** A chat message body: sanitised HTML with maths (MathJax only loads when there is maths). */

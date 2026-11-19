@@ -6,7 +6,7 @@ import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
 import { pyqSummary } from './components/module-screen';
 import { filterQuestions, questionTypeLabel } from './components/question-screens';
-import { LANGUAGE_KEY, pickVideo } from './components/lecture-screen';
+import { LANGUAGE_KEY, pickVideo } from './components/player-utils';
 import { toQuestion } from './api';
 import {
   ChapterPyqsScreen,
@@ -69,10 +69,10 @@ describe('Learn page', () => {
       http.get(`${API}/api/v4/dashboard/board/1/classes/12/subjects`, () =>
         ok({ subjects: [{ subject_id: 1, subject_name: 'SCIENCE', course_count: 2, subject_description: 'All about science' }, { subject_id: 4, subject_name: 'HINDI', course_count: 0 }] }),
       ),
-      http.get(`${API}/api/v4/learn/classes/12/subjects/1/courses`, () =>
+      http.get(`${API}/api/v4/learn/board/1/classes/12/subjects/1/courses`, () =>
         ok({ courses: [{ course_id: 5, title: 'Science Part 1', class: 'Class 10', unique_lecture: 12, assessment_count: 3 }] }),
       ),
-      http.get(`${API}/api/v4/learn/classes/12/subjects/4/courses`, () => ok({ courses: [] })),
+      http.get(`${API}/api/v4/learn/board/1/classes/12/subjects/4/courses`, () => ok({ courses: [] })),
     );
     renderWithProviders(<LearnScreen aside={<p>Aside</p>} />, { exam: cbse });
 
@@ -224,11 +224,20 @@ describe('Lecture page', () => {
     );
     renderWithProviders(<LectureScreen courseId="5" moduleId="2" lectureId="8" />, { exam: cbse });
 
-    expect(await screen.findByLabelText('Mirrors And Images')).toHaveAttribute('src', 'https://cdn.test/en.mp4');
+    expect(await screen.findByTestId('media')).toHaveAttribute('src', 'https://cdn.test/en.mp4');
+    expect(screen.getByRole('heading', { name: 'Mirrors And Images' })).toBeInTheDocument();
     expect(screen.getByText('About mirrors')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Hindi' }));
-    expect(screen.getByTitle('Mirrors And Images')).toHaveAttribute('src', expect.stringContaining('abcdefghijk'));
+    await userEvent.click(screen.getByRole('button', { name: 'Choose language' }));
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Hindi' }));
+    expect(screen.getByTestId('media')).toHaveAttribute('src', 'https://www.youtube.com/watch?v=abcdefghijk');
     expect(localStorage.getItem(LANGUAGE_KEY)).toBe('hindi');
+
+    // opening the lecture tutor pauses the video, as in the previous app
+    fireEvent.loadedMetadata(screen.getByTestId('media'));
+    await userEvent.click(screen.getByRole('button', { name: 'Play video' }));
+    expect((screen.getByTestId('media') as HTMLVideoElement).paused).toBe(false);
+    await userEvent.click(await screen.findByRole('button', { name: /^Ask / }));
+    await waitFor(() => expect((screen.getByTestId('media') as HTMLVideoElement).paused).toBe(true));
 
     await userEvent.click(screen.getByRole('tab', { name: 'Transcript' }));
     expect(await screen.findByText('First line')).toBeInTheDocument();
@@ -256,11 +265,14 @@ describe('Lecture page', () => {
       http.get(`${API}/api/v4/learn/courses/5/previous-activity`, () => ok({ activity: null })),
     );
     renderWithProviders(<LectureScreen courseId="5" moduleId="2" lectureId="8" />, { exam: cbse });
-    const video = await screen.findByLabelText('Mirrors And Images');
+    const video = await screen.findByTestId('media');
     expect(video).toHaveAttribute('src', 'https://resource2.heygen.ai/video/old-id/1280x720.mp4');
     fireEvent.error(video);
+    expect(screen.getByRole('alert')).toHaveTextContent("We couldn't load this video right now.");
     fireEvent.error(video);
-    await waitFor(() => expect(screen.getByLabelText('Mirrors And Images')).toHaveAttribute('src', 'https://cdn.test/new.mp4'));
+    await waitFor(() => expect(screen.getByTestId('media')).toHaveAttribute('src', 'https://cdn.test/new.mp4'));
+    // the refreshed link clears the error
+    await waitFor(() => expect(screen.queryByText(/couldn't load this video/)).not.toBeInTheDocument());
     expect(refreshed).toBe(1);
 
     await userEvent.click(screen.getAllByRole('button', { name: /Previous/ })[0]!);

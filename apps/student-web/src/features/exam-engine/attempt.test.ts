@@ -51,7 +51,10 @@ describe('attempt state', () => {
     let snap = withAnswer(emptySnapshot(), '1', { kind: 'option', optionId: 'b' });
     snap = withAnswer(snap, '1', null);
     expect(snap.answers['1']).toBeUndefined();
-    expect(statusOf('1', snap)).toBe('skipped');
+    // Answering or clearing doesn't make a question "skipped"; only a visit does (opening it on competitive papers,
+    // leaving it blank with Skip / Save & Next on board papers).
+    expect(statusOf('1', snap)).toBe('not-visited');
+    expect(statusOf('1', withVisit(snap, '1'))).toBe('skipped');
   });
 
   it('treats blank written answers as unanswered and text or images as answered', () => {

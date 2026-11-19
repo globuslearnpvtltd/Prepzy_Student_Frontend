@@ -5,6 +5,6 @@ import { BoardAssessments } from '@/features/test-library/ui';
 export const metadata: Metadata = { title: 'Assessments' };
 
 export default async function AssessmentsPage({ params }: { params: Promise<{ exam: string }> }) {
-  examForCategory((await params).exam, 'board');
+  await examForCategory((await params).exam, 'board');
   return <BoardAssessments />;
 }

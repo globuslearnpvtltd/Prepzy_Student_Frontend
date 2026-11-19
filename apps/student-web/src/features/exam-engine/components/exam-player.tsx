@@ -3,7 +3,7 @@
 import { Button } from '@prepzy/design-system';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { TestTypeKey } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
@@ -68,6 +68,9 @@ export function ExamPlayer({ testType, setId }: { testType: TestTypeKey; setId: 
 
 export type PlayerAttempt = ReturnType<typeof useExamAttempt>;
 
+/** The submitting screen stays at least this long, so it never flashes before the score. */
+const MIN_SUBMITTING_MS = 1200;
+
 /** What each layout gets: attempt state, timer, counts and the actions shared by both. */
 export interface PlayerLayoutProps {
   session: ExamSession;
@@ -96,16 +99,36 @@ function PlayerScreen({
 }) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // One step at a time: the confirm dialog closes when the student submits, the submitting screen shows while
+  // answers are saved and evaluated, and only then the score dialog (or the result page) opens.
+  const [submitting, setSubmitting] = useState(false);
+  const submitStartedAt = useRef(0);
   const [completed, setCompleted] = useState<{ attemptId: string; summary: SubmitSummary } | null>(null);
   const resultHref = (attemptId: string) => routes.testResult(context.exam.slug, testType, attemptId);
   const attempt = useExamAttempt(session, adapter, context, ({ attemptId, summary }) => {
-    setConfirmOpen(false);
-    if (summary && summary.obtained !== null) setCompleted({ attemptId, summary });
-    else router.replace(resultHref(attemptId));
+    const wait = Math.max(0, MIN_SUBMITTING_MS - (Date.now() - submitStartedAt.current));
+    setTimeout(() => {
+      if (summary && summary.obtained !== null) {
+        setSubmitting(false);
+        setCompleted({ attemptId, summary });
+      } else router.replace(resultHref(attemptId)); // the submitting screen stays until the result page opens
+    }, wait);
   });
+  const startSubmit = () => {
+    setConfirmOpen(false);
+    setSubmitting(true);
+    submitStartedAt.current = Date.now();
+    attempt.submit.mutate(undefined, {
+      // Back to the confirm dialog, which shows the error and lets the student try again.
+      onError: () => {
+        setSubmitting(false);
+        setConfirmOpen(true);
+      },
+    });
+  };
   const secondsLeft = useCountdown(session.deadline, () => {
     toast.info("Time's up — submitting your answers.");
-    attempt.submit.mutate();
+    startSubmit();
   });
   const counts = countStatuses(session.questions, attempt.snapshot);
   const hasWritten = session.questions.some((q) => q.kind !== 'mcq');
@@ -125,7 +148,12 @@ function PlayerScreen({
       attempt.saveNow();
       router.push(home.href);
     },
-    onNext: () => (attempt.index === attempt.total - 1 ? setConfirmOpen(true) : attempt.goTo(attempt.index + 1)),
+    onNext: () => {
+      // Save & Next on a blank question counts it as skipped (an answered one stays answered).
+      attempt.leave(attempt.question!.id);
+      if (attempt.index === attempt.total - 1) setConfirmOpen(true);
+      else attempt.goTo(attempt.index + 1);
+    },
   };
 
   return (
@@ -137,12 +165,12 @@ function PlayerScreen({
         counts={counts}
         total={attempt.total}
         hasWritten={hasWritten}
-        pending={attempt.submit.isPending}
+        pending={submitting}
         error={attempt.submit.error}
-        onSubmit={() => attempt.submit.mutate()}
+        onSubmit={startSubmit}
       />
-      {attempt.submit.isPending && <SubmittingScreen written={hasWritten} />}
-      {completed && (
+      {submitting && <SubmittingScreen written={hasWritten} />}
+      {completed && !submitting && (
         <CompletedDialog
           summary={completed.summary}
           action={

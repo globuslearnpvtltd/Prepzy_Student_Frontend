@@ -13,21 +13,48 @@ type Envelope<T> = { success?: boolean; message?: string; data?: T };
 
 /** The backend rejects longer search queries. */
 export const SEARCH_MAX_QUERY_LENGTH = 100;
+/** The semantic search agent can be slow; the backend gives it 30s. */
+const LECTURE_SEARCH_TIMEOUT_MS = 35_000;
 
 const num = (value: unknown) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 };
 
+/** What a suggestion is: a topic, a chapter (the backend's "module") or a course. */
+export type SuggestionKind = 'topic' | 'chapter' | 'course';
+
 export interface SearchSuggestion {
   key: string;
+  kind: SuggestionKind;
   title: string;
   /** e.g. "in Electrostatics" */
   context: string | null;
   subject: string;
-  /** Where the suggestion opens (competitive: the course, the topic in its notes, or the chapter). */
+  /** The backend's subject name, sent with a lecture search started from this suggestion. */
+  subjectName: string | null;
+  /**
+   * Where the suggestion opens (competitive: the course, the topic in its notes, or the chapter). null: picking it
+   * runs the lecture search for its title (board, as before).
+   */
   href: string | null;
 }
+
+/** The lecture POST /api/v4/search/:category/:examId/lectures found (ids checked against the exam by the backend). */
+export interface LectureSearchResult {
+  lectureId: number;
+  lectureName: string | null;
+  courseId: number;
+  moduleId: number;
+  moduleName: string;
+  subjectName: string | null;
+  /** 0–100, or null when the agent sent no score */
+  scorePercent: number | null;
+  assessments: { assessmentId: number; title: string; type: string }[];
+}
+
+const kindOf = (type: string | undefined): SuggestionKind =>
+  type === 'course' ? 'course' : type === 'module' ? 'chapter' : 'topic';
 
 export interface LiveDpp {
   dppId: string;
@@ -91,11 +118,58 @@ export const shellApi = {
     const linked = exam.category === 'competitive';
     return (body.data?.suggestions ?? []).map((row, index) => ({
       key: `${index}-${row.result_name}`,
+      kind: kindOf(row.result_type),
       title: row.result_name,
       context: row.module_name ? `in ${row.module_name.toLowerCase()}` : null,
       subject: subjectLabel(row.subject_name ?? ''),
+      subjectName: row.subject_name ?? null,
       href: linked ? competitiveSuggestionHref(exam.slug, row) : null,
     }));
+  },
+
+  /**
+   * The search button: POST /api/v4/search/:category/:examId/lectures. The backend asks the category's semantic
+   * search agent (board: in the class it checks against the student's plans) and returns the best lecture or null.
+   */
+  async searchLectures(
+    exam: ExamConfig,
+    query: string,
+    { subjectName, classId }: { subjectName?: string | null; classId?: number | null } = {},
+  ): Promise<LectureSearchResult | null> {
+    type Raw = {
+      lecture_id: number;
+      lecture_name?: string | null;
+      course_id: number;
+      module_id: number;
+      module_name?: string | null;
+      subject_name?: string | null;
+      score?: number | null;
+      assessments?: { assessment_id: number; title?: string | null; assessment_type?: string | null }[];
+    };
+    const body = assertOk(
+      await apiClient.post<Envelope<{ result?: Raw | null }>>(`/api/v4/search/${exam.category}/${exam.examId}/lectures`, {
+        query: query.trim().slice(0, SEARCH_MAX_QUERY_LENGTH),
+        ...(subjectName ? { subject_name: subjectName } : {}),
+        ...(classId ? { class_id: classId } : {}),
+      }, { timeout: LECTURE_SEARCH_TIMEOUT_MS }),
+    );
+    const raw = body.data?.result;
+    if (!raw) return null;
+    return {
+      lectureId: raw.lecture_id,
+      lectureName: raw.lecture_name ?? null,
+      courseId: raw.course_id,
+      moduleId: raw.module_id,
+      moduleName: raw.module_name ?? '',
+      subjectName: raw.subject_name ?? null,
+      scorePercent: typeof raw.score === 'number' ? Math.round(raw.score * 100) : null,
+      assessments: (raw.assessments ?? []).map((a) => ({
+        assessmentId: a.assessment_id,
+        title: a.title ?? '',
+        // The previous app's label: the type with underscores as spaces, "Quiz" when missing.
+        type: (a.assessment_type || 'Quiz').replace(/_/g, ' '),
+      })),
+    };
   },
 
   /** Today's daily practice paper, or null when there is none. */

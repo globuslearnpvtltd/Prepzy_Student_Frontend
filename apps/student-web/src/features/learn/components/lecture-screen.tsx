@@ -2,101 +2,19 @@
 
 import { cx, Skeleton } from '@prepzy/design-system';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Languages } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
-import { LectureAtlas } from '@/features/assistant/ui';
+import { LectureAtlas, type TutorActivity } from '@/features/assistant/ui';
 import { RichText } from '@/features/exam-engine/ui';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { userMessage } from '@/shared/lib/errors';
-import { activityHref, formatTitle, learnApi, resolveVideoSource, titleCase, type Activity, type LectureVideo } from '../api';
+import { activityHref, formatTitle, learnApi, titleCase, type Activity, type LectureVideo } from '../api';
 import { learnKeys, useCourseOutline } from '../hooks';
 import { Breadcrumb, SectionError } from './kit';
-
-/** Same key as the previous app, so a student's language choice carries over. */
-export const LANGUAGE_KEY = 'cbse_video_language';
-
-function readLanguage(): string | null {
-  try {
-    return localStorage.getItem(LANGUAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-/** The video in the student's language (remembered across lectures), else the first one. */
-export function pickVideo(videos: LectureVideo[], language: string | null): LectureVideo | null {
-  return videos.find((video) => video.language === language) ?? videos[0] ?? null;
-}
-
-const capitalize = (value: string) => (value ? value[0]!.toUpperCase() + value.slice(1) : value);
-
-/** Light player: YouTube embed, or the browser's player for direct / HeyGen files; language switch below. */
-export function LecturePlayer({ videos, title, onError }: { videos: LectureVideo[]; title: string; onError: () => void }) {
-  const [language, setLanguage] = useState<string | null>(readLanguage);
-  const video = pickVideo(videos, language);
-  const source = resolveVideoSource(video?.link);
-  const languages = videos.filter((v) => v.language);
-
-  const choose = (value: string) => {
-    setLanguage(value);
-    try {
-      localStorage.setItem(LANGUAGE_KEY, value);
-    } catch {
-      // Private mode: the choice still applies to this lecture.
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="bg-night-950 relative mx-auto h-[250px] w-full overflow-hidden rounded-md md:h-[485px]">
-        {source?.kind === 'youtube' ? (
-          <iframe
-            key={source.url}
-            src={source.url}
-            title={title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="absolute inset-0 h-full w-full border-0"
-          />
-        ) : source ? (
-          <video
-            key={source.url}
-            src={source.url}
-            aria-label={title}
-            controls
-            controlsList="nodownload"
-            playsInline
-            onError={onError}
-            onContextMenu={(event) => event.preventDefault()}
-            className="absolute inset-0 h-full w-full object-contain"
-          />
-        ) : null}
-      </div>
-      {languages.length > 1 && (
-        <div role="group" aria-label="Video language" className="flex flex-wrap items-center gap-2">
-          <Languages aria-hidden className="text-learn-muted size-4" />
-          {languages.map((item) => (
-            <button
-              key={item.language}
-              type="button"
-              aria-pressed={item === video}
-              onClick={() => choose(item.language)}
-              className={cx(
-                'rounded-full border px-3 py-1 text-[12px] font-semibold',
-                item === video ? 'bg-brand border-brand text-on-brand' : 'border-learn-line-strong text-learn-ink bg-surface',
-              )}
-            >
-              {capitalize(item.language)}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+import { LectureVideoPlayer } from './lazy-video-player';
 
 function NoVideos() {
   return (
@@ -120,6 +38,7 @@ export function LectureScreen({ courseId, moduleId, lectureId }: { courseId: str
   const [tab, setTab] = useState<'description' | 'transcript'>('description');
   const [refreshed, setRefreshed] = useState<LectureVideo[] | null>(null);
   const refreshTried = useRef(false);
+  const [tutor, setTutor] = useState<TutorActivity>({ chatOpen: false, voiceActive: false });
 
   const go = (activity: Activity | null) => {
     if (activity) router.push(activityHref(exam.slug, courseId, activity));
@@ -195,7 +114,20 @@ export function LectureScreen({ courseId, moduleId, lectureId }: { courseId: str
         <NoVideos />
       ) : (
         <div className="mx-auto w-full max-w-[1200px] px-2 py-2">
-          <LecturePlayer videos={videos} title={titleCase(title)} onError={onVideoError} />
+          <div className="relative mx-auto h-[250px] w-full overflow-hidden rounded-md md:h-[485px]">
+            <LectureVideoPlayer
+              videos={videos}
+              title={titleCase(title)}
+              onError={onVideoError}
+              chatActive={tutor.chatOpen || tutor.voiceActive}
+              analytics={{
+                examId: exam.slug,
+                subject: outline.data?.course?.subjectName ?? null,
+                chapterName: chapterIndex >= 0 ? chapters[chapterIndex]!.title : '',
+                lectureTitle: title,
+              }}
+            />
+          </div>
           <p className="mt-4 hidden text-sm text-neutral-600 md:block">
             *If you have any doubt with the narration please refer transcript.
           </p>
@@ -236,7 +168,7 @@ export function LectureScreen({ courseId, moduleId, lectureId }: { courseId: str
         </button>
       </div>
       {/* The lecture tutor (Atlas scoped to the course). */}
-      <LectureAtlas courseId={courseId} moduleId={moduleId} lectureId={lectureId} />
+      <LectureAtlas courseId={courseId} moduleId={moduleId} lectureId={lectureId} onActivity={setTutor} />
     </div>
   );
 }

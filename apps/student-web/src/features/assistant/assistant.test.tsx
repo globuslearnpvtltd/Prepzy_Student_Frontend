@@ -5,7 +5,7 @@ import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
 import { atlasEndpoints, imageSrc, toAnswer, toAvatar, toConversation, toHistory, toMessage } from './api';
-import { AtlasHost, showsAtlasLauncher } from './components/atlas-host';
+import { AtlasHost, hidesAtlas, showsAtlasLauncher } from './components/atlas-host';
 import { ChatImage, relativeDay, toChatHtml } from './components/chat-kit';
 import { Composer } from './components/composer';
 import { LectureAtlas } from './components/lecture-atlas';
@@ -83,6 +83,10 @@ describe('assistant api', () => {
   it('keeps line breaks in plain-text replies and escapes them', () => {
     expect(toChatHtml('a < b\nc')).toBe('a &lt; b<br />c');
     expect(toChatHtml('<p>x</p>')).toBe('<p>x</p>');
+    // Formulas keep their line breaks (a <br /> inside one stops MathJax) and are escaped, never read as tags.
+    expect(toChatHtml('Use\n$$\nF = ma\n$$\ndone')).toBe('Use<br />$$\nF = ma\n$$<br />done');
+    expect(toChatHtml('\\[\na<b\n\\]')).toBe('\\[\na&lt;b\n\\]');
+    expect(toChatHtml('If $x<y$ and $y>z$\nthen')).toBe('If $x&lt;y$ and $y&gt;z$<br />then');
     const now = new Date('2026-11-07T12:00:00');
     expect(relativeDay('2026-11-07T08:00:00', now)).toBe('Today');
     expect(relativeDay('2026-11-06T08:00:00', now)).toBe('Yesterday');
@@ -95,6 +99,13 @@ describe('assistant api', () => {
     expect(showsAtlasLauncher('/cbse/learn/3/4/lecture/9')).toBe(false);
     expect(showsAtlasLauncher('/neet/learn/3/4/video-lectures')).toBe(false);
     expect(showsAtlasLauncher('/neet/doubt-solver')).toBe(false);
+    // No Atlas on the diagnostic, study plan and custom test pages (user decisions).
+    for (const path of ['/cbse/diagnostic', '/cbse/diagnostic-result', '/neet/diagnostic-test/7', '/cbse/study-plan', '/cbse/study-plan/chapters', '/neet/study-plan/create', '/cbse/custom-test', '/neet/custom-test/create']) {
+      expect(showsAtlasLauncher(path)).toBe(false);
+      expect(hidesAtlas(path)).toBe(true);
+    }
+    expect(hidesAtlas('/cbse/dashboard')).toBe(false);
+    expect(hidesAtlas('/cbse/study-planner')).toBe(false);
   });
 });
 

@@ -14,7 +14,7 @@ import {
 import { emptyCounts, num, str, strOrNull, toSubmitSummary, type TestAdapter } from './types';
 
 /** NEET-style papers: MCQ only, review marks, +4/−1 scored by the backend. */
-type RawOption = { option_id: string | number; text?: string; image?: string | null; is_correct?: unknown };
+type RawOption = { option_id: string | number; text?: string; option_text?: string; image?: string | null; option_image?: string | null; is_correct?: unknown };
 export type RawCompetitiveQuestion = {
   question_id: string | number;
   question_text?: string;
@@ -99,8 +99,8 @@ export function toCompetitiveResultQuestion(raw: RawResultQuestion): ResultQuest
     const id = str(o.option_id);
     return {
       id,
-      html: o.text ?? '',
-      image: o.image ?? null,
+      html: o.text ?? o.option_text ?? '',
+      image: o.image ?? o.option_image ?? null,
       isCorrect: correctId !== null ? id === correctId : !!o.is_correct,
       isSelected: id === selected,
     };

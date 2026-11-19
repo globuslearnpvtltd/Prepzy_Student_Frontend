@@ -191,11 +191,18 @@ describe('DiagnosticTestScreen', () => {
     expect(screen.getByRole('timer')).toHaveTextContent('10:00');
     await userEvent.click(screen.getByRole('radio', { name: /Property of matter/ }));
     expect(screen.getByRole('radio', { name: /Property of matter/ })).toHaveAttribute('aria-checked', 'true');
-    await userEvent.click(screen.getByRole('button', { name: /Save & Next/ }));
+    // Previous app's footer: Skip Question · Mark for review · Save & Next (Previous only in the phone bar).
+    expect(screen.getByRole('button', { name: 'Skip Question' })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: /Save & Next/ })[0]!);
     expect(await screen.findByText('Read the case')).toBeInTheDocument();
     await userEvent.click(within(screen.getByRole('radiogroup', { name: 'Part 1' })).getByRole('radio', { name: /Yes/ }));
-    await userEvent.click(screen.getByRole('button', { name: /Mark for review/ }));
-    expect(screen.getByRole('button', { name: /Unmark review/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Part 1 of 2, answered' })).toHaveAttribute('aria-selected', 'true');
+    // One part at a time: "Next part" opens part 2 of the same question.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Next part' })[0]!);
+    expect(screen.getByRole('tab', { name: 'Part 2 of 2' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('radiogroup', { name: 'Part 2' })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: /Mark for review/ })[0]!);
+    expect(screen.getAllByRole('button', { name: /Unmark review/ })[0]).toBeInTheDocument();
     await waitFor(() => expect(saves.length).toBeGreaterThan(0), { timeout: 3500 });
     await userEvent.click(screen.getAllByRole('button', { name: 'Submit Test' }).at(-1)!);
     expect(await screen.findByRole('dialog', { name: 'Evaluating your test' })).toBeInTheDocument();

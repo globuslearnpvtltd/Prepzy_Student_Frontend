@@ -7,6 +7,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../tabs/tabs.tsx';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './dialog.tsx';
 
 describe('Dialog', () => {
+  it('adds extra backdrop classes (e.g. a blur) to the overlay', () => {
+    render(
+      <Dialog open>
+        <DialogContent overlayClassName="backdrop-blur-sm">
+          <DialogTitle>Done</DialogTitle>
+          <DialogDescription>Ready.</DialogDescription>
+        </DialogContent>
+      </Dialog>,
+    );
+    const overlay = document.querySelector('.pz-dialog__overlay');
+    expect(overlay).toHaveClass('backdrop-blur-sm');
+  });
+
   it('opens, is labelled by its title, and closes', async () => {
     render(
       <Dialog>

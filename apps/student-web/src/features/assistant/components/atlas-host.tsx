@@ -21,33 +21,74 @@ const DASHBOARD: AtlasSurface = { kind: 'dashboard' };
  * (the solver) don't show the dashboard Atlas launcher.
  */
 export function showsAtlasLauncher(pathname: string): boolean {
-  return !/^\/[^/]+\/(learn\/[^/]+\/[^/]+|doubt-solver)(\/|$)/.test(pathname);
+  return !/^\/[^/]+\/(learn\/[^/]+\/[^/]+|doubt-solver)(\/|$)/.test(pathname) && !hidesAtlas(pathname);
+}
+
+/**
+ * Pages without Atlas at all (user decisions): the diagnostic test and its result, the study plan, and the custom
+ * test pages (list and create).
+ */
+export function hidesAtlas(pathname: string): boolean {
+  return /^\/[^/]+\/(diagnostic|diagnostic-result|diagnostic-test|study-plan|custom-test)(\/|$)/.test(pathname);
 }
 
 /** A chat panel over the page: right-hand card on desktop (or full screen when expanded), full screen on mobile. */
-export function ChatOverlay({ open, expanded, onClose, children }: { open: boolean; expanded: boolean; onClose: () => void; children: React.ReactNode }) {
+export function ChatOverlay({
+  open,
+  expanded,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  expanded: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
   if (!open) return null;
   return (
     <>
       <div aria-hidden onClick={onClose} className="bg-night-900/30 fixed inset-0 z-[98] backdrop-blur-sm" />
-      <div className={cx('fixed z-[99] flex justify-end', expanded ? 'inset-0' : 'inset-0 w-full md:inset-y-4 md:right-4 md:left-auto md:w-[45%]')}>
+      <div
+        className={cx(
+          'fixed z-[99] flex justify-end',
+          expanded ? 'inset-0' : 'inset-0 w-full md:inset-y-4 md:right-4 md:left-auto md:w-[45%]',
+        )}
+      >
         <div className="shadow-socrates-sheet h-full w-full md:rounded-lg">{children}</div>
       </div>
     </>
   );
 }
 
-/** Round floating button with the tutor's face (bottom-right). */
-export function ChatLauncher({ label, image, onOpen, className }: { label: string; image?: string | null; onOpen: () => void; className?: string }) {
+/**
+ * Round floating button with the tutor's face (bottom-right), with the previous app's ripple rings
+ * (`chat-wave` in globals.css). The picture is clipped inside, so the rings can spread outside.
+ */
+export function ChatLauncher({
+  label,
+  image,
+  onOpen,
+  className,
+}: {
+  label: string;
+  image?: string | null;
+  onOpen: () => void;
+  className?: string;
+}) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onOpen}
-      className={cx('bg-brand shadow-brand-glow fixed right-6 bottom-[80px] z-10 size-[60px] overflow-hidden rounded-full md:right-10 md:bottom-10', className)}
+      className={cx(
+        'chat-wave bg-brand shadow-brand-glow fixed right-6 bottom-[80px] z-10 size-[60px] rounded-full md:right-10 md:bottom-10',
+        className,
+      )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image ?? ATLAS_IMAGE} alt="" className="size-full object-cover object-top" />
+      <span className="block size-full overflow-hidden rounded-full">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image ?? ATLAS_IMAGE} alt="" className="size-full object-cover object-top" />
+      </span>
     </button>
   );
 }
@@ -78,6 +119,11 @@ export function AtlasHost() {
 
   // Leaving the page closes the sheet (the panel stays open across pages, as before).
   useEffect(() => setAskSheet(false), [pathname, setAskSheet]);
+  // …except into a page without Atlas, where an open chat is closed too.
+  const noAtlas = hidesAtlas(pathname);
+  useEffect(() => {
+    if (noAtlas) close();
+  }, [noAtlas, close]);
 
   const launcher = showsAtlasLauncher(pathname);
   const plan = useActivePlan(exam);
@@ -131,12 +177,35 @@ function EndLiveTalkWhen({ when }: { when: boolean }) {
 }
 
 const OPTIONS = [
-  { key: 'atlas', name: 'Atlas', tag: 'Quick', description: 'Ask anything. Get the full answer & explanation', youGet: 'Instant Answers', image: ATLAS_IMAGE },
-  { key: 'socrates', name: 'Socrates', tag: 'Step by Step', description: 'Helps you solve problems one step at a time.', youGet: 'Stepwise Learning', image: SOCRATES_IMAGE },
+  {
+    key: 'atlas',
+    name: 'Atlas',
+    tag: 'Quick',
+    description: 'Ask anything. Get the full answer & explanation',
+    youGet: 'Instant Answers',
+    image: ATLAS_IMAGE,
+  },
+  {
+    key: 'socrates',
+    name: 'Socrates',
+    tag: 'Step by Step',
+    description: 'Helps you solve problems one step at a time.',
+    youGet: 'Stepwise Learning',
+    image: SOCRATES_IMAGE,
+  },
 ] as const;
 
 /** Mobile "Ask" sheet above the bottom bar: Atlas (quick answers) or Socrates (step by step). */
-export function AskOptionsSheet({ onClose, onAtlas, onSocrates }: { exam: ExamConfig; onClose: () => void; onAtlas: () => void; onSocrates: () => void }) {
+export function AskOptionsSheet({
+  onClose,
+  onAtlas,
+  onSocrates,
+}: {
+  exam: ExamConfig;
+  onClose: () => void;
+  onAtlas: () => void;
+  onSocrates: () => void;
+}) {
   const [video, setVideo] = useState(false);
   return (
     <>
@@ -148,7 +217,9 @@ export function AskOptionsSheet({ onClose, onAtlas, onSocrates }: { exam: ExamCo
         className="bg-surface shadow-socrates-sheet fixed right-3 bottom-[84px] left-3 z-30 mb-3 rounded-[22px] px-3.5 pt-[18px] pb-3.5 md:hidden"
       >
         <h2 className="text-socrates-ink text-center text-[17px] leading-6 font-semibold">Have a Question/Problem?</h2>
-        <p className="text-socrates-muted mt-0.5 text-center text-[12px] leading-4">Two ways to solve, in any subject.</p>
+        <p className="text-socrates-muted mt-0.5 text-center text-[12px] leading-4">
+          Two ways to solve, in any subject.
+        </p>
         <div className="mt-[34px] grid grid-cols-2 gap-2.5">
           {OPTIONS.map((option) => (
             <button
@@ -160,16 +231,26 @@ export function AskOptionsSheet({ onClose, onAtlas, onSocrates }: { exam: ExamCo
               <div className="relative h-[96px] w-full" style={{ clipPath: 'inset(-80px 0 0 0 round 0 0 14px 14px)' }}>
                 <div className="from-socrates-panel-from to-socrates-panel-to absolute inset-0 rounded-[14px] bg-linear-to-b" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={option.image} alt={option.name} className="absolute bottom-[-32px] left-1/2 h-[162px] w-auto max-w-none -translate-x-1/2 object-contain" />
+                <img
+                  src={option.image}
+                  alt={option.name}
+                  className="absolute bottom-[-32px] left-1/2 h-[162px] w-auto max-w-none -translate-x-1/2 object-contain"
+                />
               </div>
               <div className="flex flex-col px-1 pt-2.5 pb-1">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-socrates-text text-[15px] leading-5 font-bold">{option.name}</span>
-                  <span className="bg-socrates-chip text-brand rounded-full px-1.5 py-px text-[9px] leading-[14px] font-semibold">{option.tag}</span>
+                  <span className="bg-socrates-chip text-brand rounded-full px-1.5 py-px text-[9px] leading-[14px] font-semibold">
+                    {option.tag}
+                  </span>
                 </div>
-                <p className="text-socrates-muted mt-1.5 mb-1 min-h-[30px] text-[11px] leading-[15px]">{option.description}</p>
+                <p className="text-socrates-muted mt-1.5 mb-1 min-h-[30px] text-[11px] leading-[15px]">
+                  {option.description}
+                </p>
                 <div className="border-socrates-line mt-2 border-t pt-1.5">
-                  <p className="text-socrates-faint text-[9px] leading-3 font-semibold tracking-[0.4px] uppercase">You get</p>
+                  <p className="text-socrates-faint text-[9px] leading-3 font-semibold tracking-[0.4px] uppercase">
+                    You get
+                  </p>
                   <p className="text-brand mt-1 text-[13px] leading-[18px] font-semibold">{option.youGet}</p>
                 </div>
               </div>
@@ -177,9 +258,15 @@ export function AskOptionsSheet({ onClose, onAtlas, onSocrates }: { exam: ExamCo
           ))}
         </div>
         {video ? (
-          <p className="text-socrates-muted mt-3 text-center text-[12px]">Atlas gives you the full answer; Socrates guides you to it, one step at a time.</p>
+          <p className="text-socrates-muted mt-3 text-center text-[12px]">
+            Atlas gives you the full answer; Socrates guides you to it, one step at a time.
+          </p>
         ) : (
-          <button type="button" onClick={() => setVideo(true)} className="mt-3 flex w-full items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setVideo(true)}
+            className="mt-3 flex w-full items-center justify-center gap-2"
+          >
             <span className="bg-brand text-on-brand flex size-5 items-center justify-center rounded-full">
               <Play aria-hidden className="size-2.5 fill-current" />
             </span>

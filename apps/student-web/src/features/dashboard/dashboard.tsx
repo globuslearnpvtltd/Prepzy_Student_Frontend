@@ -4,17 +4,16 @@ import { cx } from '@prepzy/design-system';
 import type { ComponentType } from 'react';
 import type { ExamCategory } from '@/shared/config/exams';
 import { ContinueLearning, SubjectListing as MySubjects } from '@/features/learn/ui';
-import { JourneyCard } from '@/features/study-plan';
 import { SyllabusCards } from '@/features/syllabus/ui';
 import { useExam } from '@/shared/hooks/use-exam';
 import {
   ContinueAssessment,
   LinkParentCard,
-  PlanBanner,
   ReferEarnTeaser,
   SolverDiscovery,
 } from './board-widgets';
 import { ChooseYourPlan, GetReadyExam } from './free-widgets';
+import { DashboardHeroRow } from './hero-row';
 import { Divider, NeetWelcome, PracticeRow, SubjectProgressCards } from './competitive-widgets';
 import { HowYouFare, PerformanceOverview } from './performance-widgets';
 
@@ -35,7 +34,7 @@ export const DASHBOARD_WIDGETS: Record<ExamCategory, DashboardLayout> = {
         className: 'flex w-full min-w-0 flex-col gap-[30px] md:w-[70%] md:gap-10',
         // GetReadyExam and ChooseYourPlan render only for a student without an active plan;
         // MySubjects then shows "My Free Courses".
-        widgets: [PlanBanner, JourneyCard, ContinueLearning, ContinueAssessment, MySubjects, GetReadyExam, HowYouFare, ChooseYourPlan],
+        widgets: [DashboardHeroRow, ContinueLearning, ContinueAssessment, MySubjects, GetReadyExam, HowYouFare, ChooseYourPlan],
       },
       {
         className: 'flex w-full min-w-0 flex-col gap-5 md:w-[30%]',

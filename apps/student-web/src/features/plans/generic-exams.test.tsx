@@ -151,7 +151,7 @@ describe('a new board and competitive exam (DB rows only)', () => {
     noOtherExam();
 
     await userEvent.click(screen.getByRole('button', { name: /^JEE ?Prepare for your entrance exam/ }));
-    // The exam is named in the URL by its slice (the app has no route for it), replacing the history entry.
+    // The exam is named in the URL by its slice (its URL segment: it has no registry entry), replacing the history entry.
     expect(navigation.replace).toHaveBeenCalledWith('/purchase?exam=jee', { scroll: false });
     expect(screen.getByText('Target year')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^JEE 2027/ })).toHaveAttribute('aria-pressed', 'true');
@@ -171,9 +171,9 @@ describe('a new board and competitive exam (DB rows only)', () => {
     expect(options!.description).toBe('Topper JEE + ICSE Monthly · 1 Month · JEE 2027 + ICSE');
     options!.handler({ razorpay_payment_id: 'p', razorpay_order_id: 'order_j', razorpay_signature: 's' });
     expect(await screen.findByText('Payment Successful')).toBeInTheDocument();
-    // The app has no pages for this exam yet (and nothing is remembered), so the student lands on Manage Plans.
+    // Every exam has pages by its category: the student lands on the purchased exam's dashboard (its slice as the URL).
     await userEvent.click(screen.getByRole('button', { name: 'Start learning' }));
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/manage-plans'));
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/jee/dashboard'));
   });
 
   it('opens a new exam named by its slice in ?exam= on the common /purchase page', async () => {

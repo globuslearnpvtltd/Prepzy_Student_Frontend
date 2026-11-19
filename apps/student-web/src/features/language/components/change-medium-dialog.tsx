@@ -24,7 +24,8 @@ function OptionsSkeleton() {
 /**
  * "Change course medium": the mediums the current exam offers (every medium outside an exam), the current one marked.
  * Switching saves it, refetches every content list (see useChangeLanguage) and closes with a toast; an error stays in
- * the dialog. An exam with a single medium shows it alone, says so, and has nothing to switch to.
+ * the dialog. An exam with a single medium shows it alone, says so, and has nothing to switch to. When the class on
+ * screen (goal switcher) has books, only its mediums can be picked: the exam's others are listed but disabled.
  * A centred dialog from md up, a bottom sheet on phones. Rendered into body (the header has its own z-index).
  */
 export function ChangeMediumDialog({ onClose }: { onClose: () => void }) {
@@ -55,8 +56,14 @@ export function ChangeMediumDialog({ onClose }: { onClose: () => void }) {
 
   const selectedId = picked ?? current?.id ?? null;
   const selected = options.languages?.find((language) => language.id === selectedId) ?? null;
-  const only = options.exam && options.languages?.length === 1 ? options.languages[0]! : null;
-  const canSwitch = selected !== null && selected.id !== current?.id && !busy;
+  const only =
+    options.classLanguages?.length === 1
+      ? options.classLanguages[0]!
+      : options.exam && options.languages?.length === 1
+        ? options.languages[0]!
+        : null;
+  const onlyFor = options.classLanguages?.length === 1 && options.classLabel ? options.classLabel : (options.exam?.label ?? null);
+  const canSwitch = selected !== null && selected.id !== current?.id && options.isAvailable(selected.id) && !busy;
   const target = selected ? mediumLabel(selected.name).native : '';
 
   const submit = () => {
@@ -115,7 +122,12 @@ export function ChangeMediumDialog({ onClose }: { onClose: () => void }) {
               const label = mediumLabel(language.name);
               const isCurrent = language.id === current?.id;
               const isSelected = language.id === selectedId;
-              const sub = [label.english !== label.native ? label.english : null, isCurrent ? 'Current medium' : null]
+              const available = options.isAvailable(language.id);
+              const sub = [
+                label.english !== label.native ? label.english : null,
+                isCurrent ? 'Current medium' : null,
+                available ? null : `Not available for ${options.classLabel ?? 'this class'}`,
+              ]
                 .filter(Boolean)
                 .join(' · ');
               return (
@@ -125,7 +137,7 @@ export function ChangeMediumDialog({ onClose }: { onClose: () => void }) {
                   role="radio"
                   aria-checked={isSelected}
                   aria-label={isCurrent ? `${label.native} (current medium)` : label.native}
-                  disabled={busy}
+                  disabled={busy || !available}
                   onClick={() => {
                     change.reset();
                     setPicked(language.id);
@@ -133,6 +145,7 @@ export function ChangeMediumDialog({ onClose }: { onClose: () => void }) {
                   className={cx(
                     'flex w-full items-center gap-[12px] rounded-[14px] border px-[12px] py-[10px] text-left transition-colors disabled:cursor-not-allowed',
                     isSelected ? 'border-brand-150 bg-brand-75' : 'border-account-line bg-surface hover:bg-account-soft',
+                    !available && 'opacity-50 hover:bg-surface',
                   )}
                 >
                   <span
@@ -160,8 +173,8 @@ export function ChangeMediumDialog({ onClose }: { onClose: () => void }) {
         )}
 
         <p className="text-neutral-550 text-[12px]">
-          {only && options.exam
-            ? `Only ${mediumLabel(only.name).native} is available for ${options.exam.label}.`
+          {only && onlyFor
+            ? `Only ${mediumLabel(only.name).native} is available for ${onlyFor}.`
             : 'More mediums are on the way.'}
         </p>
         <p className="bg-account-soft text-neutral-550 rounded-[12px] px-[14px] py-[12px] text-[12px] leading-[1.5]">

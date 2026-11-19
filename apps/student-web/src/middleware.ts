@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { DEFAULT_EXAM, findExam } from '@/shared/config/exams';
+import { DEFAULT_EXAM, examSlugOf } from '@/shared/config/exams';
 import {
   isPortalPublicPath,
   portalForHost,
@@ -15,9 +15,10 @@ const EXAM_COOKIE = 'prepzy_exam';
 
 function homeFor(request: NextRequest): string {
   // Old links use either the slug (?exam=neet) or the backend slice (?exam=neet-ug).
-  const fromQuery = findExam(request.nextUrl.searchParams.get('exam'));
-  const fromCookie = findExam(request.cookies.get(EXAM_COOKIE)?.value);
-  return routes.dashboard((fromQuery ?? fromCookie)?.slug ?? DEFAULT_EXAM);
+  // Any exam's slug works (registry slug or exam_slice); the exam layout 404s one that is not an active exam.
+  const fromQuery = examSlugOf(request.nextUrl.searchParams.get('exam'));
+  const fromCookie = examSlugOf(request.cookies.get(EXAM_COOKIE)?.value);
+  return routes.dashboard(fromQuery ?? fromCookie ?? DEFAULT_EXAM);
 }
 
 /**

@@ -24,7 +24,7 @@ describe('competitive mapping edge cases', () => {
     const raws = [question, { ...question, question_id: 2 }, { ...question, question_id: 3 }, { question_id: 4 }];
     let snap = withMarkToggled(emptySnapshot(), '1');
     snap = withVisit(snap, '2');
-    snap = withAnswer(snap, '3', { kind: 'option', optionId: '99' });
+    snap = withAnswer(withVisit(snap, '3'), '3', { kind: 'option', optionId: '99' });
     expect(toCompetitiveAnswers(raws, snap).map((q) => [q.selected_option, q.status])).toEqual([
       [null, 'marked_for_review'],
       [null, 'skipped'],

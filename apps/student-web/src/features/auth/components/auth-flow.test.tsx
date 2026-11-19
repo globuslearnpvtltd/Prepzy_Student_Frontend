@@ -182,17 +182,30 @@ describe('SetupForm', () => {
       onboarded((b) => (body = b)),
     );
     renderWithProviders(<SetupForm />);
+    expect((await screen.findAllByText('Which NEET UG are you writing?')).length).toBeGreaterThan(0);
     await userEvent.click(await screen.findByRole('radio', { name: 'NEET UG 2028' }));
     expect(screen.getByRole('radio', { name: 'NEET UG 2027' })).toBeInTheDocument();
-    // The registry's wording for the bundle.
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Also prepare for CBSE Class 11 & 12 (PCB)' }));
+    // A length with a combo plan asks what to prepare for next (step 5), as in the previous app.
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getAllByText('What are you preparing for?').length).toBeGreaterThan(0);
+    expect(screen.getByRole('radio', { name: 'NEET UG only' })).toHaveTextContent('You get Topper NEET UG Monthly free');
+    const bundle = screen.getByRole('radio', { name: 'NEET UG + CBSE' });
+    // The registry's wording for what the combo adds.
+    expect(bundle).toHaveTextContent('NEET UG only + CBSE Class 11 and 12 (PCB)');
+    expect(bundle).toHaveTextContent('Most Chosen');
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+    // Back returns to the target year, keeping the choice.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Back' })[0]!);
+    expect(screen.getByRole('radio', { name: 'NEET UG 2028' })).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'NEET UG + CBSE' }));
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/welcome?exam=neet'));
     expect(navigation.replace).not.toHaveBeenCalledWith('/get-started');
     expect(body).toMatchObject({ phone: '+919876543210', exam_id: 2, class_id: 21, plan_length: 2, with_bundle: true });
   });
 
-  it('falls back to the current year without an exam date and never sends a bundle the length lacks', async () => {
+  it('falls back to the current year without an exam date and finishes at the year for a length without a combo', async () => {
     useOnboardingStore.getState().startOtp('+919876543210', 'signup');
     useOnboardingStore.getState().selectExam(2, 'NEET-UG');
     let body: Record<string, unknown> = {};
@@ -205,11 +218,47 @@ describe('SetupForm', () => {
     );
     renderWithProviders(<SetupForm />);
     const year = new Date().getFullYear();
-    await userEvent.click(await screen.findByRole('checkbox'));
-    await userEvent.click(screen.getByRole('radio', { name: `NEET UG ${year + 1}` }));
-    expect(screen.getByRole('checkbox')).toBeDisabled();
+    await userEvent.click(await screen.findByRole('radio', { name: `NEET UG ${year + 1}` }));
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => expect(body).toMatchObject({ class_id: 21, plan_length: 1, with_bundle: false }));
+    expect(screen.queryByText('What are you preparing for?')).not.toBeInTheDocument();
+  });
+
+  it('works for a competitive exam without a registry entry: its name, plan lengths and bundle names from the backend', async () => {
+    useOnboardingStore.getState().startOtp('+919876543210', 'signup');
+    useOnboardingStore.getState().selectExam(3, 'JEE Main');
+    let body: Record<string, unknown> = {};
+    server.use(
+      http.get(`${API}/api/v4/exams`, () =>
+        HttpResponse.json({
+          success: true,
+          data: [
+            { exam_id: 1, exam_name: 'CBSE', exam_slice: 'cbse', category: 'board' },
+            { exam_id: 3, exam_name: 'JEE Main', exam_slice: 'jee-main', category: 'competitive' },
+          ],
+        }),
+      ),
+      http.get(`${API}/api/v4/billing/competitive/3/onboarding-options`, () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            choose: 'target_year',
+            plan_lengths: [{ plan_length: 1, target_year: 2027, class_id: 40, has_bundle: true, bundle_options: [{ exam_id: 1, title: 'CBSE' }] }],
+          },
+        }),
+      ),
+      onboarded((b) => (body = b)),
+    );
+    renderWithProviders(<SetupForm />);
+    await userEvent.click(await screen.findByRole('radio', { name: 'JEE Main 2027' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    const bundle = screen.getByRole('radio', { name: 'JEE Main + CBSE' });
+    expect(bundle).toHaveTextContent('JEE Main only + CBSE');
+    expect(bundle).toHaveTextContent('You get Topper JEE Main + CBSE Monthly free');
+    await userEvent.click(screen.getByRole('radio', { name: 'JEE Main only' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(body).toMatchObject({ exam_id: 3, class_id: 40, plan_length: 1, with_bundle: false }));
+    expect(navigation.replace).toHaveBeenCalledWith('/welcome?exam=jee-main');
   });
 
   it('hides the bundle option when no length has one, and shows load errors', async () => {
@@ -230,10 +279,11 @@ describe('SetupForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Plans unavailable');
   });
 
-  it('lets CBSE students pick their class, preselecting from the marketing link', async () => {
+  it('lets board students pick their class, preselecting from the marketing link', async () => {
     useOnboardingStore.getState().startOtp('+919876543210', 'signup');
     useOnboardingStore.getState().selectExam(1, 'CBSE');
     useOnboardingStore.getState().setPreselection({ classId: 12 });
+    let body: Record<string, unknown> = {};
     server.use(
       http.get(`${API}/api/v4/billing/board/1/onboarding-options`, () =>
         HttpResponse.json({ success: true, data: { choose: 'class', plan_lengths: [] } }),
@@ -249,9 +299,42 @@ describe('SetupForm', () => {
           },
         }),
       ),
+      onboarded((b) => (body = b)),
     );
     renderWithProviders(<SetupForm />);
-    expect(await screen.findByRole('radio', { name: 'CLASS 12' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: /CLASS 11/ })).toHaveTextContent('PCM');
+    expect(await screen.findByRole('button', { name: /Class 12/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Class 11/ })).toHaveTextContent('PCM');
+    // Tapping a picked class again clears it (previous app), Continue needs a class.
+    await userEvent.click(screen.getByRole('button', { name: /Class 12/ }));
+    expect(screen.getByRole('button', { name: /Class 12/ })).toHaveAttribute('aria-pressed', 'false');
+    for (const button of screen.getAllByRole('button', { name: 'Continue' })) expect(button).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: /Class 11/ }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Continue' })[0]!);
+    await waitFor(() => expect(body).toMatchObject({ exam_id: 1, class_id: 11 }));
+    expect(body.plan_length).toBeUndefined();
+  });
+
+  it('works for a board exam without a registry entry, with classes it shares with another exam', async () => {
+    useOnboardingStore.getState().startOtp('+919876543210', 'signup');
+    useOnboardingStore.getState().selectExam(10, 'JAC');
+    let body: Record<string, unknown> = {};
+    server.use(
+      http.get(`${API}/api/v4/exams`, () =>
+        HttpResponse.json({ success: true, data: [{ exam_id: 10, exam_name: 'JAC', exam_slice: 'jac2', category: 'board' }] }),
+      ),
+      http.get(`${API}/api/v4/billing/board/10/onboarding-options`, () =>
+        HttpResponse.json({ success: true, data: { choose: 'class', plan_lengths: [] } }),
+      ),
+      http.get(`${API}/api/v4/learn/board/10/classes`, () =>
+        HttpResponse.json({ success: true, data: { classes: [{ class_id: 2, title: 'CLASS 10', exam_id: 1, stream_name: '' }] } }),
+      ),
+      onboarded((b) => (body = b)),
+    );
+    renderWithProviders(<SetupForm />);
+    expect(await screen.findByText('You picked JAC. Pick your class to get started.')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: /Class 10/ }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Continue' })[0]!);
+    await waitFor(() => expect(body).toMatchObject({ exam_id: 10, class_id: 2 }));
+    expect(navigation.replace).toHaveBeenCalledWith('/welcome?exam=jac2');
   });
 });

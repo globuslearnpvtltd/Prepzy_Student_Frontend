@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { toast } from 'sonner';
-import { authKeys, type Student } from '@/features/auth';
+import { authKeys, usePlanSelection, type Student } from '@/features/auth';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { EXAMS, type ExamConfig } from '@/shared/config/exams';
@@ -40,6 +40,27 @@ const JAC: ExamConfig = { ...EXAMS.jac, examId: 4 };
 const examLanguages = (examId: number, rows: unknown) =>
   http.get(`${API}/api/v4/languages/board/${examId}`, () => HttpResponse.json({ success: true, data: rows }));
 const HINDI_ONLY = [{ id: 2, name: 'hindi' }];
+
+/** Active plans of exam 1: class 10 (plan 1) and class 12 (plan 2). */
+const plans = () =>
+  http.get(`${API}/api/v4/student/plans/active`, () =>
+    HttpResponse.json({
+      success: true,
+      data: {
+        plans: [
+          { plan_id: 1, exam_id: 1, class_id: 10, class_name: 'CLASS 10', duration_months: 12, status: 'active' },
+          { plan_id: 2, exam_id: 1, class_id: 12, class_name: 'CLASS 12', duration_months: 12, status: 'active' },
+        ],
+      },
+    }),
+  );
+/** Class 10 of exam 1 has both mediums, class 12 only Hindi. */
+const classLanguages = () =>
+  http.get(`${API}/api/v4/languages/board/1`, ({ request }) => {
+    const classId = new URL(request.url).searchParams.get('class_id');
+    const rows = classId === '12' ? HINDI_ONLY : LANGUAGES;
+    return HttpResponse.json({ success: true, data: rows });
+  });
 
 beforeEach(() => {
   saved = [];
@@ -104,6 +125,22 @@ describe('languageApi', () => {
     await languageApi.change(2, 4);
     await languageApi.change(2);
     expect(saved).toEqual([{ language_id: 2, exam_id: 4 }, { language_id: 2 }]);
+  });
+
+  it("asks for one class's mediums and sends the class with a change", async () => {
+    let url = '';
+    server.use(
+      http.get(`${API}/api/v4/languages/board/1`, ({ request }) => {
+        url = request.url;
+        return HttpResponse.json({ success: true, data: HINDI_ONLY });
+      }),
+      change(),
+    );
+    await expect(languageApi.forExam({ category: 'board', examId: 1 }, 12)).resolves.toEqual(HINDI_ONLY);
+    expect(new URL(url).searchParams.get('class_id')).toBe('12');
+    await languageApi.change(2, 1, 12);
+    await languageApi.change(2, undefined, 12); // a class without the exam isn't sent
+    expect(saved).toEqual([{ language_id: 2, exam_id: 1, class_id: 12 }, { language_id: 2 }]);
   });
 
   it('rejects a change answer without the language', async () => {
@@ -244,6 +281,42 @@ describe('ChangeMediumDialog on an exam page', () => {
 
     expect(await within(dialog).findByRole('radio', { name: 'हिन्दी' })).toBeInTheDocument();
     expect(within(dialog).getByRole('radio', { name: 'English (current medium)' })).toBeInTheDocument();
+  });
+});
+
+describe('the class picked in the goal switcher', () => {
+  afterEach(() => usePlanSelection.setState({ planId: null }));
+
+  it("lists the exam's mediums but only the class's can be picked", async () => {
+    usePlanSelection.setState({ planId: 2 });
+    server.use(account({ id: 2, name: 'hindi' }), languages(), plans(), classLanguages());
+    renderWithProviders(<ChangeMediumDialog onClose={vi.fn()} />, { exam: CBSE });
+    const dialog = screen.getByRole('dialog', { name: 'Change course medium' });
+
+    expect(await within(dialog).findByText('Only हिन्दी is available for Class 12.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('radio', { name: 'हिन्दी (current medium)' })).toBeEnabled();
+    const english = within(dialog).getByRole('radio', { name: 'English' });
+    expect(english).toBeDisabled();
+    expect(english).toHaveTextContent('Not available for Class 12');
+    expect(within(dialog).getByRole('button', { name: 'Switch' })).toBeDisabled();
+  });
+
+  it("switching to a class without books in the saved medium saves the class's medium and says so", async () => {
+    usePlanSelection.setState({ planId: 1 });
+    server.use(account(), plans(), classLanguages(), change());
+    const { queryClient } = renderWithProviders(
+      <ExamProvider value={CBSE}>
+        <ExamLanguageSync exam={CBSE} />
+      </ExamProvider>,
+    );
+    // Class 10 has English books: nothing to do.
+    await waitFor(() => expect(queryClient.getQueryData(languageKeys.class(1, 10))).toEqual(LANGUAGES));
+    expect(saved).toEqual([]);
+
+    // Class 12 has Hindi books only.
+    act(() => usePlanSelection.setState({ planId: 2 }));
+    await waitFor(() => expect(saved).toEqual([{ language_id: 2, exam_id: 1, class_id: 12 }]));
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(`Showing ${CBSE.label} Class 12 in हिन्दी`));
   });
 });
 

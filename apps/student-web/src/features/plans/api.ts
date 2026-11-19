@@ -1,5 +1,5 @@
 import type { ExamCategory, ExamRef } from '@/shared/config/exams';
-import { findExam } from '@/shared/config/exams';
+import { examDesignFor } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { isApiError, userMessage } from '@/shared/lib/errors';
 import { assertOk } from '@/shared/lib/unwrap';
@@ -270,12 +270,15 @@ export const plansApi = {
     );
     const payload = data(body);
     const examKey = text(payload.exam?.exam_key) || exam.examSlice || '';
-    const design = findExam(examKey) ?? findExam(exam.examSlice);
+    const category = toCategory(payload.exam?.category) ?? exam.category;
+    const design =
+      examDesignFor({ examSlice: examKey, name: text(payload.exam?.title), category }) ??
+      (exam.examSlice ? examDesignFor({ examSlice: exam.examSlice, name: text(payload.exam?.title), category }) : null);
     return {
       examId: exam.examId,
       examKey,
       title: text(payload.exam?.title),
-      category: toCategory(payload.exam?.category) ?? exam.category,
+      category,
       slug: design?.slug ?? null,
       variants: (payload.variants ?? []).map(toVariant),
     };

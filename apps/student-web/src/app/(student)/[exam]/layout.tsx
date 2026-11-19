@@ -1,13 +1,17 @@
 import { notFound } from 'next/navigation';
-import { examList, getExam } from '@/shared/config/exams';
+import { examList } from '@/shared/config/exams';
+import { resolveExam } from '@/shared/config/exam-resolver';
 import { ExamFrame } from '@/shared/layout/exam-shell';
 
-/** Only exams in the registry exist; anything else is a 404. */
+/**
+ * Registry exams are prerendered; any other active exam of the backend (its exam_slice as the URL) renders on its
+ * first visit. A slug that names no active exam is a 404.
+ */
 export function generateStaticParams() {
   return examList.map((exam) => ({ exam: exam.slug }));
 }
 
-export const dynamicParams = false;
+export const dynamicParams = true;
 
 export default async function ExamLayout({
   children,
@@ -17,7 +21,7 @@ export default async function ExamLayout({
   params: Promise<{ exam: string }>;
 }) {
   const { exam } = await params;
-  const config = getExam(exam);
+  const config = await resolveExam(exam);
   if (!config) notFound();
-  return <ExamFrame examSlug={config.slug}>{children}</ExamFrame>;
+  return <ExamFrame design={config}>{children}</ExamFrame>;
 }

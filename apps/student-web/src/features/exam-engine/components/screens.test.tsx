@@ -241,7 +241,7 @@ describe('ResultView', () => {
                 question_id: 1,
                 question_text: 'Q1',
                 question_image: 'https://cdn.test/q1.png',
-                options: [{ option_id: 5, text: 'A' }, { option_id: 6, text: 'B' }],
+                options: [{ option_id: 5, text: 'A', image: 'https://cdn.test/opt-a.png' }, { option_id: 6, text: '', option_image: 'https://cdn.test/opt-b.png' }],
                 selected_option_id: 5,
                 correct_option_id: 5,
                 is_correct: true,
@@ -260,6 +260,11 @@ describe('ResultView', () => {
     expect(screen.getByText(/2026/)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Explanation' })).toHaveAttribute('src', 'https://cdn.test/exp.png');
     expect(screen.getByText('Nailed it!')).toBeInTheDocument();
+    // Option pictures show with the text (A) or on their own (B).
+    const options = screen.getByRole('list', { name: 'Options' });
+    expect(within(options).getByText('A')).toBeInTheDocument();
+    expect(options.querySelector('img[src="https://cdn.test/opt-a.png"]')).not.toBeNull();
+    expect(options.querySelector('img[src="https://cdn.test/opt-b.png"]')).not.toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: /Discuss with Vedica/ }));
     expect(await screen.findByRole('dialog', { name: 'Review chat' })).toHaveTextContent('chat 1 77');
@@ -423,13 +428,18 @@ describe('QuestionView', () => {
     expect(screen.getByRole('status')).toHaveTextContent('null');
   });
 
-  it('board: numbered question with marks', () => {
-    renderWithProviders(<Controlled question={mcq} look="board" />);
+  it('board: the numbered question on the grey header strip, with its type and marks', () => {
+    const { container } = renderWithProviders(<Controlled question={mcq} look="board" />);
+    expect(screen.getByRole('heading', { name: /^Question \d+$/ })).toBeInTheDocument();
     expect(screen.getByText('Multiple choice · 1 mark')).toBeInTheDocument();
-    renderWithProviders(<Controlled question={{ ...mcq, id: 'q2', marks: 2 }} look="board" />);
+    expect(container.querySelector('header')!.className).toContain('bg-info-25');
+    renderWithProviders(<Controlled question={{ ...mcq, id: 'q4', marks: 2 }} look="board" />);
     expect(screen.getByText('Multiple choice · 2 marks')).toBeInTheDocument();
-    renderWithProviders(<Controlled question={{ ...mcq, id: 'q3', marks: null, image: null }} look="board" />);
+    renderWithProviders(<Controlled question={{ ...mcq, id: 'q5', marks: null, image: null }} look="board" />);
     expect(screen.getAllByText(/Multiple choice ·/)).toHaveLength(2);
+    // Case-based questions sit on a white header, as before.
+    const caseBased = renderWithProviders(<Controlled question={{ ...mcq, id: 'q2', typeLabel: 'Case based' }} look="board" />);
+    expect(caseBased.container.querySelector('header')!.className).toContain('bg-surface');
   });
 
   it('written: types an answer', async () => {

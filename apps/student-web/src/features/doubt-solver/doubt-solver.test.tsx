@@ -85,6 +85,9 @@ describe('doubt solver api', () => {
     });
     expect(end).toMatchObject({ level: 'Medium', marks: 3, label: null });
     expect(pyq).toMatchObject({ level: 'Hard', label: 'Set A · 2024', options: ['x'] });
+    // A difficulty stored as the word "null" shows no chip.
+    const [unknown] = toBankQuestions({ data: { questions: [{ id: 3, question_text: 'S', difficulty_level: 'Null', year: 2025 }] } });
+    expect(unknown!.level).toBeNull();
     expect(
       toConceptCards({ concept_cards: [{ card_no: 2, title: 'B' }, { card_no: 1, title: 'A', explanation: 'e' }, { card_no: 3 }], sources: { Book: 'NCERT' } }),
     ).toMatchObject({ cards: [{ cardNo: 1 }, { cardNo: 2 }], sources: { book: 'NCERT', chapter: null } });
@@ -153,11 +156,10 @@ describe('Ask Socrates flow', () => {
     }));
     renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     const next = screen.getByRole('button', { name: 'Next' });
-    // Question Bank before choosing a book asks to pick one.
-    await userEvent.click(screen.getByRole('button', { name: 'Question Bank' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Please select a subject first');
-    expect(await screen.findByRole('button', { name: 'Physics, Physics Part 1', pressed: false })).toBeInTheDocument();
-    expect(next).toBeDisabled();
+    // The centre book is selected automatically once the list loads.
+    expect(await screen.findByRole('button', { name: 'Physics, Physics Part 1', pressed: true })).toBeInTheDocument();
+    expect(next).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Next subject' }));
     expect(screen.getByText('Maths Part 1')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Previous subject' }));

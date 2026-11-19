@@ -16,7 +16,10 @@ export function isAnswered(answer: Answer | undefined): boolean {
   }
 }
 
-/** Palette status: review marks win, then answered, then visited-but-blank (skipped). */
+/**
+ * Palette status: review marks win, then answered, then visited-but-blank (skipped). "Visited" is set when a
+ * competitive question is opened, and when a board question is left blank with Skip / Save & Next (useExamAttempt).
+ */
 export function statusOf(questionId: string, snapshot: AttemptSnapshot): QuestionStatus {
   if (snapshot.marked.includes(questionId)) return 'marked';
   if (isAnswered(snapshot.answers[questionId])) return 'answered';
@@ -37,7 +40,8 @@ export function withAnswer(snapshot: AttemptSnapshot, questionId: string, answer
   else if (answer && answer.kind !== 'option')
     answers[questionId] = answer; // keep a written draft that is blank
   else delete answers[questionId];
-  return { ...snapshot, answers, visited: addUnique(snapshot.visited, questionId) };
+  // Answering doesn't mark the question visited: clearing an answer must not make it "skipped".
+  return { ...snapshot, answers };
 }
 
 export function withVisit(snapshot: AttemptSnapshot, questionId: string): AttemptSnapshot {

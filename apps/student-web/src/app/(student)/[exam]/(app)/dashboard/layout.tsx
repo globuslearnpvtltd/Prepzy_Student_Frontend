@@ -1,8 +1,25 @@
-import { DM_Sans, Patrick_Hand } from 'next/font/google';
+import localFont from 'next/font/local';
 
-/** Journey card on the dashboard (previous app's DiagnosticCardArt / MobileNotebookCard): DM Sans + Patrick Hand. */
-const dmSans = DM_Sans({ subsets: ['latin'], weight: ['500', '700'], display: 'swap', variable: '--font-dm-sans-face' });
-const patrickHand = Patrick_Hand({ subsets: ['latin'], weight: '400', display: 'swap', variable: '--font-patrick-hand-face' });
+/*
+ * Journey card on the dashboard (previous app's DiagnosticCardArt / MobileNotebookCard): DM Sans + Patrick Hand.
+ * Self-hosted (Latin woff2 files in src/app/fonts/journey, SIL Open Font License) instead of next/font/google: the
+ * staging server's build failed fetching DM Sans from Google Fonts ("Cannot read properties of null (reading '1')"),
+ * and a build must not depend on reaching Google.
+ */
+const dmSans = localFont({
+  src: [
+    { path: '../../../../fonts/journey/dm-sans-500.woff2', weight: '500', style: 'normal' },
+    { path: '../../../../fonts/journey/dm-sans-700.woff2', weight: '700', style: 'normal' },
+  ],
+  display: 'swap',
+  variable: '--font-dm-sans-face',
+});
+const patrickHand = localFont({
+  src: '../../../../fonts/journey/patrick-hand-400.woff2',
+  weight: '400',
+  display: 'swap',
+  variable: '--font-patrick-hand-face',
+});
 
 /**
  * Dashboard pages. `--font-notebook` / `--font-hand` are re-declared where the font variables exist, so the

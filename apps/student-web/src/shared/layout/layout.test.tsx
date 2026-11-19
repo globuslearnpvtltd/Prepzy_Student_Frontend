@@ -534,8 +534,8 @@ describe('account menu', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Switch to हिन्दी' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Change course medium' })).not.toBeInTheDocument());
-    // Saved with the exam on screen, so the backend checks CBSE offers it.
-    expect(saved).toEqual({ language_id: 2, exam_id: 1 });
+    // Saved with the exam and class on screen, so the backend checks they offer it.
+    expect(saved).toEqual({ language_id: 2, exam_id: 1, class_id: 12 });
     expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) });
     await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
     expect(await screen.findByRole('menuitem', { name: 'Medium: हिन्दी' })).toBeInTheDocument();

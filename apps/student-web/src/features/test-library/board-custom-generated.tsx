@@ -10,6 +10,7 @@ const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, (c) => c.t
  * "Test Generated Successfully!" after a board custom test is generated (previous app's CustomExamCreationSuccessModal):
  * blurred page behind (as before; z 52/53 so it sits above the custom-test dialog at 51 and blurs it too), purple header with a trophy, a summary card (course, difficulty, selected topics), then "Take Test Now" (opens the
  * test) or "Save for Later" (back to Assessments, where it is listed under Saved Tests). Closing it saves for later.
+ * NEET's custom test uses it too: `itemLabel` "Chapter" with the chapter name, and its own save hint.
  */
 export function BoardCustomGenerated({
   open,
@@ -18,9 +19,14 @@ export function BoardCustomGenerated({
   topicsCount,
   onTakeNow,
   onSaveForLater,
+  itemLabel = 'Course',
+  saveHint = 'Add to Tests & Quizzes',
 }: {
   open: boolean;
+  /** The course (board) or chapter (competitive) the test was built from. */
   course: string;
+  itemLabel?: string;
+  saveHint?: string;
   difficulty: string;
   topicsCount: number;
   onTakeNow: () => void;
@@ -49,7 +55,7 @@ export function BoardCustomGenerated({
           <div className="border-generated-line bg-generated-soft flex flex-col gap-4 rounded-[20px] border-2 p-[22px]">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-col gap-[5px]">
-                <p className="text-generated-label m-0 text-[12px] leading-4 font-semibold">Course</p>
+                <p className="text-generated-label m-0 text-[12px] leading-4 font-semibold">{itemLabel}</p>
                 <p className="m-0 text-[16px] leading-[19.2px] font-bold text-neutral-950">{titleCase(course)}</p>
               </div>
               <p className="bg-generated-primary text-on-brand m-0 shrink-0 rounded-full px-3 py-1.5 text-[12px] leading-4 font-bold">
@@ -85,7 +91,7 @@ export function BoardCustomGenerated({
               iconClass="bg-neutral-100"
               title="Save for Later"
               titleClass="text-neutral-700"
-              hint="Add to Tests & Quizzes"
+              hint={saveHint}
               hintClass="text-generated-label"
             />
           </div>

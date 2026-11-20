@@ -43,7 +43,7 @@ const plan = (classId = 12) =>
 const textbooks = {
   subject_courses: [
     { subject_id: 1, subject_name: 'PHYSICS', textbooks: [{ id: 11, class_name: 'CLASS 12', textbook_name: 'Physics Part 1', textbook_image: null }] },
-    { subject_id: 2, subject_name: 'HINDI', textbooks: [{ id: 21, class_name: 'CLASS 12', textbook_name: 'Aroh', textbook_image: null }] },
+    { subject_id: 2, subject_name: 'SANSKRIT', textbooks: [{ id: 21, class_name: 'CLASS 12', textbook_name: 'Shemushi', textbook_image: null }] },
     { subject_id: 3, subject_name: 'MATHEMATICS', textbooks: [{ id: 31, class_name: 'CLASS 12', textbook_name: 'Maths Part 1', textbook_image: null }] },
   ],
 };
@@ -179,7 +179,7 @@ describe('Ask Socrates flow', () => {
       }),
     );
     renderWithProviders(<DoubtSolverScreen />, { exam: neet });
-    expect(await screen.findByRole('button', { name: 'Hindi, Aroh' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Sanskrit, Shemushi' })).toBeInTheDocument();
   });
 
   it('start options lead to asking or the question bank', async () => {

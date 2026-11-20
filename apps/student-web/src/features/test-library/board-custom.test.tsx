@@ -11,14 +11,20 @@ import { testExam } from '@/test/exams';
 const cbse = testExam('cbse');
 
 const plan = http.get(`${API}/api/v4/student/plans/active`, () =>
-  HttpResponse.json({ success: true, data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'XII', duration_months: 12, status: 'active' }] } }),
+  HttpResponse.json({
+    success: true,
+    data: { plans: [{ plan_id: 1, class_id: 12, class_name: 'XII', duration_months: 12, status: 'active' }] },
+  }),
 );
 const topics = Array.from({ length: 7 }, (_, i) => ({ topic_id: i + 1, topic_name: `Topic ${i + 1}` }));
 const builderApi = (generate: Record<string, unknown>, onBody?: (body: unknown) => void) => [
   plan,
   http.get(`${API}/api/v4/assessments/board/1/custom/courses`, ({ request }) => {
     expect(new URL(request.url).searchParams.get('class_id')).toBe('12');
-    return HttpResponse.json({ success: true, data: [{ course_id: 11, course_name: 'Physics Part 1', subject_name: 'Physics' }] });
+    return HttpResponse.json({
+      success: true,
+      data: [{ course_id: 11, course_name: 'Physics Part 1', subject_name: 'Physics' }],
+    });
   }),
   http.get(`${API}/api/v4/assessments/board/1/custom/courses/11/modules`, () =>
     HttpResponse.json({ success: true, data: [{ module_id: 101, module_name: 'ELECTRIC CHARGES', topics }] }),
@@ -59,7 +65,23 @@ describe('board custom test builder', () => {
     await user.click(within(done).getByRole('button', { name: /Take Test Now/ }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/cbse/tests/custom/77'));
     expect(body).toEqual({ module_id: 101, topic_ids: [1, 2, 3, 4, 5], difficulty_level: 'hard' });
-    expect(within(screen.getByRole('complementary', { name: 'Selection Summary', hidden: true })).getByText('5')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('complementary', { name: 'Selection Summary', hidden: true })).getByText('5'),
+    ).toBeInTheDocument();
+  });
+
+  it('counts the chapter in the Selection Summary as soon as it is picked', async () => {
+    server.use(...builderApi({ set_id: 79, total: 20 }));
+    const user = userEvent.setup();
+    renderWithProviders(<BoardCustomTestBuilder open onOpenChange={() => {}} />, { exam: cbse });
+    const summary = screen.getByRole('complementary', { name: 'Selection Summary', hidden: true });
+    const chapters = () => within(summary).getByText('Chapters').previousElementSibling;
+    await user.click(await screen.findByRole('button', { name: /Physics Part 1/ }));
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(chapters()).toHaveTextContent('0');
+    await user.click(await screen.findByRole('button', { name: /Electric Charges/ }));
+    expect(chapters()).toHaveTextContent('1');
+    expect(within(summary).getByText('Electric Charges')).toBeInTheDocument();
   });
 
   it('"Save for Later" closes the builder and keeps the test for Saved Tests', async () => {
@@ -72,7 +94,9 @@ describe('board custom test builder', () => {
     await user.click(within(done).getByRole('button', { name: /Save for Later/ }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(navigation.push).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Test Generated Successfully!' })).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Test Generated Successfully!' })).not.toBeInTheDocument(),
+    );
   });
 
   it('explains when the chosen topics have no questions', async () => {
@@ -85,7 +109,12 @@ describe('board custom test builder', () => {
   });
 
   it('opens from the Assessments page buttons', async () => {
-    server.use(...builderApi({}), http.get(`${API}/api/v4/assessments/board/1/custom/sets`, () => HttpResponse.json({ success: true, data: { sets: [] } })));
+    server.use(
+      ...builderApi({}),
+      http.get(`${API}/api/v4/assessments/board/1/custom/sets`, () =>
+        HttpResponse.json({ success: true, data: { sets: [] } }),
+      ),
+    );
     const user = userEvent.setup();
     renderWithProviders(<BoardAssessments />, { exam: cbse });
     await user.click(screen.getByRole('button', { name: 'Customize Test' }));
@@ -107,7 +136,17 @@ describe('board saved custom tests', () => {
         return HttpResponse.json({
           success: true,
           data: {
-            sets: [{ set_id: 71, course_name: 'Physics Part 1', subject_name: 'Physics', difficulty_level: 'easy', total_marks: 40, total_questions: 20, created_at: '2026-10-02T10:00:00Z' }],
+            sets: [
+              {
+                set_id: 71,
+                course_name: 'Physics Part 1',
+                subject_name: 'Physics',
+                difficulty_level: 'easy',
+                total_marks: 40,
+                total_questions: 20,
+                created_at: '2026-10-02T10:00:00Z',
+              },
+            ],
           },
         });
       }),
@@ -116,7 +155,16 @@ describe('board saved custom tests', () => {
           success: true,
           data: {
             set_id: 71,
-            attempts: [{ attempt_id: 501, attempt_number: 1, attempt_date: '2026-10-03T10:00:00Z', total_questions: 20, total_marks: 40, total_marks_obtained: 28 }],
+            attempts: [
+              {
+                attempt_id: 501,
+                attempt_number: 1,
+                attempt_date: '2026-10-03T10:00:00Z',
+                total_questions: 20,
+                total_marks: 40,
+                total_marks_obtained: 28,
+              },
+            ],
           },
         }),
       ),
@@ -128,6 +176,9 @@ describe('board saved custom tests', () => {
     expect(screen.getByRole('link', { name: 'Attempt Exam' })).toHaveAttribute('href', '/cbse/tests/custom/71');
     await user.click(screen.getByRole('button', { name: 'View Submissions' }));
     expect(await screen.findByText('Score: 28 / 40 (70%)')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'View Score Card' })).toHaveAttribute('href', '/cbse/tests/custom/result/501');
+    expect(screen.getByRole('link', { name: 'View Score Card' })).toHaveAttribute(
+      'href',
+      '/cbse/tests/custom/result/501',
+    );
   });
 });

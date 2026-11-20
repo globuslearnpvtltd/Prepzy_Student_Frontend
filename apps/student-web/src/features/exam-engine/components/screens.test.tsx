@@ -57,7 +57,9 @@ describe('TestHub', () => {
 
 describe('competitive player / result page box', () => {
   it('is full width and left-aligned with the old 18px / 48px padding (no centred column)', () => {
-    expect(competitivePage.split(' ')).toEqual(expect.arrayContaining(['w-full', 'max-w-[1760px]', 'px-[18px]', 'pt-[18px]', 'lg:p-12']));
+    expect(competitivePage.split(' ')).toEqual(
+      expect.arrayContaining(['w-full', 'max-w-[1760px]', 'px-[18px]', 'pt-[18px]', 'lg:p-12']),
+    );
     expect(competitivePage).not.toContain('mx-auto');
   });
 });
@@ -88,7 +90,10 @@ describe('SetCard', () => {
 
   it('resumes a paper in progress without optional details', () => {
     renderWithProviders(
-      <SetCard set={set({ status: 'in-progress', subtitle: null, questionCount: null, durationMinutes: null })} testType="mock" />,
+      <SetCard
+        set={set({ status: 'in-progress', subtitle: null, questionCount: null, durationMinutes: null })}
+        testType="mock"
+      />,
       { exam: cbse },
     );
     expect(screen.getByText('In progress')).toBeInTheDocument();
@@ -99,7 +104,10 @@ describe('SetCard', () => {
 
   it('offers a retake and the last result of a completed paper', () => {
     renderWithProviders(
-      <SetCard set={set({ status: 'completed', lastScore: { obtained: 61, total: 80 }, lastAttemptId: '300' })} testType="pyq" />,
+      <SetCard
+        set={set({ status: 'completed', lastScore: { obtained: 61, total: 80 }, lastAttemptId: '300' })}
+        testType="pyq"
+      />,
       { exam: cbse },
     );
     expect(screen.getByText('Last score 61/80')).toBeInTheDocument();
@@ -138,7 +146,9 @@ describe('TestSets', () => {
 
   it('shows plan loading errors', async () => {
     server.use(
-      http.get(`${API}/api/v4/student/plans/active`, () => HttpResponse.json({ success: false, message: 'Plan lookup failed' })),
+      http.get(`${API}/api/v4/student/plans/active`, () =>
+        HttpResponse.json({ success: false, message: 'Plan lookup failed' }),
+      ),
     );
     renderWithProviders(<TestSets testType="mock" />, { exam: cbse });
     expect(await screen.findByText('Plan lookup failed')).toBeInTheDocument();
@@ -173,7 +183,10 @@ describe('TestSets', () => {
   });
 
   it('tells the student when their class has no subjects yet', async () => {
-    server.use(plans([cbsePlan]), http.get(`${API}/api/v4/assessments/board/1/pyq/subjects`, () => HttpResponse.json({ success: true })));
+    server.use(
+      plans([cbsePlan]),
+      http.get(`${API}/api/v4/assessments/board/1/pyq/subjects`, () => HttpResponse.json({ success: true })),
+    );
     renderWithProviders(<TestSets testType="pyq" />, { exam: cbse });
     expect(await screen.findByText('No papers are available for your class yet.')).toBeInTheDocument();
   });
@@ -181,15 +194,21 @@ describe('TestSets', () => {
   it('shows subject and paper loading errors', async () => {
     server.use(
       plans([cbsePlan]),
-      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () => HttpResponse.json({ success: false, message: 'Subjects down' })),
+      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () =>
+        HttpResponse.json({ success: false, message: 'Subjects down' }),
+      ),
     );
     const { unmount } = renderWithProviders(<TestSets testType="mock" />, { exam: cbse });
     expect(await screen.findByText('Subjects down')).toBeInTheDocument();
     unmount();
 
     server.use(
-      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () => HttpResponse.json({ success: true, data: [{ subject_id: 3, subject_title: 'Physics' }] })),
-      http.get(`${API}/api/v4/assessments/board/1/mock/sets`, () => HttpResponse.json({ success: false, message: 'Papers down' })),
+      http.get(`${API}/api/v4/assessments/board/1/mock/subjects`, () =>
+        HttpResponse.json({ success: true, data: [{ subject_id: 3, subject_title: 'Physics' }] }),
+      ),
+      http.get(`${API}/api/v4/assessments/board/1/mock/sets`, () =>
+        HttpResponse.json({ success: false, message: 'Papers down' }),
+      ),
     );
     renderWithProviders(<TestSets testType="mock" />, { exam: cbse });
     expect(await screen.findByText('Papers down')).toBeInTheDocument();
@@ -199,7 +218,10 @@ describe('TestSets', () => {
     server.use(
       plans([]),
       http.get(`${API}/api/v4/assessments/competitive/2/dpp/live`, () =>
-        HttpResponse.json({ success: true, data: { dpp: { dpp_id: 7, dpp_name: 'DPP 7' }, question_count: 10, attempt: null } }),
+        HttpResponse.json({
+          success: true,
+          data: { dpp: { dpp_id: 7, dpp_name: 'DPP 7' }, question_count: 10, attempt: null },
+        }),
       ),
     );
     renderWithProviders(<TestSets testType="dpp" />, { exam: neet });
@@ -235,13 +257,22 @@ describe('ResultView', () => {
         HttpResponse.json({
           success: true,
           data: {
-            summary: { name: 'Full mock 1', total_marks: 8, total_marks_obtained: 4, set_id: 4, attempt_date: '2026-11-01T10:00:00Z' },
+            summary: {
+              name: 'Full mock 1',
+              total_marks: 8,
+              total_marks_obtained: 4,
+              set_id: 4,
+              attempt_date: '2026-11-01T10:00:00Z',
+            },
             questions: [
               {
                 question_id: 1,
                 question_text: 'Q1',
                 question_image: 'https://cdn.test/q1.png',
-                options: [{ option_id: 5, text: 'A', image: 'https://cdn.test/opt-a.png' }, { option_id: 6, text: '', option_image: 'https://cdn.test/opt-b.png' }],
+                options: [
+                  { option_id: 5, text: 'A', image: 'https://cdn.test/opt-a.png' },
+                  { option_id: 6, text: '', option_image: 'https://cdn.test/opt-b.png' },
+                ],
                 selected_option_id: 5,
                 correct_option_id: 5,
                 is_correct: true,
@@ -280,6 +311,33 @@ describe('ResultView', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /^Back/ }));
     expect(navigation.push).toHaveBeenCalledWith('/neet/mock-tests');
+  });
+
+  it('competitive result: Back returns to the page the test was opened from when there is one', async () => {
+    const nav = window as { navigation?: unknown };
+    nav.navigation = { canGoBack: true };
+    try {
+      renderWithProviders(
+        <ResultContent
+          category="competitive"
+          home={{ label: 'Learn', href: '/neet/learn' }}
+          result={{
+            title: 'Chapter practice',
+            totalMarks: 0,
+            obtained: 0,
+            attemptedAt: null,
+            counts: { correct: 0, incorrect: 0, partial: 0, unattempted: 0 },
+            questions: [],
+          }}
+        />,
+        { exam: neet },
+      );
+      await userEvent.click(screen.getByRole('button', { name: /^Back/ }));
+      expect(navigation.back).toHaveBeenCalled();
+      expect(navigation.push).not.toHaveBeenCalledWith('/neet/learn');
+    } finally {
+      delete nav.navigation;
+    }
   });
 
   it('explains a failed load with a way back (HTTP 200 + success:false)', async () => {
@@ -382,7 +440,10 @@ describe('ResultView', () => {
     expect(screen.getByText('Not Attempted')).toBeInTheDocument();
     expect(screen.getByText('Incorrect')).toBeInTheDocument();
     // No paper id in the result: discussing falls back to the doubt solver.
-    expect(screen.getAllByRole('link', { name: /Discuss with Vedica/ })[0]).toHaveAttribute('href', '/cbse/doubt-solver');
+    expect(screen.getAllByRole('link', { name: /Discuss with Vedica/ })[0]).toHaveAttribute(
+      'href',
+      '/cbse/doubt-solver',
+    );
   });
 });
 
@@ -406,7 +467,13 @@ function Controlled({ question, look }: { question: ExamQuestion; look?: 'board'
   const [answer, setAnswer] = useState<Answer | undefined>();
   return (
     <>
-      <QuestionView question={question} number={3} answer={answer} onAnswer={(a) => setAnswer(a ?? undefined)} look={look} />
+      <QuestionView
+        question={question}
+        number={3}
+        answer={answer}
+        onAnswer={(a) => setAnswer(a ?? undefined)}
+        look={look}
+      />
       <output>{JSON.stringify(answer ?? null)}</output>
     </>
   );
@@ -438,7 +505,9 @@ describe('QuestionView', () => {
     renderWithProviders(<Controlled question={{ ...mcq, id: 'q5', marks: null, image: null }} look="board" />);
     expect(screen.getAllByText(/Multiple choice ·/)).toHaveLength(2);
     // Case-based questions sit on a white header, as before.
-    const caseBased = renderWithProviders(<Controlled question={{ ...mcq, id: 'q2', typeLabel: 'Case based' }} look="board" />);
+    const caseBased = renderWithProviders(
+      <Controlled question={{ ...mcq, id: 'q2', typeLabel: 'Case based' }} look="board" />,
+    );
     expect(caseBased.container.querySelector('header')!.className).toContain('bg-surface');
   });
 
@@ -493,7 +562,9 @@ describe('submit flow', () => {
       />,
     );
     const dialog = screen.getByRole('dialog', { name: 'Submit your test?' });
-    expect(dialog).toHaveTextContent('You have answered 3 of 5 questions. 2 are still unanswered. 1 are marked for review.');
+    expect(dialog).toHaveTextContent(
+      'You have answered 3 of 5 questions. 2 are still unanswered. 1 are marked for review.',
+    );
     expect(dialog).toHaveTextContent('Written answers are evaluated');
     expect(dialog).toHaveTextContent("We couldn't submit. Your answers are saved");
     await userEvent.click(within(dialog).getByRole('button', { name: 'Submit' }));

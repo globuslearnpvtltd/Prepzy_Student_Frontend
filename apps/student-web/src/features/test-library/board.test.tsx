@@ -39,7 +39,7 @@ describe('BoardAssessments: full length exams', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Past Year Exams' }));
     expect(screen.getByRole('tab', { name: 'Past Year Exams' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByRole('link', { name: /chemistry/i })).toHaveAttribute('href', '/cbse/pyq-sets/5');
-    expect(screen.getByText(/Actual CBSE board papers/)).toBeInTheDocument();
+    expect(screen.getByText(/Actual CBSE papers from previous years/)).toBeInTheDocument();
   });
 
   it('says "Coming Soon" without subjects and shows load errors', async () => {

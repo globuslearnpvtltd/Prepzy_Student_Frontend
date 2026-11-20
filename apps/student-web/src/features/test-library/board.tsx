@@ -15,25 +15,27 @@ import { BoardCustomTestBuilder, BoardSavedTests } from './board-custom';
 import { libraryApi, type BoardPaper, type BoardPaperKind } from './api';
 import { EmptyState, GridSkeleton, LoadError, pad2 } from './kit';
 
-const KIND_COPY: Record<BoardPaperKind, { tab: string; title: string; text: string; page: string }> = {
-  mock: {
-    tab: 'Mock Exams',
-    title: 'Mock Exams',
-    text: 'Timed CBSE mock exams per subject with detailed, personalized feedback after every attempt.',
-    page: 'Mock Exams',
-  },
-  pyq: {
-    tab: 'Past Year Exams',
-    title: 'Past Year Exams',
-    text: 'Actual CBSE board papers from previous years, evaluated like the real exam.',
-    page: 'Previous Year Papers',
-  },
-};
+/** `text` names the exam on screen (its label, e.g. "CBSE", "JAC"). */
+const KIND_COPY: Record<BoardPaperKind, { tab: string; title: string; text: (exam: string) => string; page: string }> =
+  {
+    mock: {
+      tab: 'Mock Exams',
+      title: 'Mock Exams',
+      text: (exam) => `Timed ${exam} mock exams per subject with detailed, personalized feedback after every attempt.`,
+      page: 'Mock Exams',
+    },
+    pyq: {
+      tab: 'Past Year Exams',
+      title: 'Past Year Exams',
+      text: (exam) => `Actual ${exam} papers from previous years, evaluated like the real exam.`,
+      page: 'Previous Year Papers',
+    },
+  };
 
 const setsRoute = (kind: BoardPaperKind, exam: string, subjectId: string) =>
   kind === 'mock' ? routes.mockSets(exam, subjectId) : routes.pyqSets(exam, subjectId);
 
-/** CBSE Assessments hub (previous app's [exam]/(dashboard)/assessments). */
+/** Board Assessments hub (previous app's [exam]/(dashboard)/assessments). */
 export function BoardAssessments() {
   const [sheet, setSheet] = useState<'create' | 'saved' | null>(null);
   // Study-plan tasks link here with ?open=custom-test to open the builder straight away (as before).
@@ -50,8 +52,13 @@ export function BoardAssessments() {
         <h1 className="md:text-brand text-[28px] leading-7 font-bold text-neutral-950 md:text-[64px] md:leading-[64px]">
           Assessments
         </h1>
-        <section className="border-brand-150 bg-brand-50 flex flex-col gap-5 rounded-[20px] border-2 p-6" aria-labelledby="custom-practice">
-          <p className="bg-brand-100 text-brand w-fit rounded-full p-3 text-xs leading-3 font-semibold">CUSTOM PRACTICE</p>
+        <section
+          className="border-brand-150 bg-brand-50 flex flex-col gap-5 rounded-[20px] border-2 p-6"
+          aria-labelledby="custom-practice"
+        >
+          <p className="bg-brand-100 text-brand w-fit rounded-full p-3 text-xs leading-3 font-semibold">
+            CUSTOM PRACTICE
+          </p>
           <div className="flex flex-col gap-3">
             <h2 id="custom-practice" className="text-xl leading-5 font-bold text-neutral-950">
               Build Your Own Test
@@ -75,7 +82,11 @@ export function BoardAssessments() {
             </button>
           </div>
           <BoardCustomTestBuilder open={sheet === 'create'} onOpenChange={(open) => setSheet(open ? 'create' : null)} />
-          <BoardSavedTests open={sheet === 'saved'} onOpenChange={(open) => setSheet(open ? 'saved' : null)} onCreate={() => setSheet('create')} />
+          <BoardSavedTests
+            open={sheet === 'saved'}
+            onOpenChange={(open) => setSheet(open ? 'saved' : null)}
+            onCreate={() => setSheet('create')}
+          />
         </section>
         <ContinueAssessment />
         <FullLengthExams />
@@ -114,7 +125,11 @@ function FullLengthExams() {
       <h2 id="full-length" className="text-neutral-850 text-[16px] leading-6 font-semibold md:text-[20px]">
         Full Length Practice Exams
       </h2>
-      <div role="tablist" aria-label="Exam type" className="border-neutral-150 bg-surface grid grid-cols-2 gap-2 rounded-[20px] border-2 p-2">
+      <div
+        role="tablist"
+        aria-label="Exam type"
+        className="border-neutral-150 bg-surface grid grid-cols-2 gap-2 rounded-[20px] border-2 p-2"
+      >
         {(['mock', 'pyq'] as const).map((k) => (
           <button
             key={k}
@@ -137,7 +152,7 @@ function FullLengthExams() {
         </span>
         <div className="flex flex-col gap-2">
           <p className="text-brand text-[20px] leading-5 font-bold">{copy.title}</p>
-          <p className="text-sm font-medium text-neutral-900">{copy.text}</p>
+          <p className="text-sm font-medium text-neutral-900">{copy.text(exam.label)}</p>
         </div>
       </div>
       {subjects.isPending ? (
@@ -197,13 +212,22 @@ export function BoardPaperSets({ kind, subjectId }: { kind: BoardPaperKind; subj
     <div className="flex flex-col">
       <div className="bg-surface flex flex-col gap-6 px-5 pt-8 pb-10 md:px-10">
         <div className="flex items-center justify-between gap-4">
-          <Link href={routes.assessments(exam.slug)} aria-label="Back to Assessments" className="border-neutral-150 flex size-10 items-center justify-center rounded-full border">
+          <Link
+            href={routes.assessments(exam.slug)}
+            aria-label="Back to Assessments"
+            className="border-neutral-150 flex size-10 items-center justify-center rounded-full border"
+          >
             <ChevronLeft aria-hidden className="size-5" />
           </Link>
           <h1 className="text-[28px] font-semibold text-neutral-950">{KIND_COPY[kind].page}</h1>
           <div className="flex gap-2">
             {(query.data?.subjects.length ?? 0) > 1 && (
-              <select aria-label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} className={select}>
+              <select
+                aria-label="Subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className={select}
+              >
                 {query.data!.subjects.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.title}
@@ -229,7 +253,12 @@ export function BoardPaperSets({ kind, subjectId }: { kind: BoardPaperKind; subj
                 tone === 'brand' ? 'border-brand-150 bg-canvas' : 'border-accent-100 bg-accent-50',
               )}
             >
-              <span className={cx('text-on-brand flex size-10 items-center justify-center rounded-lg', tone === 'brand' ? 'bg-brand' : 'bg-accent-400')}>
+              <span
+                className={cx(
+                  'text-on-brand flex size-10 items-center justify-center rounded-lg',
+                  tone === 'brand' ? 'bg-brand' : 'bg-accent-400',
+                )}
+              >
                 <Icon aria-hidden className="size-5" />
               </span>
               <dt className="text-foreground-subtle text-[16px]">{label}</dt>
@@ -265,7 +294,8 @@ function PaperCard({ paper, kind }: { paper: BoardPaper; kind: BoardPaperKind })
   const exam = useExam();
   const Icon = STATUS_ICON[paper.status];
   const play = routes.testPlayer(exam.slug, kind, paper.setId);
-  const percent = paper.maxScore > 0 && paper.lastScore !== null ? Math.round((paper.lastScore / paper.maxScore) * 100) : 0;
+  const percent =
+    paper.maxScore > 0 && paper.lastScore !== null ? Math.round((paper.lastScore / paper.maxScore) * 100) : 0;
   const rows: [string, string][] = [
     ['Duration', paper.durationLabel ? paper.durationLabel.replace(/hrs?/i, 'Hours') : '3 Hours'],
     ['Total questions', String(paper.questionCount)],
@@ -275,15 +305,20 @@ function PaperCard({ paper, kind }: { paper: BoardPaper; kind: BoardPaperKind })
     rows.push(['Last Attempted', new Date(paper.lastAttemptedAt).toLocaleDateString('en-GB')]);
   const button = 'flex h-10 flex-1 items-center justify-center rounded-xl text-xs font-semibold';
   return (
-    <article className="border-neutral-150 bg-surface flex h-full flex-col gap-4 rounded-[20px] border-2 p-5 shadow-card">
+    <article className="border-neutral-150 bg-surface shadow-card flex h-full flex-col gap-4 rounded-[20px] border-2 p-5">
       <div className="flex items-start justify-between">
         <div className="flex gap-2">
-          <span className="bg-brand text-on-brand rounded-lg px-3 py-2 text-xs font-semibold uppercase">{exam.label}</span>
+          <span className="bg-brand text-on-brand rounded-lg px-3 py-2 text-xs font-semibold uppercase">
+            {exam.label}
+          </span>
           <span className="border-neutral-150 text-brand rounded-lg border-2 px-3 py-2 text-xs font-semibold">
             {paper.year ? paper.year : `SET ${paper.setNumber}`}
           </span>
         </div>
-        <span className="bg-accent-400 text-on-brand flex size-10 items-center justify-center rounded-lg" aria-label={paper.status}>
+        <span
+          className="bg-accent-400 text-on-brand flex size-10 items-center justify-center rounded-lg"
+          aria-label={paper.status}
+        >
           <Icon aria-hidden className="size-5" />
         </span>
       </div>
@@ -330,7 +365,10 @@ function PaperCard({ paper, kind }: { paper: BoardPaper; kind: BoardPaperKind })
         {paper.status === 'completed' ? (
           <>
             {paper.attemptId && (
-              <Link href={routes.testResult(exam.slug, kind, paper.attemptId)} className={cx(button, 'border-brand bg-brand-50 text-brand border')}>
+              <Link
+                href={routes.testResult(exam.slug, kind, paper.attemptId)}
+                className={cx(button, 'border-brand bg-brand-50 text-brand border')}
+              >
                 Review
               </Link>
             )}

@@ -2,10 +2,29 @@
 
 import { cx } from '@prepzy/design-system';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, Check, ChevronDown, ClipboardList, Clock, Info, Layers, Lightbulb, Plus, X } from 'lucide-react';
+import {
+  ArrowRight,
+  BookOpen,
+  Check,
+  ChevronDown,
+  ClipboardList,
+  Clock,
+  Info,
+  Layers,
+  Lightbulb,
+  Plus,
+  X,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { modulesOf, toSentenceCase, useClassContext, useSyllabus, type DiagnosticRules, type SyllabusSubject } from '@/features/study-plan';
+import {
+  modulesOf,
+  toSentenceCase,
+  useClassContext,
+  useSyllabus,
+  type DiagnosticRules,
+  type SyllabusSubject,
+} from '@/features/study-plan';
 import { BackButton, Breadcrumb, Notice, ProgressRing, ScreenLoader, stickyFooter } from '@/features/study-plan/ui';
 import type { ExamRef } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
@@ -16,7 +35,7 @@ const STEPS = ['Select Topics', 'Review Blueprint', 'Take Test'];
 
 export function Stepper({ current, onBack, backHref }: { current: 1 | 2 | 3; onBack?: () => void; backHref?: string }) {
   return (
-    <div className="border-neutral-150 flex w-full items-center justify-between gap-4 md:h-20 md:rounded-2xl md:border md:bg-surface md:p-5 md:shadow-[0px_18px_44px_rgba(61,52,139,0.06)]">
+    <div className="border-neutral-150 md:bg-surface flex w-full items-center justify-between gap-4 md:h-20 md:rounded-2xl md:border md:p-5 md:shadow-[0px_18px_44px_rgba(61,52,139,0.06)]">
       <BackButton onClick={onBack} href={backHref} />
       <ol className="flex min-w-0 items-center gap-2 overflow-x-auto md:gap-4">
         {STEPS.map((label, i) => {
@@ -24,7 +43,12 @@ export function Stepper({ current, onBack, backHref }: { current: 1 | 2 | 3; onB
           const lit = current >= n;
           return (
             <li key={label} className="flex shrink-0 items-center gap-2">
-              <span className={cx('flex size-7 items-center justify-center rounded-[14px] text-[13px] font-bold tabular-nums md:font-semibold', lit ? 'bg-brand text-on-brand' : 'bg-brand-125 text-neutral-400')}>
+              <span
+                className={cx(
+                  'flex size-7 items-center justify-center rounded-[14px] text-[13px] font-bold tabular-nums md:font-semibold',
+                  lit ? 'bg-brand text-on-brand' : 'bg-brand-125 text-neutral-400',
+                )}
+              >
                 {current > n ? (
                   <>
                     <Check aria-hidden className="size-[14px] md:hidden" />
@@ -34,8 +58,20 @@ export function Stepper({ current, onBack, backHref }: { current: 1 | 2 | 3; onB
                   n
                 )}
               </span>
-              <span className={cx('hidden text-[14px] font-semibold whitespace-nowrap md:inline', lit ? 'text-brand' : 'text-neutral-400')}>{label}</span>
-              {n < STEPS.length && <span aria-hidden className={cx('ml-2 h-1 w-8 rounded-full md:ml-2', current > n ? 'bg-brand' : 'bg-brand-175')} />}
+              <span
+                className={cx(
+                  'hidden text-[14px] font-semibold whitespace-nowrap md:inline',
+                  lit ? 'text-brand' : 'text-neutral-400',
+                )}
+              >
+                {label}
+              </span>
+              {n < STEPS.length && (
+                <span
+                  aria-hidden
+                  className={cx('ml-2 h-1 w-8 rounded-full md:ml-2', current > n ? 'bg-brand' : 'bg-brand-175')}
+                />
+              )}
             </li>
           );
         })}
@@ -44,7 +80,21 @@ export function Stepper({ current, onBack, backHref }: { current: 1 | 2 | 3; onB
   );
 }
 
-function ChapterTile({ name, topics, selected, disabled, selectable, onToggle }: { name: string; topics: number; selected: boolean; disabled: boolean; selectable: boolean; onToggle: () => void }) {
+function ChapterTile({
+  name,
+  topics,
+  selected,
+  disabled,
+  selectable,
+  onToggle,
+}: {
+  name: string;
+  topics: number;
+  selected: boolean;
+  disabled: boolean;
+  selectable: boolean;
+  onToggle: () => void;
+}) {
   return (
     <button
       type="button"
@@ -53,15 +103,28 @@ function ChapterTile({ name, topics, selected, disabled, selectable, onToggle }:
       onClick={onToggle}
       className={cx(
         'flex items-center gap-4 rounded-xl border-2 p-5 text-left disabled:cursor-not-allowed disabled:opacity-55',
-        selected ? 'border-brand bg-brand-125 shadow-[0px_10px_24px_rgba(61,52,139,0.07)]' : disabled ? 'border-neutral-150 bg-neutral-50' : 'border-neutral-150 bg-surface',
+        selected
+          ? 'border-brand bg-brand-125 shadow-[0px_10px_24px_rgba(61,52,139,0.07)]'
+          : disabled
+            ? 'border-neutral-150 bg-neutral-50'
+            : 'border-neutral-150 bg-surface',
       )}
     >
-      <span className={cx('bg-surface text-brand flex size-6 shrink-0 items-center justify-center rounded-[6px] border-[1.5px]', selected ? 'border-brand' : 'border-brand-175')}>
+      <span
+        className={cx(
+          'bg-surface text-brand flex size-6 shrink-0 items-center justify-center rounded-[6px] border-[1.5px]',
+          selected ? 'border-brand' : 'border-brand-175',
+        )}
+      >
         {selected && <Check aria-hidden className="size-[15px]" strokeWidth={3} />}
       </span>
       <span className="min-w-0">
-        <span className={cx('block text-[15px] leading-[1.3] font-semibold', selected ? 'text-brand' : 'text-neutral-800')}>{toSentenceCase(name)}</span>
-        <span className="mt-[3px] block text-[12px] text-neutral-350">
+        <span
+          className={cx('block text-[15px] leading-[1.3] font-semibold', selected ? 'text-brand' : 'text-neutral-800')}
+        >
+          {toSentenceCase(name)}
+        </span>
+        <span className="text-neutral-350 mt-[3px] block text-[12px]">
           {topics} topics{!selectable && ' · no questions yet'}
         </span>
       </span>
@@ -115,7 +178,9 @@ function ChapterSelection({
       {/* Phones: one accordion per subject */}
       <div className="flex flex-col gap-3 md:hidden">
         <h1 className="mt-4 text-[26px] leading-[1.18] font-bold text-neutral-950">Which chapters have you studied?</h1>
-        <p className="text-[14px] text-neutral-500">Choose the chapters you&apos;ve covered so far to help us build your diagnostic test.</p>
+        <p className="text-[14px] text-neutral-500">
+          Choose the chapters you&apos;ve covered so far to help us build your diagnostic test.
+        </p>
         {subjects.map((subject) => {
           const open = mobileOpen && subject.id === activeId;
           return (
@@ -123,16 +188,23 @@ function ChapterSelection({
               <button
                 type="button"
                 aria-expanded={open}
-                onClick={() => (subject.id === activeId ? setMobileOpen(!mobileOpen) : (setActiveId(subject.id), setMobileOpen(true)))}
+                onClick={() =>
+                  subject.id === activeId ? setMobileOpen(!mobileOpen) : (setActiveId(subject.id), setMobileOpen(true))
+                }
                 className="flex items-center justify-between gap-3 text-left"
               >
                 <span className="flex flex-col">
-                  <span className={cx('text-[20px] font-bold', open ? 'text-brand' : 'text-neutral-900')}>{subject.name}</span>
+                  <span className={cx('text-[20px] font-bold', open ? 'text-brand' : 'text-neutral-900')}>
+                    {subject.name}
+                  </span>
                   <span className="text-[12px] text-neutral-500">
                     {subject.moduleCount} Chapters · {countFor(subject)} selected
                   </span>
                 </span>
-                <ChevronDown aria-hidden className={cx('text-brand size-5 transition-transform', open && 'rotate-180')} />
+                <ChevronDown
+                  aria-hidden
+                  className={cx('text-brand size-5 transition-transform', open && 'rotate-180')}
+                />
               </button>
               {open && <div className="flex flex-col gap-3">{tiles(subject)}</div>}
             </div>
@@ -162,12 +234,17 @@ function ChapterSelection({
                         <span className="text-on-brand/60 mt-1 block text-[12px]">{subject.moduleCount} chapters</span>
                       </div>
                       <div className="bg-on-brand/10 mt-auto rounded-md p-4">
-                        <span className="text-on-brand/55 block text-[10px] font-medium tracking-[0.1em] uppercase">Selected</span>
+                        <span className="text-on-brand/55 block text-[10px] font-medium tracking-[0.1em] uppercase">
+                          Selected
+                        </span>
                         <span className="text-on-brand mt-1 block text-[15px] font-bold">
                           {count} of {rules.maxPerSubject} chapters
                         </span>
                         <span className="bg-on-brand/20 mt-3 block h-[5px] w-full overflow-hidden rounded-full">
-                          <span className="bg-surface block h-full rounded-full" style={{ width: `${Math.min(100, (count / rules.maxPerSubject) * 100)}%` }} />
+                          <span
+                            className="bg-surface block h-full rounded-full"
+                            style={{ width: `${Math.min(100, (count / rules.maxPerSubject) * 100)}%` }}
+                          />
                         </span>
                       </div>
                     </div>
@@ -175,7 +252,11 @@ function ChapterSelection({
                 );
               return (
                 <li key={subject.id}>
-                  <button type="button" onClick={() => setActiveId(subject.id)} className="border-neutral-150 hover:bg-surface flex w-full flex-col gap-[10px] rounded-lg border p-5 text-left">
+                  <button
+                    type="button"
+                    onClick={() => setActiveId(subject.id)}
+                    className="border-neutral-150 hover:bg-surface flex w-full flex-col gap-[10px] rounded-lg border p-5 text-left"
+                  >
                     <span className="text-[17px] font-bold text-neutral-950">{subject.name}</span>
                     <span className="flex items-center justify-between gap-2 text-[11.5px]">
                       <span className="text-neutral-350">{subject.moduleCount} Chapters</span>
@@ -190,14 +271,30 @@ function ChapterSelection({
           </ul>
         </aside>
         <section className="min-w-0 flex-1">
-          <h1 className="text-[26px] leading-[1.18] font-bold tracking-[-0.01em] text-neutral-950 sm:text-[32px]">Which chapters have you studied?</h1>
-          <p className="mt-2 text-[14px] text-neutral-500">Choose the chapters you&apos;ve covered so far to help us build your diagnostic test.</p>
-          <div className={cx('mt-5 flex items-center gap-[14px] rounded-xl border px-5 py-3', atCap ? 'bg-danger-soft border-danger/20' : 'bg-accent-50 border-accent-100')}>
-            <span className={cx('text-on-brand flex size-7 shrink-0 items-center justify-center rounded-full', atCap ? 'bg-danger' : 'bg-accent-400')}>
+          <h1 className="text-[26px] leading-[1.18] font-bold tracking-[-0.01em] text-neutral-950 sm:text-[32px]">
+            Which chapters have you studied?
+          </h1>
+          <p className="mt-2 text-[14px] text-neutral-500">
+            Choose the chapters you&apos;ve covered so far to help us build your diagnostic test.
+          </p>
+          <div
+            className={cx(
+              'mt-5 flex items-center gap-[14px] rounded-xl border px-5 py-3',
+              atCap ? 'bg-danger-soft border-danger/20' : 'bg-accent-50 border-accent-100',
+            )}
+          >
+            <span
+              className={cx(
+                'text-on-brand flex size-7 shrink-0 items-center justify-center rounded-full',
+                atCap ? 'bg-danger' : 'bg-accent-400',
+              )}
+            >
               <Info aria-hidden className="size-[15px]" />
             </span>
             <div className="min-w-0">
-              <p className={cx('text-[16px] leading-6 font-bold', atCap ? 'text-danger' : 'text-accent-800')}>{atCap ? 'Maximum chapter limit reached' : 'Select your prefered chapters'}</p>
+              <p className={cx('text-[16px] leading-6 font-bold', atCap ? 'text-danger' : 'text-accent-800')}>
+                {atCap ? 'Maximum chapter limit reached' : 'Select your prefered chapters'}
+              </p>
               <p className={cx('text-[12.5px]', atCap ? 'text-danger' : 'text-accent-700')}>
                 {atCap
                   ? `You can select up to ${rules.maxPerSubject} chapters per subject, unselect one to choose another.`
@@ -210,8 +307,16 @@ function ChapterSelection({
               const open = openCourses[course.id] ?? course.id === active.courses[0]?.id;
               const picked = course.modules.filter((m) => set.has(m.id)).length;
               return (
-                <div key={course.id} className="border-neutral-150 bg-surface flex flex-col gap-6 rounded-[28px] border p-7 shadow-[0px_18px_44px_rgba(61,52,139,0.06)]">
-                  <button type="button" aria-expanded={open} onClick={() => setOpenCourses({ ...openCourses, [course.id]: !open })} className="flex items-center justify-between gap-4 text-left">
+                <div
+                  key={course.id}
+                  className="border-neutral-150 bg-surface flex flex-col gap-6 rounded-[28px] border p-7 shadow-[0px_18px_44px_rgba(61,52,139,0.06)]"
+                >
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setOpenCourses({ ...openCourses, [course.id]: !open })}
+                    className="flex items-center justify-between gap-4 text-left"
+                  >
                     <span>
                       <span className="block text-[20px] font-bold text-neutral-950">{course.name}</span>
                       <span className="text-neutral-350 mt-1 block text-[12.5px]">
@@ -220,7 +325,10 @@ function ChapterSelection({
                       </span>
                     </span>
                     <span className="bg-brand-50 text-brand flex size-8 shrink-0 items-center justify-center rounded-full">
-                      <ChevronDown aria-hidden className={cx('size-[17px] transition-transform', open && 'rotate-180')} />
+                      <ChevronDown
+                        aria-hidden
+                        className={cx('size-[17px] transition-transform', open && 'rotate-180')}
+                      />
                     </span>
                   </button>
                   {open && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{tiles(active, course.modules)}</div>}
@@ -238,7 +346,11 @@ function ChapterSelection({
             <p className="text-[14px] font-bold text-neutral-950 md:text-[16px]">
               {selected.length} {selected.length === 1 ? 'chapter' : 'chapters'} selected
             </p>
-            <p className="text-[13px] text-neutral-900/40">{remaining > 0 ? `Select ${remaining} more to continue` : `out of ${String(total).padStart(2, '0')} total`}</p>
+            <p className="text-[13px] text-neutral-900/40">
+              {remaining > 0
+                ? `Select ${remaining} more to continue`
+                : `out of ${String(total).padStart(2, '0')} total`}
+            </p>
           </div>
         </div>
         <button
@@ -257,10 +369,12 @@ function ChapterSelection({
 
 function StatTile({ icon, value, label }: { icon: ReactNode; value: string | number; label: string }) {
   return (
-    <div className="border-brand-175 bg-surface flex flex-col items-center justify-center gap-3 rounded-lg border p-4 text-center md:gap-2 md:border-neutral-150 md:px-3 md:py-5">
-      <span className="bg-brand-50 text-brand flex size-10 items-center justify-center rounded-md md:size-8">{icon}</span>
+    <div className="border-brand-175 bg-surface md:border-neutral-150 flex flex-col items-center justify-center gap-3 rounded-lg border p-4 text-center md:gap-2 md:px-3 md:py-5">
+      <span className="bg-brand-50 text-brand flex size-10 items-center justify-center rounded-md md:size-8">
+        {icon}
+      </span>
       <span className="text-[18px] font-bold text-neutral-950">{value}</span>
-      <span className="text-[12px] font-medium text-neutral-900/60 md:text-[11px] md:text-neutral-350">{label}</span>
+      <span className="md:text-neutral-350 text-[12px] font-medium text-neutral-900/60 md:text-[11px]">{label}</span>
     </div>
   );
 }
@@ -303,7 +417,10 @@ function BlueprintReview({
     <div className="flex w-full flex-col gap-5 md:gap-6 lg:flex-row lg:items-stretch">
       <section className="flex min-w-0 flex-1 flex-col gap-5 md:gap-6">
         {grouped.map(({ subject, modules }) => (
-          <div key={subject.id} className="border-neutral-150 bg-surface flex flex-col gap-4 rounded-lg border p-5 md:gap-5 md:rounded-2xl md:p-7 md:shadow-[0px_18px_44px_rgba(61,52,139,0.06)]">
+          <div
+            key={subject.id}
+            className="border-neutral-150 bg-surface flex flex-col gap-4 rounded-lg border p-5 md:gap-5 md:rounded-2xl md:p-7 md:shadow-[0px_18px_44px_rgba(61,52,139,0.06)]"
+          >
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-col gap-1">
                 <h2 className="text-[20px] font-bold text-neutral-950">{subject.name}</h2>
@@ -311,16 +428,25 @@ function BlueprintReview({
                   {modules.length} {plural(modules.length, 'chapter', 'chapters')} selected
                 </span>
               </div>
-              <button type="button" onClick={() => onAdd(subject.id)} className="bg-brand-50 text-brand flex h-10 items-center gap-2 rounded-md px-[18px] text-[13px] font-semibold hover:opacity-80">
+              <button
+                type="button"
+                onClick={() => onAdd(subject.id)}
+                className="bg-brand-50 text-brand flex h-10 items-center gap-2 rounded-md px-[18px] text-[13px] font-semibold hover:opacity-80"
+              >
                 <Plus aria-hidden className="size-[14px]" />
                 Add Chapter
               </button>
             </div>
             <div className="flex flex-col gap-3">
               {modules.map((m) => (
-                <div key={m.id} className="border-brand-175 flex items-center justify-between gap-4 rounded-lg border bg-neutral-50 px-5 py-[18px]">
+                <div
+                  key={m.id}
+                  className="border-brand-175 flex items-center justify-between gap-4 rounded-lg border bg-neutral-50 px-5 py-[18px]"
+                >
                   <div className="flex min-w-0 flex-col gap-[2px]">
-                    <span className="truncate text-[14px] font-semibold text-neutral-950">{toSentenceCase(m.name)}</span>
+                    <span className="truncate text-[14px] font-semibold text-neutral-950">
+                      {toSentenceCase(m.name)}
+                    </span>
                     <span className="text-neutral-350 text-[12px]">
                       {m.topicCount} core syllabus {plural(m.topicCount, 'topic', 'topics')}
                     </span>
@@ -347,13 +473,31 @@ function BlueprintReview({
           </div>
           {bp ? (
             <div className="grid grid-cols-2 gap-3 md:gap-4">
-              <StatTile icon={<Clock aria-hidden className="size-[18px]" />} value={formatDuration(bp.durationSeconds)} label="Exam Duration" />
-              <StatTile icon={<ClipboardList aria-hidden className="size-[18px]" />} value={bp.totalQuestions} label={plural(bp.totalQuestions, 'MCQ', 'MCQs')} />
-              <StatTile icon={<Layers aria-hidden className="size-[18px]" />} value={bp.chapterCount} label={plural(bp.chapterCount, 'Chapter', 'Chapters')} />
-              <StatTile icon={<BookOpen aria-hidden className="size-[18px]" />} value={bp.subjectCount} label={plural(bp.subjectCount, 'Subject', 'Subjects')} />
+              <StatTile
+                icon={<Clock aria-hidden className="size-[18px]" />}
+                value={formatDuration(bp.durationSeconds)}
+                label="Exam Duration"
+              />
+              <StatTile
+                icon={<ClipboardList aria-hidden className="size-[18px]" />}
+                value={bp.totalQuestions}
+                label={plural(bp.totalQuestions, 'MCQ', 'MCQs')}
+              />
+              <StatTile
+                icon={<Layers aria-hidden className="size-[18px]" />}
+                value={bp.chapterCount}
+                label={plural(bp.chapterCount, 'Chapter', 'Chapters')}
+              />
+              <StatTile
+                icon={<BookOpen aria-hidden className="size-[18px]" />}
+                value={bp.subjectCount}
+                label={plural(bp.subjectCount, 'Subject', 'Subjects')}
+              />
             </div>
           ) : (
-            <p className="py-10 text-center text-sm text-neutral-500">{blueprint.isError ? userMessage(blueprint.error) : 'Building your blueprint...'}</p>
+            <p className="py-10 text-center text-sm text-neutral-500">
+              {blueprint.isError ? userMessage(blueprint.error) : 'Building your blueprint...'}
+            </p>
           )}
           <div className="bg-accent-50 border-accent-100 flex flex-col gap-4 rounded-2xl border-2 p-5 shadow-[0px_16px_36px_rgba(249,115,22,0.1)]">
             <div className="flex items-center gap-[10px]">
@@ -365,10 +509,15 @@ function BlueprintReview({
                 <span className="text-neutral-350 text-[11px]">Your partner to help you stay focused.</span>
               </div>
             </div>
-            <p className="text-[12.5px] leading-[1.5] text-neutral-600">Use the timer to pace yourself and leave time to review.</p>
+            <p className="text-[12.5px] leading-[1.5] text-neutral-600">
+              Use the timer to pace yourself and leave time to review.
+            </p>
           </div>
           {bp && !bp.isValid && bp.errors.length > 0 && (
-            <div role="alert" className="bg-danger-soft border-danger/30 text-danger rounded-lg border p-[14px] text-[13px]">
+            <div
+              role="alert"
+              className="bg-danger-soft border-danger/30 text-danger rounded-lg border p-[14px] text-[13px]"
+            >
               {bp.errors.join(' ')}
             </div>
           )}
@@ -382,7 +531,10 @@ function BlueprintReview({
           type="button"
           disabled={!canStart}
           onClick={onStart}
-          className={cx('text-on-brand flex h-12 w-full items-center justify-center gap-2 rounded-md text-[15px] font-semibold', canStart ? 'bg-brand' : 'bg-neutral-300 cursor-not-allowed')}
+          className={cx(
+            'text-on-brand sticky bottom-[84px] z-10 flex h-12 w-full items-center justify-center gap-2 rounded-md text-[15px] font-semibold shadow-[0px_12px_28px_rgba(61,52,139,0.22)] md:bottom-6',
+            canStart ? 'bg-brand' : 'cursor-not-allowed bg-neutral-300',
+          )}
         >
           {starting ? 'Starting...' : 'Start Test'}
           {!starting && <ArrowRight aria-hidden className="size-4" />}
@@ -396,7 +548,11 @@ function BlueprintReview({
 export function DiagnosticSetupScreen() {
   const router = useRouter();
   const { exam, classId, isPending } = useClassContext();
-  const status = useQuery({ queryKey: ['diagnostic', 'status', classId], queryFn: () => diagnosticApi.status(exam!, classId!), enabled: !!exam && !!classId });
+  const status = useQuery({
+    queryKey: ['diagnostic', 'status', classId],
+    queryFn: () => diagnosticApi.status(exam!, classId!),
+    enabled: !!exam && !!classId,
+  });
   const syllabus = useSyllabus(classId, exam?.examId ?? 0);
   const [step, setStep] = useState<1 | 2>(1);
   const [selected, setSelected] = useState<number[]>([]);
@@ -407,7 +563,8 @@ export function DiagnosticSetupScreen() {
 
   useEffect(() => {
     if (!status.data || !slug) return;
-    if (status.data.state === 'in_progress' && status.data.assessmentId) router.replace(routes.diagnosticTest(slug, status.data.assessmentId));
+    if (status.data.state === 'in_progress' && status.data.assessmentId)
+      router.replace(routes.diagnosticTest(slug, status.data.assessmentId));
     else if (status.data.state === 'cooldown') router.replace(routes.diagnosticResult(slug));
   }, [status.data, slug, router]);
 
@@ -415,7 +572,10 @@ export function DiagnosticSetupScreen() {
     if (step === 2 && selected.length === 0) setStep(1);
   }, [step, selected.length]);
 
-  const subjectOf = useMemo(() => new Map(subjects.flatMap((s) => modulesOf(s).map((m) => [m.id, s.id] as const))), [subjects]);
+  const subjectOf = useMemo(
+    () => new Map(subjects.flatMap((s) => modulesOf(s).map((m) => [m.id, s.id] as const))),
+    [subjects],
+  );
 
   const start = useMutation({
     mutationFn: () => diagnosticApi.start(exam!, classId!, selected),
@@ -425,7 +585,8 @@ export function DiagnosticSetupScreen() {
     },
   });
 
-  if (!isPending && !classId) return <Notice title="No active class" body="Pick a class from the sidebar to take your diagnostic test." />;
+  if (!isPending && !classId)
+    return <Notice title="No active class" body="Pick a class from the sidebar to take your diagnostic test." />;
   if (status.isError || syllabus.isError)
     return (
       <Notice
@@ -435,9 +596,21 @@ export function DiagnosticSetupScreen() {
         action={{ label: 'Back to dashboard', href: routes.dashboard(slug) }}
       />
     );
-  if (isPending || status.isPending || syllabus.isPending || status.data.state === 'in_progress' || status.data.state === 'cooldown')
+  if (
+    isPending ||
+    status.isPending ||
+    syllabus.isPending ||
+    status.data.state === 'in_progress' ||
+    status.data.state === 'cooldown'
+  )
     return <ScreenLoader message="Loading Your Syllabus" sub="Fetching the chapters for your class..." />;
-  if (!subjects.length) return <Notice title="No chapters available yet" body="Your class doesn't have diagnostic content set up yet. Please check back soon." />;
+  if (!subjects.length)
+    return (
+      <Notice
+        title="No chapters available yet"
+        body="Your class doesn't have diagnostic content set up yet. Please check back soon."
+      />
+    );
 
   const toggle = (moduleId: number, subjectId: number) =>
     setSelected((prev) => {
@@ -449,11 +622,27 @@ export function DiagnosticSetupScreen() {
   return (
     <div className="w-full">
       <div className="mb-4 md:mb-6">
-        <Stepper current={step} onBack={step === 2 ? () => setStep(1) : undefined} backHref={step === 1 ? routes.dashboard(slug) : undefined} />
+        <Stepper
+          current={step}
+          onBack={step === 2 ? () => setStep(1) : undefined}
+          backHref={step === 1 ? routes.dashboard(slug) : undefined}
+        />
       </div>
-      <Breadcrumb dashboardHref={routes.dashboard(slug)} current="Diagnostic test" className={cx('md:hidden', step === 2 && 'mb-5')} />
+      <Breadcrumb
+        dashboardHref={routes.dashboard(slug)}
+        current="Diagnostic test"
+        className={cx('md:hidden', step === 2 && 'mb-5')}
+      />
       {step === 1 ? (
-        <ChapterSelection subjects={subjects} rules={rules} selected={selected} focusId={focusId} onToggle={toggle} onContinue={() => setStep(2)} continuing={false} />
+        <ChapterSelection
+          subjects={subjects}
+          rules={rules}
+          selected={selected}
+          focusId={focusId}
+          onToggle={toggle}
+          onContinue={() => setStep(2)}
+          continuing={false}
+        />
       ) : (
         <BlueprintReview
           subjects={subjects}
@@ -467,7 +656,11 @@ export function DiagnosticSetupScreen() {
           }}
           onStart={() => start.mutate()}
           starting={start.isPending}
-          error={start.isError && !(isApiError(start.error) && start.error.status === 429) ? userMessage(start.error, "We couldn't start your test. Please try again.") : null}
+          error={
+            start.isError && !(isApiError(start.error) && start.error.status === 429)
+              ? userMessage(start.error, "We couldn't start your test. Please try again.")
+              : null
+          }
         />
       )}
     </div>

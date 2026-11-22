@@ -3,6 +3,7 @@
 import { BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { useActivePlan } from '@/features/auth';
+import { FeatureLock } from '@/features/feature-access/ui';
 import { useExam } from '@/shared/hooks/use-exam';
 import { syllabusCards, type SyllabusKind } from '../api';
 import { SyllabusSubjectPicker } from './subject-picker';
@@ -29,10 +30,12 @@ export function SyllabusCards() {
             <h2 className="text-neutral-850 text-[20px] leading-5 font-semibold">Syllabus</h2>
             <p className="text-[14px] leading-[19px] text-neutral-800">Always updated with your latest syllabus.</p>
           </div>
-          <button type="button" onClick={() => setPicker({ kind: 'syllabus', open: true })} className={button}>
-            <BookOpen aria-hidden className="size-4" />
-            View Syllabus
-          </button>
+          <FeatureLock feature="syllabus" label="View Syllabus" badge="edge">
+            <button type="button" onClick={() => setPicker({ kind: 'syllabus', open: true })} className={button}>
+              <BookOpen aria-hidden className="size-4" />
+              View Syllabus
+            </button>
+          </FeatureLock>
         </div>
       )}
       {trends && (
@@ -41,9 +44,11 @@ export function SyllabusCards() {
             <h2 className="text-neutral-850 text-[20px] leading-5 font-semibold">PYQ Trends</h2>
             <p className="text-[14px] leading-[19px] text-neutral-800">Curated analysis of past year exams focused on top ranks.</p>
           </div>
-          <button type="button" onClick={() => setPicker({ kind: 'trend', open: true })} className={button}>
-            View Trend Analysis
-          </button>
+          <FeatureLock feature="pyq_trends" label="View Trend Analysis" badge="edge">
+            <button type="button" onClick={() => setPicker({ kind: 'trend', open: true })} className={button}>
+              View Trend Analysis
+            </button>
+          </FeatureLock>
         </div>
       )}
       <SyllabusSubjectPicker

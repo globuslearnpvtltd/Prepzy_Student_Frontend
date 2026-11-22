@@ -25,6 +25,8 @@ import { CourseScreen } from './components/course-screen';
 import { NotesLibrary } from './components/notes-library';
 import { adjacentSteps, isChapterStep } from './steps';
 import { testExam } from '@/test/exams';
+import { useFeatureRestrictedDialog } from '@/features/feature-access';
+import { restrictFeatures } from '@/test/feature-access';
 
 const neet = testExam('neet');
 
@@ -244,6 +246,20 @@ describe('CourseScreen', () => {
     expect(await screen.findByText('Physics')).toBeInTheDocument();
   });
 
+  it('opens chapters on the first step the institute allows', async () => {
+    server.use(
+      sidebar,
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/courses/214/chapters`, () =>
+        ok({ data: { chapters: [{ module_id: 341, title: 'Laws of Motion', orders: 1 }] } }),
+      ),
+      restrictFeatures('summary_videos'),
+    );
+    renderWithProviders(<CourseScreen courseId="214" />, { exam: neet });
+    await waitFor(async () =>
+      expect(await screen.findByRole('link', { name: /Laws of Motion/ })).toHaveAttribute('href', '/neet/learn/214/341/study-notes'),
+    );
+  });
+
   it('shows the empty and error states', async () => {
     server.use(http.get(`${API}/api/v4/learn/competitive/${neet.examId}/courses/1/chapters`, () => ok({ data: { chapters: [] } })));
     const { unmount } = renderWithProviders(<CourseScreen courseId="1" />, { exam: neet });
@@ -269,6 +285,23 @@ describe('ChapterScreen', () => {
     expect(screen.getAllByRole('link', { name: 'Previous step' })[0]).toHaveAttribute('href', '/neet/learn/214/341/video-lectures');
     expect(screen.getAllByRole('link', { name: 'Next step' })[0]).toHaveAttribute('href', '/neet/learn/214/341/practice-questions');
     expect(screen.getByRole('progressbar', { name: 'Overall progress' })).toHaveAttribute('aria-valuenow', '25');
+  });
+
+  it('padlocks steps the institute switched off (the video step by either video key) and the chapter tutor', async () => {
+    useFeatureRestrictedDialog.setState({ open: false, feature: null });
+    server.use(sidebar, video({}), restrictFeatures('summary_videos', 'chapter_pyq', 'lecture_chat'));
+    renderWithProviders(<ChapterScreen courseId="214" moduleId="341" step="video-lectures" />, { exam: neet });
+    const steps = await screen.findByRole('navigation', { name: 'Chapter steps' });
+    const videoStep = await within(steps).findByRole('button', { name: /Video Lectures/ });
+    expect(within(steps).getByRole('button', { name: /Previous Year Questions/ })).toHaveAttribute('aria-disabled', 'true');
+    expect(within(steps).getByRole('link', { name: /Study Notes/ })).toHaveAttribute('href', '/neet/learn/214/341/study-notes');
+    await userEvent.click(videoStep);
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('summary_videos');
+
+    const tutor = await screen.findByRole('button', { name: 'Ask your tutor' });
+    expect(tutor).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(tutor);
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('lecture_chat');
   });
 
   it('plays a video, switches language and marks it completed', async () => {

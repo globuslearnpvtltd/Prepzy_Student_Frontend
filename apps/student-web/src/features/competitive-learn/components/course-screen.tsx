@@ -3,10 +3,12 @@
 import { cx } from '@prepzy/design-system';
 import { BookOpen, ClipboardPen, Files, Video } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useFeatureAccess } from '@/features/feature-access';
+import { isStepRestricted } from '@/shared/config/feature-routes';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { useChapter, useCourse } from '../hooks';
-import { FIRST_STEP } from '../steps';
+import { CHAPTER_STEPS, FIRST_STEP } from '../steps';
 import { Breadcrumb, ChapterRow, ErrorCard, ListSkeleton } from './kit';
 
 function StatCard({ label, done, total, icon, tone }: { label: string; done: number; total: number; icon: ReactNode; tone: 'accent' | 'brand' }) {
@@ -38,6 +40,9 @@ function StatCard({ label, done, total, icon, tone }: { label: string; done: num
 /** A competitive course: video / notes / test / PYQ totals and its chapters. */
 export function CourseScreen({ courseId }: { courseId: string }) {
   const exam = useExam();
+  // A chapter opens on its first step the student's institute hasn't switched off.
+  const { isRestricted } = useFeatureAccess();
+  const firstStep = CHAPTER_STEPS.find((s) => !isStepRestricted(s.key, isRestricted))?.key ?? FIRST_STEP;
   const course = useCourse(courseId);
   const firstModule = course.data?.chapters[0]?.moduleId;
   const subject = useChapter(firstModule).data?.subject;
@@ -86,7 +91,7 @@ export function CourseScreen({ courseId }: { courseId: string }) {
                   tag={chapter.tag}
                   status={chapter.status}
                   percent={chapter.percent}
-                  href={routes.learnModule(exam.slug, courseId, chapter.moduleId, FIRST_STEP)}
+                  href={routes.learnModule(exam.slug, courseId, chapter.moduleId, firstStep)}
                 />
               ))}
             </div>

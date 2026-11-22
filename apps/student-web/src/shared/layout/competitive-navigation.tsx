@@ -2,15 +2,17 @@
 
 import { cx } from '@prepzy/design-system';
 import { useQueryClient } from '@tanstack/react-query';
-import { Crown, X } from 'lucide-react';
+import { Crown, Lock, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useActivePlan } from '@/features/auth';
+import { useFeatureAccess } from '@/features/feature-access';
 import { useActivePlanName } from '@/features/plans';
 import type { ExamConfig } from '@/shared/config/exams';
-import { isActivePath, navigationFor, type NavItem } from '@/shared/config/navigation';
+import { isActivePath, isNavLocked, navigationFor, type NavItem } from '@/shared/config/navigation';
 import { routes } from '@/shared/config/routes';
+import { lockedClick, lockLabel } from './board-navigation';
 import { useMobileNav } from './mobile-nav-store';
 import { shellApi, shellKeys } from './shell-api';
 
@@ -94,6 +96,7 @@ export function CompetitiveSidebar({ exam, rail = true }: { exam: ExamConfig; ra
   const queryClient = useQueryClient();
   const { open, setOpen } = useMobileNav();
   const [resolving, setResolving] = useState(false);
+  const { restricted } = useFeatureAccess(exam);
   const close = () => setOpen(false);
 
   useEffect(() => setOpen(false), [pathname, setOpen]);
@@ -112,13 +115,22 @@ export function CompetitiveSidebar({ exam, rail = true }: { exam: ExamConfig; ra
   const item = (nav: NavItem) => {
     const href = nav.href(exam.slug);
     const active = isActivePath(href, pathname);
+    // Competitive items have no plan locks; only the institute's (features/feature-access).
+    const locked = isNavLocked(nav, { hasPlan: true, hasStudyPlan: true, restricted });
     const className = cx(
       'flex h-11 w-full items-center gap-4 rounded-md px-3 text-[14px] font-medium transition-colors',
       active ? 'bg-brand-75 text-brand' : 'text-neutral-400 hover:bg-canvas hover:text-neutral-600',
     );
     const body = (
       <>
-        <nav.icon aria-hidden className="size-[22px] shrink-0" strokeWidth={2} />
+        <span className="relative shrink-0">
+          <nav.icon aria-hidden className="size-[22px]" strokeWidth={2} />
+          {locked && (
+            <span title={lockLabel(locked)} className="bg-surface text-brand absolute -top-1.5 -right-1.5 rounded-full p-0.5 shadow-sm">
+              <Lock aria-label={lockLabel(locked)} className="size-3" />
+            </span>
+          )}
+        </span>
         <span className="whitespace-nowrap opacity-0 transition-opacity delay-75 duration-200 group-hover/rail:opacity-100 group-data-[open=true]/rail:opacity-100 max-md:opacity-100">
           {nav.label}
         </span>
@@ -126,7 +138,18 @@ export function CompetitiveSidebar({ exam, rail = true }: { exam: ExamConfig; ra
     );
     return (
       <li key={nav.key}>
-        {nav.opens === 'live-dpp' ? (
+        {locked ? (
+          <button
+            type="button"
+            onClick={lockedClick(nav, locked)}
+            aria-label={nav.label}
+            aria-disabled="true"
+            title={lockLabel(locked)}
+            className={cx(className, 'cursor-not-allowed opacity-60')}
+          >
+            {body}
+          </button>
+        ) : nav.opens === 'live-dpp' ? (
           <button
             type="button"
             onClick={openDailyPractice}

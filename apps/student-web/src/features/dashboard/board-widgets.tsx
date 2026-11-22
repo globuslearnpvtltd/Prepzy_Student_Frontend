@@ -7,6 +7,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useActivePlan, type ActivePlan } from '@/features/auth';
+import { TEST_TYPE_FEATURE } from '@/features/feature-access';
+import { FeatureLock } from '@/features/feature-access/ui';
 import { useActivePlanName } from '@/features/plans';
 import { hasTestType } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
@@ -350,6 +352,11 @@ export function ContinueAssessment() {
           const playable = test.testType && hasTestType(exam, test.testType);
           return (
             <li key={`${test.kind}-${test.setId}`}>
+              <FeatureLock
+                feature={playable ? TEST_TYPE_FEATURE[test.testType!] : null}
+                label={`Resume ${TEST_LABEL[test.kind]} ${test.className}`}
+                className="h-full"
+              >
               <Link
                 href={
                   playable ? routes.testPlayer(exam.slug, test.testType!, test.setId) : routes.assessments(exam.slug)
@@ -378,6 +385,7 @@ export function ContinueAssessment() {
                   <ProgressBar percent={test.percent} label={`${test.className} progress`} fill="bg-brand" />
                 </span>
               </Link>
+              </FeatureLock>
             </li>
           );
         })}
@@ -450,20 +458,26 @@ export function SolverDiscovery() {
         <p className="text-foreground-soft mt-2.5 text-[13px] leading-[19px]">
           Socrates walks you through one step at a time, so you reach the answer yourself.
         </p>
-        <Link
-          href={routes.doubtSolver(exam.slug)}
-          className="from-brand-450 to-brand text-on-brand shadow-raised mt-3.5 flex w-full items-center justify-center rounded-[15px] bg-linear-to-b py-[9px] text-[15px] font-semibold"
-        >
-          Start Solving
-        </Link>
+        <div className="mt-3.5">
+        <FeatureLock feature="doubt_solver" label="Start Solving" badge="edge">
+          <Link
+            href={routes.doubtSolver(exam.slug)}
+            className="from-brand-450 to-brand text-on-brand shadow-raised flex w-full items-center justify-center rounded-[15px] bg-linear-to-b py-[9px] text-[15px] font-semibold"
+          >
+            Start Solving
+          </Link>
+        </FeatureLock>
+        </div>
         <div className="bg-brand-100 mt-3.5 h-px w-full" />
         <p className="text-foreground-muted mt-2.5 flex items-center gap-2 text-[13px] font-semibold">
           <MessageCircle aria-hidden className="size-3.5" />
           <span>
             Just want the answer?{' '}
-            <Link href={routes.atlas(exam.slug)} scroll={false} className="text-brand font-bold hover:underline">
-              Use Atlas.
-            </Link>
+            <FeatureLock feature="atlas_chat" label="Use Atlas" badge="none" as="span">
+              <Link href={routes.atlas(exam.slug)} scroll={false} className="text-brand font-bold hover:underline">
+                Use Atlas.
+              </Link>
+            </FeatureLock>
           </span>
         </p>
       </div>

@@ -1,7 +1,11 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { useAtlas } from '@/features/assistant';
 import { usePlanSelection } from '@/features/auth';
+import { useFeatureRestrictedDialog } from '@/features/feature-access';
+import { isNavLocked } from '@/shared/config/navigation';
+import { restrictFeatures } from '@/test/feature-access';
 import { examDesignFor, getExam } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { apiClient } from '@/shared/lib/api-client';
@@ -754,5 +758,133 @@ describe('ExamFrame exam id from the backend', () => {
       </ExamFrame>,
     );
     expect(await screen.findByText("CBSE isn't available right now")).toBeInTheDocument();
+  });
+});
+
+describe('institute feature restrictions in the shell', () => {
+  beforeEach(() => {
+    useFeatureRestrictedDialog.setState({ open: false, feature: null });
+  });
+
+  it('board: padlocks restricted sidebar, bottom bar and drawer items, the Ask button and search; clicks explain why', async () => {
+    navigation.pathname = '/cbse/dashboard';
+    server.use(
+      purchased(['cbse', 'CBSE']),
+      account,
+      plans(boardPlan()),
+      studyPlan(true),
+      restrictFeatures('notes', 'summary_videos', 'study_plan', 'atlas_chat', 'doubt_solver', 'search'),
+    );
+    renderShell('cbse');
+    await screen.findByText('Page');
+    const [sidebar, bottomBar] = screen.getAllByRole('navigation', { name: 'Main' });
+    await waitFor(() => expect(within(sidebar!).getAllByLabelText('Not enabled by your institute')).toHaveLength(2));
+    expect(within(sidebar!).queryByRole('link', { name: /Notes/ })).not.toBeInTheDocument();
+    expect(within(sidebar!).getByRole('link', { name: 'Learn' })).toHaveAttribute('href', '/cbse/learn');
+    await userEvent.click(within(sidebar!).getByRole('button', { name: /Study Plan/ }));
+    expect(useFeatureRestrictedDialog.getState()).toMatchObject({ open: true, feature: 'study_plan' });
+
+    expect(within(bottomBar!).getAllByRole('link').map((l) => l.textContent)).toEqual(['Dashboard', 'Learn', 'Assessments']);
+    await userEvent.click(within(bottomBar!).getByRole('button', { name: /Notes/ }));
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('notes');
+    // Atlas and Socrates both off: the Ask button explains instead of opening the sheet.
+    await userEvent.click(within(bottomBar!).getByRole('button', { name: 'Ask a question' }));
+    expect(screen.queryByRole('dialog', { name: 'Have a Question/Problem?' })).not.toBeInTheDocument();
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('atlas_chat');
+
+    // Search is off: the box is a locked button.
+    const search = screen.getAllByRole('button', { name: 'Search (not enabled by your institute)' })[0]!;
+    expect(screen.queryByRole('combobox', { name: 'Search topics' })).not.toBeInTheDocument();
+    useFeatureRestrictedDialog.setState({ open: false, feature: null });
+    await userEvent.click(search);
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('search');
+
+    // Atlas launcher: padlocked, explains instead of opening.
+    await userEvent.click(screen.getByRole('button', { name: 'Ask Atlas' }));
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('atlas_chat');
+
+    // Drawer: Study Plan locked by the institute.
+    await userEvent.click(screen.getByRole('button', { name: /Open account menu/ }));
+    const more = within(screen.getByRole('dialog', { name: 'Menu' })).getByRole('navigation', { name: 'More' });
+    useFeatureRestrictedDialog.setState({ open: false, feature: null });
+    await userEvent.click(within(more).getByRole('button', { name: /Study Plan/ }));
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('study_plan');
+  });
+
+  it('board: the Ask sheet padlocks the one option the institute switched off', async () => {
+    navigation.pathname = '/cbse/dashboard';
+    server.use(purchased(['cbse', 'CBSE']), account, plans(boardPlan()), studyPlan(true), restrictFeatures('doubt_solver'));
+    renderShell('cbse');
+    await screen.findByText('Page');
+    const [, bottomBar] = screen.getAllByRole('navigation', { name: 'Main' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ask Atlas' })).toBeInTheDocument());
+    await userEvent.click(within(bottomBar!).getByRole('button', { name: 'Ask a question' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Have a Question/Problem?' });
+    const socrates = within(sheet).getByRole('button', { name: /Socrates/ });
+    expect(socrates).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(socrates);
+    expect(navigation.push).not.toHaveBeenCalledWith('/cbse/doubt-solver');
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('doubt_solver');
+  });
+
+  it('ignores ?atlas=1 when Atlas is switched off', async () => {
+    navigation.pathname = '/cbse/dashboard';
+    navigation.searchParams = new URLSearchParams('atlas=1');
+    server.use(purchased(['cbse', 'CBSE']), account, plans(boardPlan()), studyPlan(true), restrictFeatures('atlas_chat'));
+    try {
+      renderShell('cbse');
+      await screen.findByText('Page');
+      await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/cbse/dashboard', { scroll: false }));
+      expect(useAtlas.getState().open).toBe(false);
+      expect(useFeatureRestrictedDialog.getState().open).toBe(false);
+    } finally {
+      navigation.searchParams = new URLSearchParams();
+    }
+  });
+
+  it('closes Atlas opened from elsewhere (event, links) and explains why when it is switched off', async () => {
+    navigation.pathname = '/cbse/dashboard';
+    server.use(purchased(['cbse', 'CBSE']), account, plans(boardPlan()), studyPlan(true), restrictFeatures('atlas_chat'));
+    renderShell('cbse');
+    await screen.findByText('Page');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ask Atlas' })).toHaveAttribute('aria-disabled', 'true'));
+    act(() => useAtlas.getState().openAtlas());
+    await waitFor(() => expect(useAtlas.getState().open).toBe(false));
+    expect(useFeatureRestrictedDialog.getState()).toMatchObject({ open: true, feature: 'atlas_chat' });
+  });
+
+  it('shows "Not enabled by your institute" for a restricted page opened by URL', async () => {
+    navigation.pathname = '/cbse/syllabus';
+    server.use(purchased(['cbse', 'CBSE']), account, plans(boardPlan()), studyPlan(true), restrictFeatures('syllabus'));
+    renderShell('cbse');
+    expect(await screen.findByRole('heading', { name: 'Not enabled by your institute' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/cbse/dashboard');
+    expect(screen.queryByText('Page')).not.toBeInTheDocument();
+  });
+
+  it('competitive: padlocks restricted rail items, which open the dialog instead of navigating', async () => {
+    navigation.pathname = '/neet/dashboard';
+    server.use(
+      purchased(['neet-ug', 'NEET-UG']),
+      account,
+      plans(boardPlan({ class_id: 20, class_name: 'NEET', stream_name: '' })),
+      restrictFeatures('mock_exam', 'practice_dpp'),
+    );
+    renderShell('neet');
+    await screen.findByText('Page');
+    const [rail] = screen.getAllByRole('navigation', { name: 'Main' });
+    await waitFor(() => expect(within(rail!).getAllByLabelText('Not enabled by your institute')).toHaveLength(2));
+    expect(within(rail!).queryByRole('link', { name: 'Mock Tests' })).not.toBeInTheDocument();
+    expect(within(rail!).getByRole('link', { name: 'PYQ Library' })).toHaveAttribute('href', '/neet/pyq-library');
+    await userEvent.click(within(rail!).getByRole('button', { name: 'Daily Practice' }));
+    expect(navigation.push).not.toHaveBeenCalled();
+    expect(useFeatureRestrictedDialog.getState()).toMatchObject({ open: true, feature: 'practice_dpp' });
+  });
+
+  it('locks items by the institute first', () => {
+    const access = { hasPlan: false, hasStudyPlan: false, restricted: ['notes' as const] };
+    expect(isNavLocked({ lock: 'plan', feature: 'notes' }, access)).toBe('institute');
+    expect(isNavLocked({ lock: 'plan', feature: ['notes', 'summary_videos'] }, access)).toBe('plan');
+    expect(isNavLocked({ feature: 'search' }, { ...access, hasPlan: true })).toBe(false);
   });
 });

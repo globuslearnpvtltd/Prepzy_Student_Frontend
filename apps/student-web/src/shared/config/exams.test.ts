@@ -134,9 +134,9 @@ describe('navigation', () => {
 
   it('locks items by plan and study plan', () => {
     const none = { hasPlan: false, hasStudyPlan: false };
-    expect(isNavLocked({ lock: 'plan' }, none)).toBe(true);
+    expect(isNavLocked({ lock: 'plan' }, none)).toBe('plan');
     expect(isNavLocked({ lock: 'plan' }, { ...none, hasPlan: true })).toBe(false);
-    expect(isNavLocked({ lock: 'study-plan' }, { hasPlan: true, hasStudyPlan: false })).toBe(true);
+    expect(isNavLocked({ lock: 'study-plan' }, { hasPlan: true, hasStudyPlan: false })).toBe('study-plan');
     expect(isNavLocked({ lock: 'study-plan' }, { hasPlan: true, hasStudyPlan: true })).toBe(false);
     expect(isNavLocked({}, none)).toBe(false);
   });

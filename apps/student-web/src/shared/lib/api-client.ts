@@ -18,11 +18,29 @@ type ErrorBody = {
   details?: unknown;
 };
 
-type Listener = (error: ApiError) => void;
-const listeners = { unauthorized: new Set<Listener>(), rateLimited: new Set<Listener>() };
+/** The failed request: GET page loads vs actions (POST, streams …). */
+export interface ApiRequestInfo {
+  method: string;
+  path: string;
+}
+
+type Listener = (error: ApiError, request: ApiRequestInfo) => void;
+const listeners = {
+  unauthorized: new Set<Listener>(),
+  rateLimited: new Set<Listener>(),
+  featureRestricted: new Set<Listener>(),
+};
+
+/** Tells the listeners about a failed request. */
+function emit(error: ApiError, request: ApiRequestInfo) {
+  if (error.isUnauthorized) listeners.unauthorized.forEach((listener) => listener(error, request));
+  if (error.isPlanLimit) listeners.rateLimited.forEach((listener) => listener(error, request));
+  if (error.isFeatureRestricted) listeners.featureRestricted.forEach((listener) => listener(error, request));
+}
 
 /**
- * Lets features react to session expiry (401) or plan limits (429) without coupling to the client.
+ * Lets features react to session expiry (401), plan limits (429) or institute restrictions (403 FEATURE_RESTRICTED)
+ * without coupling to the client.
  * `rateLimited` is the plan/feature limit only: the OTP request limit (429 TOO_MANY_REQUESTS) is shown by the form.
  */
 export function onApiEvent(event: keyof typeof listeners, listener: Listener): () => void {
@@ -104,8 +122,7 @@ export function createApiClient(baseUrl: string) {
     const data = await readBody(response);
     if (!response.ok) {
       const error = toApiError(response.status, data, response.headers.get('x-request-id') ?? requestId);
-      if (error.isUnauthorized) listeners.unauthorized.forEach((listener) => listener(error));
-      if (error.isPlanLimit) listeners.rateLimited.forEach((listener) => listener(error));
+      emit(error, { method, path });
       throw error;
     }
     return data as T;
@@ -140,8 +157,7 @@ export function createApiClient(baseUrl: string) {
       }
       if (!response.ok || !response.body) {
         const error = toApiError(response.status, await readBody(response), response.headers.get('x-request-id'));
-        if (error.isUnauthorized) listeners.unauthorized.forEach((listener) => listener(error));
-        if (error.isPlanLimit) listeners.rateLimited.forEach((listener) => listener(error));
+        emit(error, { method: 'POST', path });
         throw error;
       }
       return response.body;

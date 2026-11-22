@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, useMemo } from 'react';
 import { AtlasHost } from '@/features/assistant/ui';
 import { rememberExam, usePurchasedExams } from '@/features/auth';
+import { FeatureRouteGate } from '@/features/feature-access/ui';
 import { ExamLanguageSync } from '@/features/language/ui';
 import { examFromCatalog, REFERENCE, type ExamConfig, type ExamDesign } from '@/shared/config/exams';
 import { competitiveChrome } from '@/shared/config/navigation';
@@ -155,7 +156,8 @@ function AccessGate({ exam, children }: { exam: ExamConfig; children: React.Reac
   return (
     <>
       <ExamLanguageSync exam={exam} />
-      {children}
+      {/* A page the student's institute switched off shows "Not enabled by your institute" instead. */}
+      <FeatureRouteGate>{children}</FeatureRouteGate>
     </>
   );
 }

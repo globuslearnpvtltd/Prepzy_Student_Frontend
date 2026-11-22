@@ -1,9 +1,11 @@
 'use client';
 
 import { cx } from '@prepzy/design-system';
-import { Menu, X } from 'lucide-react';
+import { Lock, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { RESTRICTED_COPY, showFeatureRestricted, useFeatureAccess } from '@/features/feature-access';
+import { CHAPTER_STEP_FEATURE, isStepRestricted } from '@/shared/config/feature-routes';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { useChapter } from '../hooks';
@@ -23,6 +25,7 @@ export interface ChapterProps {
 function ChapterSidebar({ courseId, moduleId, step }: ChapterProps) {
   const exam = useExam();
   const chapter = useChapter(moduleId);
+  const { isRestricted } = useFeatureAccess();
   if (chapter.isPending) {
     return <aside className="bg-surface w-80 max-w-full p-5 text-sm">Loading...</aside>;
   }
@@ -51,6 +54,30 @@ function ChapterSidebar({ courseId, moduleId, step }: ChapterProps) {
         <ol className="flex flex-col gap-1">
           {CHAPTER_STEPS.map((s, index) => {
             const active = s.key === step;
+            if (isStepRestricted(s.key, isRestricted)) {
+              const feature = CHAPTER_STEP_FEATURE[s.key].find((key) => isRestricted(key)) ?? null;
+              // Switched off by the student's institute: padlock, and a click explains why.
+              return (
+                <li key={s.key}>
+                  <button
+                    type="button"
+                    aria-disabled="true"
+                    title={RESTRICTED_COPY.tooltip}
+                    onClick={() => showFeatureRestricted(feature)}
+                    className={cx(
+                      'flex w-full cursor-not-allowed items-center gap-3 rounded-md px-3 py-3.5 text-left opacity-60',
+                      active && 'bg-brand-75',
+                    )}
+                  >
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 font-semibold text-neutral-350">
+                      {index + 1}
+                    </span>
+                    <span className="text-[15px] font-semibold text-neutral-950">{s.title}</span>
+                    <Lock aria-label={RESTRICTED_COPY.tooltip} className="text-brand ml-auto size-4 shrink-0" />
+                  </button>
+                </li>
+              );
+            }
             return (
               <li key={s.key}>
                 <Link

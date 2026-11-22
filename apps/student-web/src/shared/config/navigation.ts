@@ -11,6 +11,7 @@ import {
   Notebook,
   type LucideIcon,
 } from 'lucide-react';
+import type { FeatureKeys, RestrictableFeature } from '@/features/feature-access';
 import type { ExamCategory, ExamConfig } from './exams';
 import { routes, type SectionKey } from './routes';
 
@@ -21,12 +22,17 @@ import { routes, type SectionKey } from './routes';
  */
 export type NavLock = 'plan' | 'study-plan';
 
+/** Why an item is locked right now: its own lock, or `institute` (the student's institute switched it off). */
+export type NavLockReason = NavLock | 'institute';
+
 export interface NavItem {
   key: string;
   label: string;
   icon: LucideIcon;
   href: (exam: string) => string;
   lock?: NavLock;
+  /** Institute-restrictable feature(s) behind the item: locked when all of them are restricted (features/feature-access). */
+  feature?: FeatureKeys;
   /** Opens today's live daily practice paper (resolved when clicked); `href` is the fallback. */
   opens?: 'live-dpp';
   /** Shown in the board mobile bottom bar (the raised "Ask" button sits in the middle). */
@@ -37,21 +43,44 @@ export interface NavItem {
 export const NAVIGATION: Record<ExamCategory, readonly NavItem[]> = {
   board: [
     { key: 'dashboard', label: 'Dashboard', icon: House, href: routes.dashboard, mobile: true },
-    { key: 'learn', label: 'Learn', icon: BookOpen, href: routes.learn, lock: 'plan', mobile: true },
-    { key: 'assessments', label: 'Assessments', icon: ClipboardList, href: routes.assessments, lock: 'plan', mobile: true },
-    { key: 'notes', label: 'Notes', icon: FileText, href: routes.notes, lock: 'plan', mobile: true },
-    { key: 'study-plan', label: 'Study Plan', icon: CalendarDays, href: routes.studyPlan, lock: 'study-plan' },
+    {
+      key: 'learn',
+      label: 'Learn',
+      icon: BookOpen,
+      href: routes.learn,
+      lock: 'plan',
+      mobile: true,
+      feature: ['video_lectures', 'summary_videos', 'notes', 'quiz', 'unit_test', 'chapter_pyq'],
+    },
+    {
+      key: 'assessments',
+      label: 'Assessments',
+      icon: ClipboardList,
+      href: routes.assessments,
+      lock: 'plan',
+      mobile: true,
+      feature: ['mock_exam', 'pyq_exam', 'custom_exam'],
+    },
+    { key: 'notes', label: 'Notes', icon: FileText, href: routes.notes, lock: 'plan', mobile: true, feature: ['notes', 'summary_videos'] },
+    { key: 'study-plan', label: 'Study Plan', icon: CalendarDays, href: routes.studyPlan, lock: 'study-plan', feature: 'study_plan' },
     // Referring friends isn't premium content, so it's never locked.
     { key: 'refer-and-earn', label: 'Refer & Earn', icon: Gift, href: routes.referAndEarn },
   ],
   competitive: [
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: routes.dashboard },
-    { key: 'notes', label: 'Notes', icon: FileText, href: routes.notes },
-    { key: 'mock-tests', label: 'Mock Tests', icon: ClipboardList, href: routes.mockTests },
-    { key: 'pyq-library', label: 'PYQ Library', icon: BookOpen, href: routes.pyqLibrary },
-    { key: 'daily-practice', label: 'Daily Practice', icon: Notebook, href: routes.dailyPractice, opens: 'live-dpp' },
+    { key: 'notes', label: 'Notes', icon: FileText, href: routes.notes, feature: 'notes' },
+    { key: 'mock-tests', label: 'Mock Tests', icon: ClipboardList, href: routes.mockTests, feature: 'mock_exam' },
+    { key: 'pyq-library', label: 'PYQ Library', icon: BookOpen, href: routes.pyqLibrary, feature: 'pyq_exam' },
+    {
+      key: 'daily-practice',
+      label: 'Daily Practice',
+      icon: Notebook,
+      href: routes.dailyPractice,
+      opens: 'live-dpp',
+      feature: 'practice_dpp',
+    },
     { key: 'refer-and-earn', label: 'Refer & Earn', icon: Gift, href: routes.referAndEarn },
-    { key: 'custom-exam', label: 'Custom Exam', icon: FilePenLine, href: routes.customTest },
+    { key: 'custom-exam', label: 'Custom Exam', icon: FilePenLine, href: routes.customTest, feature: 'custom_exam' },
   ],
   reference: [{ key: 'reference-books', label: 'Reference Books', icon: Library, href: () => routes.referenceBooks() }],
 };
@@ -125,11 +154,22 @@ export function sectionTitle(exam: Pick<ExamConfig, 'category'>, section: string
 export interface NavAccess {
   hasPlan: boolean;
   hasStudyPlan: boolean;
+  /** Features the student's institute switched off for this exam (empty while loading or on error). */
+  restricted?: readonly RestrictableFeature[];
 }
 
-export function isNavLocked(item: Pick<NavItem, 'lock'>, access: NavAccess): boolean {
-  if (item.lock === 'plan') return !access.hasPlan;
-  if (item.lock === 'study-plan') return !access.hasStudyPlan;
+/** Restricted when every feature of the item is (an item without features never is). */
+export function isNavRestricted(item: Pick<NavItem, 'feature'>, restricted: readonly RestrictableFeature[] = []): boolean {
+  if (!item.feature) return false;
+  const features: readonly RestrictableFeature[] = typeof item.feature === 'string' ? [item.feature] : item.feature;
+  return features.length > 0 && features.every((feature) => restricted.includes(feature));
+}
+
+/** The reason the item is locked, or false. The institute comes first: its dialog says the plan wouldn't help. */
+export function isNavLocked(item: Pick<NavItem, 'lock' | 'feature'>, access: NavAccess): NavLockReason | false {
+  if (isNavRestricted(item, access.restricted)) return 'institute';
+  if (item.lock === 'plan' && !access.hasPlan) return 'plan';
+  if (item.lock === 'study-plan' && !access.hasStudyPlan) return 'study-plan';
   return false;
 }
 

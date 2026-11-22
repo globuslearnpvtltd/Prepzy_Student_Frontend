@@ -6,16 +6,36 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAtlas } from '@/features/assistant';
 import { planTier, useActivePlan, type ActivePlan } from '@/features/auth';
+import { featureList, RESTRICTED_COPY, showFeatureRestricted, useFeatureAccess } from '@/features/feature-access';
 import type { ExamConfig } from '@/shared/config/exams';
-import { isActivePath, isNavLocked, navigationFor, type NavAccess, type NavItem } from '@/shared/config/navigation';
+import {
+  isActivePath,
+  isNavLocked,
+  navigationFor,
+  type NavAccess,
+  type NavItem,
+  type NavLockReason,
+} from '@/shared/config/navigation';
 import { routes } from '@/shared/config/routes';
 import { useHasStudyPlan } from './shell-api';
 
-/** What the student can open: Learn / Assessments / Notes need a plan, Study Plan needs a built study plan. */
+/**
+ * What the student can open: Learn / Assessments / Notes need a plan, Study Plan needs a built study plan, and nothing
+ * the student's institute switched off (empty while the access list loads, so no lock flashes).
+ */
 export function useNavAccess(exam: ExamConfig): NavAccess {
   const plan = useActivePlan(exam);
   const studyPlan = useHasStudyPlan(plan.data?.classId ?? null);
-  return { hasPlan: !!plan.data, hasStudyPlan: !!studyPlan.data };
+  const { restricted } = useFeatureAccess(exam);
+  return { hasPlan: !!plan.data, hasStudyPlan: !!studyPlan.data, restricted };
+}
+
+/** A locked item's padlock label: the institute's lock has its own tooltip. */
+export const lockLabel = (reason: NavLockReason | false) => (reason === 'institute' ? RESTRICTED_COPY.tooltip : 'Locked');
+
+/** Clicking an item the institute switched off explains why (other locks stay silent, as before). */
+export function lockedClick(item: Pick<NavItem, 'feature'>, reason: NavLockReason | false) {
+  return reason === 'institute' && item.feature ? () => showFeatureRestricted(featureList(item.feature!)[0] ?? null) : undefined;
 }
 
 /** "CLASS 12 (PCB)" */
@@ -25,7 +45,17 @@ const classLabel = (plan: Pick<ActivePlan, 'className' | 'streamName'>) =>
 const formatDate = (iso: string) =>
   new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
 
-function NavRow({ item, exam, active, locked }: { item: NavItem; exam: ExamConfig; active: boolean; locked: boolean }) {
+function NavRow({
+  item,
+  exam,
+  active,
+  locked,
+}: {
+  item: NavItem;
+  exam: ExamConfig;
+  active: boolean;
+  locked: NavLockReason | false;
+}) {
   const content = (
     <>
       <span className="flex items-center gap-2.5">
@@ -33,13 +63,26 @@ function NavRow({ item, exam, active, locked }: { item: NavItem; exam: ExamConfi
         {item.label}
       </span>
       {locked && (
-        <span className="bg-surface text-brand flex size-6 items-center justify-center rounded-[6px]">
-          <Lock aria-label="Locked" className="size-3.5" />
+        <span title={lockLabel(locked)} className="bg-surface text-brand flex size-6 items-center justify-center rounded-[6px]">
+          <Lock aria-label={lockLabel(locked)} className="size-3.5" />
         </span>
       )}
     </>
   );
   const base = 'flex items-center justify-between gap-4 rounded-lg p-4 text-[16px] font-medium transition-colors';
+  if (locked === 'institute') {
+    return (
+      <button
+        type="button"
+        aria-disabled="true"
+        title={RESTRICTED_COPY.tooltip}
+        onClick={lockedClick(item, locked)}
+        className={cx(base, 'bg-canvas text-foreground-muted w-full cursor-not-allowed text-left opacity-70')}
+      >
+        {content}
+      </button>
+    );
+  }
   if (locked) {
     return (
       <span aria-disabled="true" className={cx(base, 'bg-canvas text-foreground-muted cursor-not-allowed opacity-70')}>
@@ -132,6 +175,8 @@ function AskIcon() {
 export function BoardBottomBar({ exam }: { exam: ExamConfig }) {
   const pathname = usePathname();
   const access = useNavAccess(exam);
+  // "Ask" leads to Atlas and Socrates: locked when the institute switched both off.
+  const askLocked = useFeatureAccess(exam).isRestricted(['atlas_chat', 'doubt_solver']);
   const items = navigationFor(exam).filter((item) => item.mobile);
   const half = Math.ceil(items.length / 2);
 
@@ -143,8 +188,8 @@ export function BoardBottomBar({ exam }: { exam: ExamConfig }) {
         <span className="relative">
           <item.icon aria-hidden className="size-[22px]" />
           {locked && (
-            <span className="bg-surface text-brand absolute -top-1.5 -right-1.5 rounded-full p-0.5 shadow-sm">
-              <Lock aria-label="Locked" className="size-3" />
+            <span title={lockLabel(locked)} className="bg-surface text-brand absolute -top-1.5 -right-1.5 rounded-full p-0.5 shadow-sm">
+              <Lock aria-label={lockLabel(locked)} className="size-3" />
             </span>
           )}
         </span>
@@ -154,7 +199,17 @@ export function BoardBottomBar({ exam }: { exam: ExamConfig }) {
     const className = cx('flex flex-col items-center', active ? 'text-brand-600' : 'text-neutral-600');
     return (
       <li key={item.key}>
-        {locked ? (
+        {locked === 'institute' ? (
+          <button
+            type="button"
+            aria-disabled="true"
+            title={RESTRICTED_COPY.tooltip}
+            onClick={lockedClick(item, locked)}
+            className={cx(className, 'w-full cursor-not-allowed opacity-60')}
+          >
+            {body}
+          </button>
+        ) : locked ? (
           <span aria-disabled="true" className={cx(className, 'cursor-not-allowed opacity-60')}>
             {body}
           </span>
@@ -175,11 +230,23 @@ export function BoardBottomBar({ exam }: { exam: ExamConfig }) {
           {/* Opens the Atlas vs Socrates sheet (features/assistant AtlasHost). */}
           <button
             type="button"
-            onClick={() => useAtlas.getState().setAskSheet(!useAtlas.getState().askSheet)}
+            onClick={() =>
+              askLocked ? showFeatureRestricted('atlas_chat') : useAtlas.getState().setAskSheet(!useAtlas.getState().askSheet)
+            }
             aria-label="Ask a question"
-            className="border-surface from-brand-450 to-brand shadow-raised -mt-[30px] flex size-[52px] items-center justify-center rounded-full border-4 bg-linear-to-b"
+            aria-disabled={askLocked || undefined}
+            title={askLocked ? RESTRICTED_COPY.tooltip : undefined}
+            className={cx(
+              'border-surface from-brand-450 to-brand shadow-raised relative -mt-[30px] flex size-[52px] items-center justify-center rounded-full border-4 bg-linear-to-b',
+              askLocked && 'cursor-not-allowed opacity-60',
+            )}
           >
             <AskIcon />
+            {askLocked && (
+              <span className="bg-surface text-brand absolute -top-1.5 -right-1.5 rounded-full p-0.5 shadow-sm">
+                <Lock aria-label={RESTRICTED_COPY.tooltip} className="size-3" />
+              </span>
+            )}
           </button>
           <span className="mt-2 text-[10px] leading-[14px] font-semibold text-neutral-600" aria-hidden="true">
             Ask

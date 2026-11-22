@@ -5,6 +5,8 @@ import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { BoardAssessments, BoardPaperSets } from './board';
 import { testExam } from '@/test/exams';
+import { useFeatureRestrictedDialog } from '@/features/feature-access';
+import { restrictFeatures } from '@/test/feature-access';
 
 const cbse = testExam('cbse');
 
@@ -63,6 +65,43 @@ describe('BoardAssessments: full length exams', () => {
     renderWithProviders(<BoardAssessments />, { exam: cbse });
     expect(await screen.findByRole('dialog', { name: 'Create Custom Test' })).toBeInTheDocument();
     expect(window.location.search).toBe('?x=1');
+  });
+});
+
+describe('BoardAssessments: institute restrictions', () => {
+  it('opens the allowed tab, padlocks the restricted one and the custom test buttons', async () => {
+    useFeatureRestrictedDialog.setState({ open: false, feature: null });
+    server.use(
+      plan,
+      http.get(`${API}/api/v4/assessments/board/1/pyq/subjects`, () =>
+        HttpResponse.json({ success: true, data: [{ subject_id: 5, subject_title: 'CHEMISTRY', exam_count: 2 }] }),
+      ),
+      restrictFeatures('mock_exam', 'custom_exam'),
+    );
+    renderWithProviders(<BoardAssessments />, { exam: cbse });
+    expect(await screen.findByRole('link', { name: /chemistry/i })).toHaveAttribute('href', '/cbse/pyq-sets/5');
+    expect(screen.getByRole('tab', { name: 'Past Year Exams' })).toHaveAttribute('aria-selected', 'true');
+    const mock = screen.getByRole('tab', { name: /Mock Exams/ });
+    expect(mock).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(mock);
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('mock_exam');
+    expect(screen.getByRole('tab', { name: 'Past Year Exams' })).toHaveAttribute('aria-selected', 'true');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Customize Test (not enabled by your institute)' }));
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('custom_exam');
+    expect(screen.queryByRole('dialog', { name: 'Create Custom Test' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Saved Tests (not enabled by your institute)' })).toBeInTheDocument();
+  });
+
+  it('says so when both paper kinds are off, and ignores ?open=custom-test', async () => {
+    useFeatureRestrictedDialog.setState({ open: false, feature: null });
+    server.use(plan, restrictFeatures('mock_exam', 'pyq_exam', 'custom_exam'));
+    window.history.replaceState(null, '', '/cbse/assessments?open=custom-test');
+    renderWithProviders(<BoardAssessments />, { exam: cbse });
+    expect(await screen.findByText('Contact your institute to use this feature.')).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).toBe(''));
+    expect(screen.queryByRole('dialog', { name: 'Create Custom Test' })).not.toBeInTheDocument();
+    expect(useFeatureRestrictedDialog.getState().feature).toBe('custom_exam');
   });
 });
 

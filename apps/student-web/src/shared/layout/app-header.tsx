@@ -13,7 +13,7 @@ import type { ExamCategory, ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { isNavLocked, navigationFor } from '@/shared/config/navigation';
 import { AccountMenu, AccountMenuBody, Avatar, useMenuDot } from './account-menu';
-import { useNavAccess } from './board-navigation';
+import { lockedClick, lockLabel, useNavAccess } from './board-navigation';
 import { GoalMenu, GoalSheet, useOwnedExams } from './goal-switcher';
 import { useMobileNav } from './mobile-nav-store';
 import { SearchBox } from './search-box';
@@ -81,7 +81,7 @@ function BoardDrawerNavigation({ exam, onNavigate }: { exam: ExamConfig; onNavig
             <item.icon aria-hidden className="size-5 shrink-0 text-account-body" />
             <span>{item.label}</span>
             {locked ? (
-              <Lock aria-label="Locked" className="ml-auto size-4 shrink-0 text-neutral-550" />
+              <Lock aria-label={lockLabel(locked)} className="ml-auto size-4 shrink-0 text-neutral-550" />
             ) : (
               <ChevronRight aria-hidden className="ml-auto size-4 shrink-0 text-neutral-550" />
             )}
@@ -89,6 +89,20 @@ function BoardDrawerNavigation({ exam, onNavigate }: { exam: ExamConfig; onNavig
         );
         const className =
           'flex w-full items-center gap-3 rounded-[12px] px-3 py-3 text-[15px] font-medium text-account-ink hover:bg-account-soft';
+        if (locked === 'institute') {
+          return (
+            <button
+              key={item.key}
+              type="button"
+              aria-disabled="true"
+              title={lockLabel(locked)}
+              onClick={lockedClick(item, locked)}
+              className={cx(className, 'cursor-not-allowed text-left opacity-60 hover:bg-transparent')}
+            >
+              {body}
+            </button>
+          );
+        }
         return locked ? (
           <span key={item.key} aria-disabled="true" className={cx(className, 'cursor-not-allowed opacity-60 hover:bg-transparent')}>
             {body}

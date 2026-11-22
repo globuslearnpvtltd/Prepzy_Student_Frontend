@@ -2,10 +2,11 @@
 
 import { cx } from '@prepzy/design-system';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowRight, BookOpen, FileText, Library, Search } from 'lucide-react';
+import { ArrowRight, BookOpen, FileText, Library, Lock, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useActivePlan } from '@/features/auth';
+import { RESTRICTED_COPY, showFeatureRestricted, useFeatureAccess } from '@/features/feature-access';
 import { track } from '@/shared/analytics/track';
 import type { ExamConfig } from '@/shared/config/exams';
 import { ApiError } from '@/shared/lib/errors';
@@ -41,7 +42,35 @@ export const searchErrorText = (error: unknown) =>
  *   search for its title and subject, as before.
  * - the arrow button runs the lecture search (POST .../lectures) and shows the results panel (see SearchResults).
  */
-export function SearchBox({ exam, onNavigate, className }: { exam: ExamConfig; onNavigate?: () => void; className?: string }) {
+export function SearchBox(props: { exam: ExamConfig; onNavigate?: () => void; className?: string }) {
+  const restricted = useFeatureAccess(props.exam).isRestricted('search');
+  return restricted ? <LockedSearchBox className={props.className} /> : <OpenSearchBox {...props} />;
+}
+
+/** The search box when the student's institute switched search off: same look, disabled, with a padlock. */
+function LockedSearchBox({ className }: { className?: string }) {
+  return (
+    <button
+      type="button"
+      aria-disabled="true"
+      aria-label={`Search (${RESTRICTED_COPY.tooltip.toLowerCase()})`}
+      title={RESTRICTED_COPY.tooltip}
+      onClick={() => showFeatureRestricted('search')}
+      className={cx(
+        'border-line bg-surface flex h-11 w-full cursor-not-allowed items-center gap-2.5 rounded-full border pr-1 pl-4 text-left opacity-70',
+        className,
+      )}
+    >
+      <Search aria-hidden className="text-foreground-muted size-[18px] shrink-0" />
+      <span className="text-foreground-muted min-w-0 flex-1 truncate text-[14px]">Search chapters, notes and tests</span>
+      <span className="bg-canvas text-brand flex size-9 shrink-0 items-center justify-center rounded-full">
+        <Lock aria-hidden className="size-4" />
+      </span>
+    </button>
+  );
+}
+
+function OpenSearchBox({ exam, onNavigate, className }: { exam: ExamConfig; onNavigate?: () => void; className?: string }) {
   const router = useRouter();
   const plan = useActivePlan(exam);
   const classId = plan.data?.classId ?? null;

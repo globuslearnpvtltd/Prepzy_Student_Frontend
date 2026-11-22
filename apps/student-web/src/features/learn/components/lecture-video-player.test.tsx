@@ -10,10 +10,20 @@ const FILE = 'https://cdn.test/en.mp4';
 const YOUTUBE = 'https://youtu.be/abcdefghijk';
 const analytics = { examId: 'cbse', subject: 'Science', chapterName: 'Light', lectureTitle: 'Mirrors' };
 
-type FakeMedia = HTMLVideoElement & { api?: Record<string, ReturnType<typeof vi.fn>>; webkitEnterFullscreen?: () => void };
+type FakeMedia = HTMLVideoElement & {
+  api?: Record<string, ReturnType<typeof vi.fn>>;
+  webkitEnterFullscreen?: () => void;
+};
 
 function renderPlayer(props: Partial<LectureVideoPlayerProps> = {}) {
-  const result = render(<LectureVideoPlayer videos={[{ language: 'english', link: FILE }]} title="Mirrors" analytics={analytics} {...props} />);
+  const result = render(
+    <LectureVideoPlayer
+      videos={[{ language: 'english', link: FILE }]}
+      title="Mirrors"
+      analytics={analytics}
+      {...props}
+    />,
+  );
   return { ...result, media: () => screen.getByTestId('media') as FakeMedia };
 }
 
@@ -56,7 +66,9 @@ describe('LectureVideoPlayer: sources', () => {
   it('plays a YouTube link through its watch URL, with the quality label and captions toggle', () => {
     const { media } = renderPlayer({ videos: [{ language: 'english', link: YOUTUBE }] });
     expect(media()).toHaveAttribute('src', 'https://www.youtube.com/watch?v=abcdefghijk');
-    expect(JSON.parse(media().dataset.config!)).toEqual({ youtube: { rel: 0, iv_load_policy: 3, disablekb: 1, fs: 0, cc_load_policy: 1 } });
+    expect(JSON.parse(media().dataset.config!)).toEqual({
+      youtube: { rel: 0, iv_load_policy: 3, disablekb: 1, fs: 0, cc_load_policy: 1 },
+    });
     expect(screen.getByText('Auto')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Turn off captions' })).toHaveAttribute('aria-pressed', 'true');
     // the YouTube poster covers the cued screen; the iframe is cropped until playback settles
@@ -188,7 +200,15 @@ describe('LectureVideoPlayer: playback', () => {
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Playback speed' }), '1.5');
     expect(media()).toHaveAttribute('data-rate', '1.5');
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['0.5x', '0.75x', '1x', '1.25x', '1.5x', '1.75x', '2x']);
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      '0.5x',
+      '0.75x',
+      '1x',
+      '1.25x',
+      '1.5x',
+      '1.75x',
+      '2x',
+    ]);
   });
 
   it('opens a vertical volume slider on phones', async () => {
@@ -206,7 +226,12 @@ describe('LectureVideoPlayer: playback', () => {
     localStorage.setItem(CAPTIONS_KEYS.board, 'off');
     const { media } = renderPlayer({ videos: [{ language: 'english', link: YOUTUBE }] });
     expect(JSON.parse(media().dataset.config!).youtube.cc_load_policy).toBe(0);
-    const api = { loadModule: vi.fn(), unloadModule: vi.fn(), getPlaybackQuality: vi.fn(() => 'hd720'), addEventListener: vi.fn() };
+    const api = {
+      loadModule: vi.fn(),
+      unloadModule: vi.fn(),
+      getPlaybackQuality: vi.fn(() => 'hd720'),
+      addEventListener: vi.fn(),
+    };
     media().api = api;
     clock(media(), 100).at(5);
     expect(screen.getByText('720p')).toBeInTheDocument();
@@ -226,7 +251,11 @@ describe('LectureVideoPlayer: playback', () => {
     try {
       const { media } = renderPlayer({ videos: [{ language: 'english', link: YOUTUBE }] });
       const listeners: ((event: { data: number }) => void)[] = [];
-      media().api = { loadModule: vi.fn(), unloadModule: vi.fn(), addEventListener: vi.fn((_: string, fn: (event: { data: number }) => void) => listeners.push(fn)) };
+      media().api = {
+        loadModule: vi.fn(),
+        unloadModule: vi.fn(),
+        addEventListener: vi.fn((_: string, fn: (event: { data: number }) => void) => listeners.push(fn)),
+      };
       fireEvent.loadedMetadata(media());
       fireEvent.click(screen.getByRole('button', { name: 'Play video' }));
       expect(screen.getByTestId('video-layer')).toHaveAttribute('data-cropped', 'true');
@@ -349,20 +378,40 @@ describe('LectureVideoPlayer: playback', () => {
     const time = clock(media(), 100);
     await userEvent.click(screen.getByRole('button', { name: 'Play video' }));
     time.at(60);
-    expect(track).toHaveBeenCalledWith('video_lecture_milestone', { milestone_percent: 25, lecture_title: 'Mirrors', chapter_name: 'Light', subject: 'Science' });
+    expect(track).toHaveBeenCalledWith('video_lecture_milestone', {
+      milestone_percent: 25,
+      lecture_title: 'Mirrors',
+      chapter_name: 'Light',
+      subject: 'Science',
+    });
     expect(track).toHaveBeenCalledWith('video_lecture_milestone', expect.objectContaining({ milestone_percent: 50 }));
-    expect(track).not.toHaveBeenCalledWith('video_lecture_milestone', expect.objectContaining({ milestone_percent: 75 }));
+    expect(track).not.toHaveBeenCalledWith(
+      'video_lecture_milestone',
+      expect.objectContaining({ milestone_percent: 75 }),
+    );
     time.at(60);
     expect(vi.mocked(track).mock.calls.filter(([event]) => event === 'video_lecture_milestone')).toHaveLength(2);
     unmount();
-    expect(track).toHaveBeenCalledWith('video_lecture_exited', { percent_watched: 60, exam_id: 'cbse', video_type: 'lecture', subject: 'Science', chapter_name: 'Light' });
+    expect(track).toHaveBeenCalledWith('video_lecture_exited', {
+      percent_watched: 60,
+      exam_id: 'cbse',
+      video_type: 'lecture',
+      subject: 'Science',
+      chapter_name: 'Light',
+    });
 
     vi.mocked(track).mockClear();
     const second = renderPlayer();
     const t2 = clock(second.media(), 100);
     await userEvent.click(screen.getByRole('button', { name: 'Play video' }));
     t2.at(96);
-    expect(track).toHaveBeenCalledWith('video_lecture_completed', { exam_id: 'cbse', video_type: 'lecture', subject: 'Science', chapter_name: 'Light', watch_time_seconds: 96 });
+    expect(track).toHaveBeenCalledWith('video_lecture_completed', {
+      exam_id: 'cbse',
+      video_type: 'lecture',
+      subject: 'Science',
+      chapter_name: 'Light',
+      watch_time_seconds: 96,
+    });
     second.unmount();
     expect(track).not.toHaveBeenCalledWith('video_lecture_exited', expect.anything());
   });
@@ -394,7 +443,9 @@ describe('LectureVideoPlayer: errors', () => {
     const onError = vi.fn();
     const { media } = renderPlayer({ onError });
     Object.defineProperty(media(), 'error', { configurable: true, value: { code: 4 } });
-    vi.spyOn(media(), 'play').mockRejectedValueOnce(Object.assign(new Error('no source'), { name: 'NotSupportedError' }));
+    vi.spyOn(media(), 'play').mockRejectedValueOnce(
+      Object.assign(new Error('no source'), { name: 'NotSupportedError' }),
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Play video' }));
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(onError).toHaveBeenCalledTimes(1);
@@ -452,5 +503,30 @@ describe('LectureVideoPlayer: competitive variant', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("covers YouTube's cued thumbnail with its own fitted poster (the cropped iframe would zoom it); files keep the backdrop", () => {
+    const { container, unmount } = render(
+      <LectureVideoPlayer
+        variant="competitive"
+        backdrop={<svg data-testid="backdrop" />}
+        videos={[{ language: 'english', link: YOUTUBE }]}
+        language="english"
+        onLanguageChange={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('img[src^="https://i.ytimg.com/vi/abcdefghijk/"]')).not.toBeNull();
+    unmount();
+
+    const file = render(
+      <LectureVideoPlayer
+        variant="competitive"
+        backdrop={<svg data-testid="backdrop" />}
+        videos={[{ language: 'hindi', link: FILE }]}
+        language="hindi"
+        onLanguageChange={vi.fn()}
+      />,
+    );
+    expect(file.container.querySelector('img')).toBeNull();
   });
 });

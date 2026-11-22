@@ -8,8 +8,9 @@ const titleCase = (s: string) => s.toLowerCase().replace(/(^|\s)\S/g, (c) => c.t
 
 /**
  * "Test Generated Successfully!" after a board custom test is generated (previous app's CustomExamCreationSuccessModal):
- * blurred page behind (as before), purple header with a trophy, a summary card (course, difficulty, selected topics), then "Take Test Now" (opens the
+ * blurred page behind (as before; z 52/53 so it sits above the custom-test dialog at 51 and blurs it too), purple header with a trophy, a summary card (course, difficulty, selected topics), then "Take Test Now" (opens the
  * test) or "Save for Later" (back to Assessments, where it is listed under Saved Tests). Closing it saves for later.
+ * NEET's custom test uses it too: `itemLabel` "Chapter" with the chapter name, and its own save hint.
  */
 export function BoardCustomGenerated({
   open,
@@ -18,9 +19,14 @@ export function BoardCustomGenerated({
   topicsCount,
   onTakeNow,
   onSaveForLater,
+  itemLabel = 'Course',
+  saveHint = 'Add to Tests & Quizzes',
 }: {
   open: boolean;
+  /** The course (board) or chapter (competitive) the test was built from. */
   course: string;
+  itemLabel?: string;
+  saveHint?: string;
   difficulty: string;
   topicsCount: number;
   onTakeNow: () => void;
@@ -30,8 +36,8 @@ export function BoardCustomGenerated({
     <Dialog open={open} onOpenChange={(next) => !next && onSaveForLater()}>
       <DialogContent
         onPointerDownOutside={(event) => event.preventDefault()}
-        overlayClassName="bg-generated-scrim/30 backdrop-blur-sm"
-        className="flex max-h-[90%] w-[95%] max-w-[512px] flex-col gap-6 overflow-y-auto rounded-[24px] p-0 font-sans md:w-[512px]"
+        overlayClassName="z-[52] bg-generated-scrim/30 backdrop-blur-sm"
+        className="z-[53] flex max-h-[90%] w-[95%] max-w-[512px] flex-col gap-6 overflow-y-auto rounded-[24px] p-0 font-sans md:w-[512px]"
       >
         <div className="from-brand-700 to-generated-deep flex flex-col items-center gap-[14px] rounded-t-[24px] bg-linear-to-r p-8 text-center">
           <span className="bg-generated-ring hidden size-16 items-center justify-center rounded-full md:flex">
@@ -49,7 +55,7 @@ export function BoardCustomGenerated({
           <div className="border-generated-line bg-generated-soft flex flex-col gap-4 rounded-[20px] border-2 p-[22px]">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-col gap-[5px]">
-                <p className="text-generated-label m-0 text-[12px] leading-4 font-semibold">Course</p>
+                <p className="text-generated-label m-0 text-[12px] leading-4 font-semibold">{itemLabel}</p>
                 <p className="m-0 text-[16px] leading-[19.2px] font-bold text-neutral-950">{titleCase(course)}</p>
               </div>
               <p className="bg-generated-primary text-on-brand m-0 shrink-0 rounded-full px-3 py-1.5 text-[12px] leading-4 font-bold">
@@ -85,7 +91,7 @@ export function BoardCustomGenerated({
               iconClass="bg-neutral-100"
               title="Save for Later"
               titleClass="text-neutral-700"
-              hint="Add to Tests & Quizzes"
+              hint={saveHint}
               hintClass="text-generated-label"
             />
           </div>

@@ -14,7 +14,10 @@ const num = (value: unknown): number | null => {
   return typeof n === 'number' && Number.isFinite(n) ? n : null;
 };
 
-/** Board subjects Socrates can solve (the textbook API also lists languages etc.). Competitive: all. */
+/**
+ * Board subjects Socrates can solve (the textbook API also lists languages etc.). Competitive: all. A medium's
+ * subject is named after the base one ("MATHEMATICS - HINDI"), so the part before " - " is what counts.
+ */
 const SOLVABLE_BOARD_SUBJECTS = new Set([
   'SCIENCE',
   'MATHEMATICS',
@@ -29,19 +32,32 @@ const SOLVABLE_BOARD_SUBJECTS = new Set([
   'POLITICAL SCIENCE',
   'SOCIOLOGY',
   'ENGLISH',
+  'HINDI',
   'BUSINESS STUDIES',
 ]);
+
+/** "SCIENCE", "Science - Hindi", "HINDI" → solvable; "SANSKRIT - HINDI" → not. */
+export const isSolvableBoardSubject = (name: string): boolean => {
+  const upper = name.toUpperCase().trim();
+  return SOLVABLE_BOARD_SUBJECTS.has(upper) || SOLVABLE_BOARD_SUBJECTS.has(upper.split(/\s+-\s+/)[0]!.trim());
+};
 
 const ACRONYMS = new Set(['NEET', 'CBSE', 'NCERT', 'PCB', 'PCM', 'PCMB']);
 
 /** "NEET-PHYSICS" → "NEET Physics", "SOCIAL SCIENCE" → "Social Science". */
 export function formatSubject(name: string): string {
-  return name
-    .split(/[\s-]+/)
-    .filter(Boolean)
-    // Acronyms (NEET, CBSE, PCB) stay upper-case.
-    .map((word) => (ACRONYMS.has(word.toUpperCase()) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()))
-    .join(' ');
+  return (
+    name
+      .split(/[\s-]+/)
+      .filter(Boolean)
+      // Acronyms (NEET, CBSE, PCB) stay upper-case.
+      .map((word) =>
+        ACRONYMS.has(word.toUpperCase())
+          ? word.toUpperCase()
+          : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+      )
+      .join(' ')
+  );
 }
 
 /** Subject label without the exam prefix ("NEET-PHYSICS" → "Physics"), for headings. */
@@ -137,7 +153,7 @@ export interface SolvePayload {
 
 export function toBooks(body: unknown, competitive: boolean): SolverBook[] {
   return toArray(asRaw(body).subject_courses)
-    .filter((group) => competitive || SOLVABLE_BOARD_SUBJECTS.has((str(group.subject_name) ?? '').toUpperCase()))
+    .filter((group) => competitive || isSolvableBoardSubject(str(group.subject_name) ?? ''))
     .flatMap((group) =>
       toArray(group.textbooks).map((book) => ({
         bookId: num(book.id) ?? 0,
@@ -201,7 +217,13 @@ export function toConceptCards(body: unknown): { cards: ConceptCard[]; sources: 
     .sort((a, b) => a.cardNo - b.cardNo);
   const raw = isRaw(data.sources) ? data.sources : null;
   const sources = raw
-    ? { className: str(raw.Class), subject: str(raw.Subject), book: str(raw.Book), chapter: str(raw.Chapter), lecture: str(raw.Lecture) }
+    ? {
+        className: str(raw.Class),
+        subject: str(raw.Subject),
+        book: str(raw.Book),
+        chapter: str(raw.Chapter),
+        lecture: str(raw.Lecture),
+      }
     : null;
   return { cards, sources: sources && Object.values(sources).some(Boolean) ? sources : null };
 }
@@ -209,7 +231,8 @@ export function toConceptCards(body: unknown): { cards: ConceptCard[]; sources: 
 export function toTutorReply(body: unknown): TutorReply {
   const data = asRaw(body);
   const text = str(data.text);
-  if (!text) throw new ApiError({ status: 502, code: 'EMPTY_REPLY', message: "Socrates couldn't reply. Please try again." });
+  if (!text)
+    throw new ApiError({ status: 502, code: 'EMPTY_REPLY', message: "Socrates couldn't reply. Please try again." });
   return {
     chatId: num(data.chat_id),
     text,
@@ -290,8 +313,10 @@ export function buildSolvePayload(question: {
   imageDescription?: string | null;
 }): SolvePayload {
   const parts = [htmlToText(question.html)];
-  if (question.options?.length) parts.push(question.options.map((o, i) => `(${OPTION_LETTERS[i] ?? i + 1}) ${htmlToText(o)}`).join('\n'));
-  if (question.subQuestions?.length) parts.push(question.subQuestions.map((s, i) => `(${i + 1}) ${htmlToText(s)}`).join('\n'));
+  if (question.options?.length)
+    parts.push(question.options.map((o, i) => `(${OPTION_LETTERS[i] ?? i + 1}) ${htmlToText(o)}`).join('\n'));
+  if (question.subQuestions?.length)
+    parts.push(question.subQuestions.map((s, i) => `(${i + 1}) ${htmlToText(s)}`).join('\n'));
   const display = parts.filter(Boolean).join('\n');
   const description = question.imageDescription?.trim();
   return {
@@ -371,7 +396,8 @@ export const solverApi = {
       exam.category === 'competitive',
     ),
 
-  chapters: async (bookId: number) => toChapters(assertOk(await apiClient.get(`${LEARN_API}/courses/${bookId}/outline`))),
+  chapters: async (bookId: number) =>
+    toChapters(assertOk(await apiClient.get(`${LEARN_API}/courses/${bookId}/outline`))),
 
   /**
    * End of chapter: the NCERT questions (board); competitive chapters have none, so a daily sample of the
@@ -390,38 +416,67 @@ export const solverApi = {
   /** Is this a real question for the subject? (the backend uses the maths checker for MATHEMATICS) */
   checkQuestion: async (exam: ExamRef, subject: SolverSubject | null, query: string): Promise<boolean> => {
     const body = asRaw(
-      assertOk(await apiClient.post(`${doubtsApiBase(exam)}/check`, { query, sub_name: subject?.title ?? '' }, { timeout: 60_000 })),
+      assertOk(
+        await apiClient.post(
+          `${doubtsApiBase(exam)}/check`,
+          { query, sub_name: subject?.title ?? '' },
+          { timeout: 60_000 },
+        ),
+      ),
     );
     return asRaw(body.data).valid === true;
   },
 
   /** Reads a photo of a question (OCR): text with LaTeX, plus described diagrams. */
-  extractQuestion: async (exam: ExamRef, file: File): Promise<{ text: string; diagrams: { description: string; base64: string }[] }> => {
+  extractQuestion: async (
+    exam: ExamRef,
+    file: File,
+  ): Promise<{ text: string; diagrams: { description: string; base64: string }[] }> => {
     const form = new FormData();
     form.append('image', file);
-    const data = asRaw(asRaw(assertOk(await apiClient.post(`${doubtsApiBase(exam)}/extract-question`, form, { timeout: 90_000 }))).data);
-    const diagrams = toArray(data.diagrams).map((d) => ({ description: str(d.description) ?? '', base64: str(d.base64) ?? '' }));
+    const data = asRaw(
+      asRaw(assertOk(await apiClient.post(`${doubtsApiBase(exam)}/extract-question`, form, { timeout: 90_000 }))).data,
+    );
+    const diagrams = toArray(data.diagrams).map((d) => ({
+      description: str(d.description) ?? '',
+      base64: str(d.base64) ?? '',
+    }));
     return { text: removeLatexTables(str(data.text) ?? ''), diagrams };
   },
 
   /** Opens a solver chat (counts against the plan's doubt limit of the class). */
   createChat: async (exam: ExamRef, input: { subjectId: number | null; classId: number | null }) => {
-    const body = asRaw(assertOk(await apiClient.post(`${doubtsApiBase(exam)}/chats`, { subject_id: input.subjectId, class_id: input.classId })));
+    const body = asRaw(
+      assertOk(
+        await apiClient.post(`${doubtsApiBase(exam)}/chats`, { subject_id: input.subjectId, class_id: input.classId }),
+      ),
+    );
     const chatId = num(asRaw(body.data).chat_id);
-    if (!chatId) throw new ApiError({ status: 502, code: 'NO_CHAT', message: "Couldn't start solving. Please try again." });
+    if (!chatId)
+      throw new ApiError({ status: 502, code: 'NO_CHAT', message: "Couldn't start solving. Please try again." });
     return chatId;
   },
 
   /** One tutoring turn (JSON reply; this endpoint doesn't stream). */
   ask: async (exam: ExamRef, request: TutorRequest) =>
     toTutorReply(
-      asRaw(assertOk(await apiClient.post(`${doubtsApiBase(exam)}/chats/${request.chatId}/ask`, tutorForm(request), { timeout: 120_000 }))).data,
+      asRaw(
+        assertOk(
+          await apiClient.post(`${doubtsApiBase(exam)}/chats/${request.chatId}/ask`, tutorForm(request), {
+            timeout: 120_000,
+          }),
+        ),
+      ).data,
     ),
 
   conceptCards: async (exam: ExamRef, request: TutorRequest) =>
     toConceptCards(
       asRaw(
-        assertOk(await apiClient.post(`${doubtsApiBase(exam)}/chats/${request.chatId}/concept-cards`, tutorForm(request), { timeout: 120_000 })),
+        assertOk(
+          await apiClient.post(`${doubtsApiBase(exam)}/chats/${request.chatId}/concept-cards`, tutorForm(request), {
+            timeout: 120_000,
+          }),
+        ),
       ).data,
     ),
 

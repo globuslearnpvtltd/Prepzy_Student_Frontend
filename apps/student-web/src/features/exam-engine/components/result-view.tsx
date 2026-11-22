@@ -12,6 +12,7 @@ import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { PageSpinner, StatusScreen } from '@/shared/layout/status-screens';
 import { userMessage } from '@/shared/lib/errors';
+import { canGoBackInApp } from '@/shared/lib/history';
 import { useExamResult } from '../hooks';
 import type { ExamResult, Outcome, ResultQuestion } from '../model';
 import { testHome } from '../test-links';
@@ -61,7 +62,11 @@ export function ResultContent({
   home: { label: string; href: string };
   category: ExamCategory;
 }) {
-  return category === 'board' ? <BoardResult result={result} home={home} /> : <CompetitiveResult result={result} home={home} />;
+  return category === 'board' ? (
+    <BoardResult result={result} home={home} />
+  ) : (
+    <CompetitiveResult result={result} home={home} />
+  );
 }
 
 /* ------------------------------ shared pieces ------------------------------ */
@@ -100,7 +105,13 @@ function DiscussCard({ question }: { question: ResultQuestion }) {
   const c = copy[outcome];
   return (
     <div className="border-info-50 bg-info-25 flex flex-col gap-4 rounded-[14px] border p-6 sm:flex-row sm:items-center">
-      <Image src="/illustrations/tests/vedica.jpg" alt="" width={40} height={40} className="size-10 rounded-full object-cover" />
+      <Image
+        src="/illustrations/tests/vedica.jpg"
+        alt=""
+        width={40}
+        height={40}
+        className="size-10 rounded-full object-cover"
+      />
       <div className="flex-1">
         <p className={cx('text-md font-semibold', c.tone)}>{c.title}</p>
         <p className="text-foreground-muted text-xs">{c.text}</p>
@@ -141,7 +152,8 @@ function DiscussCard({ question }: { question: ResultQuestion }) {
   );
 }
 
-const discussButton = 'border-neutral-150 bg-surface text-brand-400 flex items-center gap-2 rounded-full border px-6 py-3 text-[16px] font-semibold';
+const discussButton =
+  'border-neutral-150 bg-surface text-brand-400 flex items-center gap-2 rounded-full border px-6 py-3 text-[16px] font-semibold';
 
 /* --------------------------------- board ---------------------------------- */
 
@@ -170,7 +182,10 @@ function BoardResult({ result, home }: { result: ExamResult; home: { label: stri
       </header>
       <ol className="bg-surface border-border flex flex-col rounded-[20px] border px-5 py-10 sm:px-10">
         {result.questions.map((question, i) => (
-          <li key={question.id} className="border-neutral-250 flex flex-col gap-5 border-b border-dashed py-10 last:border-b-0">
+          <li
+            key={question.id}
+            className="border-neutral-250 flex flex-col gap-5 border-b border-dashed py-10 last:border-b-0"
+          >
             <BoardResultQuestion question={question} number={i + 1} />
             <DiscussCard question={question} />
             <ReportProblem questionId={question.id} questionHtml={question.html} />
@@ -206,7 +221,10 @@ function BoardResultQuestion({ question, number }: { question: ResultQuestion; n
             >
               <span
                 aria-hidden
-                className={cx('size-5 rounded-full border border-neutral-300', option.isSelected && 'border-info-700 border-[6px]')}
+                className={cx(
+                  'size-5 rounded-full border border-neutral-300',
+                  option.isSelected && 'border-info-700 border-[6px]',
+                )}
               />
               <span className="flex flex-col gap-2">
                 {option.html && <RichText html={option.html} />}
@@ -276,7 +294,12 @@ function BoardResultQuestion({ question, number }: { question: ResultQuestion; n
                 <RichText html={question.sampleAnswerHtml} className="text-sm" />
                 {question.explanationImage && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={question.explanationImage} alt="Explanation" className="mt-3 max-h-72 w-auto rounded-md" loading="lazy" />
+                  <img
+                    src={question.explanationImage}
+                    alt="Explanation"
+                    className="mt-3 max-h-72 w-auto rounded-md"
+                    loading="lazy"
+                  />
                 )}
               </div>
             )}
@@ -289,6 +312,11 @@ function BoardResultQuestion({ question, number }: { question: ResultQuestion; n
 
 /* ------------------------------ competitive ------------------------------- */
 
+/**
+ * Competitive result. Back returns to the page the test was opened from (the player replaces itself with the result,
+ * so that is the chapter's practice step, the PYQ library, Daily Practice, Mock Exams or a results list); opened
+ * directly, it goes to the test type's hub (`home`).
+ */
 function CompetitiveResult({ result, home }: { result: ExamResult; home: { label: string; href: string } }) {
   const router = useRouter();
   const [index, setIndex] = useState(0);
@@ -298,7 +326,11 @@ function CompetitiveResult({ result, home }: { result: ExamResult; home: { label
 
   return (
     <div className={cx(competitivePage, 'pb-10')}>
-      <CompetitiveBreadcrumb home={home} current="Result" onBack={() => router.push(home.href)} />
+      <CompetitiveBreadcrumb
+        home={home}
+        current="Result"
+        onBack={() => (canGoBackInApp() ? router.back() : router.push(home.href))}
+      />
       <section className={cx(card, 'flex flex-wrap items-center justify-between gap-4 px-6 py-4')}>
         <div>
           <h1 className="text-lg font-semibold">{result.title}</h1>
@@ -308,7 +340,10 @@ function CompetitiveResult({ result, home }: { result: ExamResult; home: { label
             </p>
           )}
         </div>
-        <p className="text-brand text-2xl font-bold" aria-label={`Score ${result.obtained} out of ${result.totalMarks}`}>
+        <p
+          className="text-brand text-2xl font-bold"
+          aria-label={`Score ${result.obtained} out of ${result.totalMarks}`}
+        >
           {result.obtained}
           <span className="text-foreground-subtle text-md font-medium"> / {result.totalMarks}</span>
         </p>
@@ -317,13 +352,17 @@ function CompetitiveResult({ result, home }: { result: ExamResult; home: { label
       {question ? (
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <section className={cx(card, 'flex flex-col gap-6 p-6')}>
-            <h2 className="bg-brand-75 text-brand w-fit rounded-md px-4 py-1.5 text-[11px] font-semibold">Question {index + 1}</h2>
+            <h2 className="bg-brand-75 text-brand w-fit rounded-md px-4 py-1.5 text-[11px] font-semibold">
+              Question {index + 1}
+            </h2>
             <RichText html={question.html} className="text-lg font-semibold text-neutral-950" />
             {question.image && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={question.image} alt="" className="max-h-72 w-fit rounded-md" loading="lazy" />
             )}
-            <p className="text-sm font-medium text-neutral-800">Choose the correct answer from the options given below:</p>
+            <p className="text-sm font-medium text-neutral-800">
+              Choose the correct answer from the options given below:
+            </p>
             <ul className="flex flex-col gap-4" aria-label="Options">
               {question.options.map((option, i) => {
                 const state = option.isCorrect ? 'correct' : option.isSelected ? 'incorrect' : 'none';
@@ -342,16 +381,32 @@ function CompetitiveResult({ result, home }: { result: ExamResult; home: { label
                       aria-hidden
                       className={cx(
                         'flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                        state === 'correct' ? 'bg-success-450 text-on-brand' : state === 'incorrect' ? 'bg-danger-450 text-on-brand' : 'bg-canvas text-foreground-muted',
+                        state === 'correct'
+                          ? 'bg-success-450 text-on-brand'
+                          : state === 'incorrect'
+                            ? 'bg-danger-450 text-on-brand'
+                            : 'bg-canvas text-foreground-muted',
                       )}
                     >
-                      {state === 'correct' ? <Check className="size-4" /> : state === 'incorrect' ? <X className="size-4" /> : String.fromCharCode(65 + i)}
+                      {state === 'correct' ? (
+                        <Check className="size-4" />
+                      ) : state === 'incorrect' ? (
+                        <X className="size-4" />
+                      ) : (
+                        String.fromCharCode(65 + i)
+                      )}
                     </span>
                     <span className="flex flex-1 flex-col gap-2 py-3">
                       {option.html && <RichText html={option.html} />}
                       <OptionImage src={option.image} />
                       <span className="sr-only">
-                        {option.isCorrect && option.isSelected ? ' · Your answer · correct' : option.isCorrect ? ' · Correct answer' : option.isSelected ? ' · Your answer' : ''}
+                        {option.isCorrect && option.isSelected
+                          ? ' · Your answer · correct'
+                          : option.isCorrect
+                            ? ' · Correct answer'
+                            : option.isSelected
+                              ? ' · Your answer'
+                              : ''}
                       </span>
                     </span>
                   </li>
@@ -364,7 +419,12 @@ function CompetitiveResult({ result, home }: { result: ExamResult; home: { label
                 <RichText html={question.sampleAnswerHtml} className="text-md text-neutral-700" />
                 {question.explanationImage && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={question.explanationImage} alt="Explanation" className="mt-3 max-h-72 w-auto rounded-md" loading="lazy" />
+                  <img
+                    src={question.explanationImage}
+                    alt="Explanation"
+                    className="mt-3 max-h-72 w-auto rounded-md"
+                    loading="lazy"
+                  />
                 )}
               </section>
             )}
@@ -381,11 +441,14 @@ function CompetitiveResult({ result, home }: { result: ExamResult; home: { label
             </footer>
           </section>
           <aside className="flex flex-col gap-6">
-            <StatusLegend legend={REVIEW_LEGEND.filter((l) => l.status !== 'partial')} counts={{
-              correct: result.counts.correct,
-              incorrect: result.counts.incorrect,
-              unattempted: result.counts.unattempted,
-            }} />
+            <StatusLegend
+              legend={REVIEW_LEGEND.filter((l) => l.status !== 'partial')}
+              counts={{
+                correct: result.counts.correct,
+                incorrect: result.counts.incorrect,
+                unattempted: result.counts.unattempted,
+              }}
+            />
             <QuestionGrid statuses={statuses} legend={REVIEW_LEGEND} current={index} onSelect={setIndex} />
           </aside>
         </div>

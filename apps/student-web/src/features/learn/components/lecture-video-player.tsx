@@ -5,7 +5,17 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import ReactPlayer from 'react-player';
 import { track } from '@/shared/analytics/track';
 import { resolveVideoSource, type LectureVideo } from '../api';
-import { BackIcon, ClockIcon, ForwardIcon, FullscreenIcon, PauseIcon, PlayIcon, ReplayIcon, TranslateIcon, VolumeIcon } from './player-icons';
+import {
+  BackIcon,
+  ClockIcon,
+  ForwardIcon,
+  FullscreenIcon,
+  PauseIcon,
+  PlayIcon,
+  ReplayIcon,
+  TranslateIcon,
+  VolumeIcon,
+} from './player-icons';
 import {
   CAPTIONS_KEYS,
   capitalize,
@@ -32,7 +42,11 @@ interface YouTubeApi {
 /** The element react-player renders: a `<video>` for files, a `<youtube-video>` custom element for YouTube. */
 type MediaElement = HTMLVideoElement & { api?: YouTubeApi | null; webkitEnterFullscreen?: () => void };
 
-type FullscreenDocument = Document & { webkitFullscreenEnabled?: boolean; webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => void };
+type FullscreenDocument = Document & {
+  webkitFullscreenEnabled?: boolean;
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => void;
+};
 type FullscreenElement = HTMLElement & { webkitRequestFullscreen?: () => void };
 
 /**
@@ -58,7 +72,8 @@ const VARIANTS = {
     minLanguages: 2,
     languageLabelOnMobile: true,
     quality: false,
-    frame: 'rounded-2xl border-4 border-on-brand/10 shadow-player-frame md:rounded-lg md:border-0 md:ring-1 md:ring-on-brand/10',
+    frame:
+      'rounded-2xl border-4 border-on-brand/10 shadow-player-frame md:rounded-lg md:border-0 md:ring-1 md:ring-on-brand/10',
   },
 } as const;
 
@@ -145,7 +160,13 @@ export function LectureVideoPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [captionsOn, setCaptionsOn] = useState(() => readStorage(config.captionsKey) !== 'off');
   // YouTube reads cc_load_policy only when the embed loads; later toggles go through the captions module.
-  const [youtubeConfig] = useState(() => ({ rel: 0 as const, iv_load_policy: 3 as const, disablekb: 1 as const, fs: 0 as const, cc_load_policy: (captionsOn ? 1 : 0) as 0 | 1 }));
+  const [youtubeConfig] = useState(() => ({
+    rel: 0 as const,
+    iv_load_policy: 3 as const,
+    disablekb: 1 as const,
+    fs: 0 as const,
+    cc_load_policy: (captionsOn ? 1 : 0) as 0 | 1,
+  }));
 
   const [youtubeSettled, setYoutubeSettled] = useState(false);
   const [youtubeQuality, setYoutubeQuality] = useState<string | null>(null);
@@ -167,7 +188,9 @@ export function LectureVideoPlayer({
   const isYoutube = source?.kind === 'youtube';
   const languageOptions = videos.filter((video) => video.language);
 
-  const posterUrl = thumbnail || (source?.kind === 'youtube' ? `https://i.ytimg.com/vi/${source.id}/${youtubePoster}.jpg` : HEYGEN_POSTER);
+  const posterUrl =
+    thumbnail ||
+    (source?.kind === 'youtube' ? `https://i.ytimg.com/vi/${source.id}/${youtubePoster}.jpg` : HEYGEN_POSTER);
 
   const attachMedia = useCallback((node: MediaElement | null) => {
     mediaRef.current = node;
@@ -596,17 +619,29 @@ export function LectureVideoPlayer({
       onPointerMove={revealControls}
       onPointerDown={revealControls}
       // isolate keeps the overlay z-indexes inside the player, so the floating tutor launcher stays on top
-      className={cx('group bg-player-stage relative isolate h-full w-full overflow-hidden', config.frame, !showControls && 'cursor-none')}
+      className={cx(
+        'group bg-player-stage relative isolate h-full w-full overflow-hidden',
+        config.frame,
+        !showControls && 'cursor-none',
+      )}
     >
       {backdrop ? (
-        <div aria-hidden className={cx('absolute inset-0 transition-opacity duration-700', playing ? 'opacity-0' : 'opacity-100')}>
+        <div
+          aria-hidden
+          className={cx('absolute inset-0 transition-opacity duration-700', playing ? 'opacity-0' : 'opacity-100')}
+        >
           {backdrop}
         </div>
       ) : (
         showPoster && (
           // Blurred poster fills the letterbox area until playback starts.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={posterUrl} alt="" aria-hidden className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl" />
+          <img
+            src={posterUrl}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+          />
         )
       )}
 
@@ -653,22 +688,31 @@ export function LectureVideoPlayer({
             </div>
           )}
 
-          {/* Our own poster covers YouTube's cued screen and end screen */}
-          {showPoster && !backdrop && (
+          {/* Our own poster covers YouTube's cued screen and end screen. With a backdrop (NEET) it is still drawn for
+              YouTube: its cued thumbnail inside the 3x-tall cropped iframe would show zoomed in. */}
+          {showPoster && (!backdrop || isYoutube) && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={posterUrl}
               alt=""
               onLoad={(event) => {
                 // YouTube serves a 120px grey placeholder when there's no maxres thumbnail.
-                if (isYoutube && !thumbnail && event.currentTarget.naturalWidth > 0 && event.currentTarget.naturalWidth <= 120) setYoutubePoster('hqdefault');
+                if (
+                  isYoutube &&
+                  !thumbnail &&
+                  event.currentTarget.naturalWidth > 0 &&
+                  event.currentTarget.naturalWidth <= 120
+                )
+                  setYoutubePoster('hqdefault');
               }}
               onError={() => isYoutube && setYoutubePoster('hqdefault')}
               className="pointer-events-none absolute inset-0 h-full w-full object-cover"
             />
           )}
 
-          {hasStarted && !playing && !ended && <div className="bg-player-ink/30 pointer-events-none absolute inset-0" />}
+          {hasStarted && !playing && !ended && (
+            <div className="bg-player-ink/30 pointer-events-none absolute inset-0" />
+          )}
         </div>
       </div>
 
@@ -702,7 +746,7 @@ export function LectureVideoPlayer({
       {/* Centre state: error, spinner, replay or play / pause */}
       {loadError ? (
         <div className="bg-player-ink/70 text-on-brand absolute inset-0 z-30 flex flex-col items-center justify-center gap-[12px] px-[24px] text-center">
-          <p role="alert" className="text-sm font-semibold sm:text-md">
+          <p role="alert" className="sm:text-md text-sm font-semibold">
             We couldn&apos;t load this video right now.
           </p>
           <button
@@ -759,15 +803,35 @@ export function LectureVideoPlayer({
       >
         {title && <h3 className="truncate text-sm font-semibold sm:text-lg">{title}</h3>}
 
-        <div className={cx('mt-[8px] flex flex-wrap items-center gap-x-[12px] gap-y-[8px] sm:mt-[12px] sm:gap-[16px]', showControls && 'pointer-events-auto')}>
-          <button type="button" onClick={togglePlay} className="text-on-brand/80 hover:text-on-brand transition" aria-label={playing ? 'Pause' : 'Play'}>
+        <div
+          className={cx(
+            'mt-[8px] flex flex-wrap items-center gap-x-[12px] gap-y-[8px] sm:mt-[12px] sm:gap-[16px]',
+            showControls && 'pointer-events-auto',
+          )}
+        >
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="text-on-brand/80 hover:text-on-brand transition"
+            aria-label={playing ? 'Pause' : 'Play'}
+          >
             {playing ? <PauseIcon className="size-[18px]" /> : <PlayIcon className="size-[18px]" />}
           </button>
           {/* Board: seek buttons are desktop-only; on mobile the progress bar and arrow keys cover seeking. */}
-          <button type="button" onClick={() => seekBy(-10)} className={cx(iconButton, !config.seekOnMobile && 'hidden sm:block')} aria-label="Back 10 seconds">
+          <button
+            type="button"
+            onClick={() => seekBy(-10)}
+            className={cx(iconButton, !config.seekOnMobile && 'hidden sm:block')}
+            aria-label="Back 10 seconds"
+          >
             <BackIcon className="size-[18px]" />
           </button>
-          <button type="button" onClick={() => seekBy(10)} className={cx(iconButton, !config.seekOnMobile && 'hidden sm:block')} aria-label="Forward 10 seconds">
+          <button
+            type="button"
+            onClick={() => seekBy(10)}
+            className={cx(iconButton, !config.seekOnMobile && 'hidden sm:block')}
+            aria-label="Forward 10 seconds"
+          >
             <ForwardIcon className="size-[18px]" />
           </button>
           <div ref={volumeMenuRef} className="relative flex items-center gap-x-[12px] sm:gap-x-[16px]">
@@ -858,7 +922,10 @@ export function LectureVideoPlayer({
             )}
 
             {isYoutube && config.quality && (
-              <span title="Quality adjusts automatically to your internet speed" className="text-on-brand/70 text-[11px] font-medium whitespace-nowrap tabular-nums">
+              <span
+                title="Quality adjusts automatically to your internet speed"
+                className="text-on-brand/70 text-[11px] font-medium whitespace-nowrap tabular-nums"
+              >
                 <span className={youtubeQuality ? 'hidden sm:inline' : ''}>Auto</span>
                 {youtubeQuality && (
                   <>
@@ -877,7 +944,9 @@ export function LectureVideoPlayer({
                 aria-pressed={captionsOn}
                 className={cx(
                   'rounded-[6px] border-[1px] border-solid px-[6px] py-[2px] text-[11px] leading-none font-bold transition',
-                  captionsOn ? 'border-on-brand bg-on-brand text-player-ink' : 'border-on-brand/40 text-on-brand/70 hover:text-on-brand line-through',
+                  captionsOn
+                    ? 'border-on-brand bg-on-brand text-player-ink'
+                    : 'border-on-brand/40 text-on-brand/70 hover:text-on-brand line-through',
                 )}
               >
                 CC
@@ -904,8 +973,16 @@ export function LectureVideoPlayer({
         </div>
 
         {/* Progress bar */}
-        <div className={cx('bg-on-brand/20 relative mt-[12px] h-[6px] w-full rounded-full', showControls && 'pointer-events-auto')}>
-          <div className="bg-on-brand pointer-events-none absolute inset-y-0 left-0 rounded-full" style={{ width: `${played * 100}%` }} />
+        <div
+          className={cx(
+            'bg-on-brand/20 relative mt-[12px] h-[6px] w-full rounded-full',
+            showControls && 'pointer-events-auto',
+          )}
+        >
+          <div
+            className="bg-on-brand pointer-events-none absolute inset-y-0 left-0 rounded-full"
+            style={{ width: `${played * 100}%` }}
+          />
           <input
             type="range"
             min={0}

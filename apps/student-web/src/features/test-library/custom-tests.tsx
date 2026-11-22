@@ -11,6 +11,7 @@ import { useExam } from '@/shared/hooks/use-exam';
 import { userMessage } from '@/shared/lib/errors';
 import { CompetitiveSubjectArt } from '@/shared/ui/competitive-subject-art';
 import { libraryApi, type CustomSubject, type Difficulty } from './api';
+import { BoardCustomGenerated } from './board-custom-generated';
 import { formatDate, GridSkeleton, LoadError, panel } from './kit';
 
 const STEPS = [
@@ -23,8 +24,14 @@ const STEPS = [
 export function CustomTests() {
   const exam = useExam();
   const [tab, setTab] = useState<'saved' | 'past'>('saved');
-  const saved = useQuery({ queryKey: ['test-library', exam.slug, 'custom-saved'], queryFn: () => libraryApi.savedCustomTests(exam) });
-  const past = useQuery({ queryKey: ['test-library', exam.slug, 'custom-past'], queryFn: () => libraryApi.pastCustomAttempts(exam) });
+  const saved = useQuery({
+    queryKey: ['test-library', exam.slug, 'custom-saved'],
+    queryFn: () => libraryApi.savedCustomTests(exam),
+  });
+  const past = useQuery({
+    queryKey: ['test-library', exam.slug, 'custom-past'],
+    queryFn: () => libraryApi.pastCustomAttempts(exam),
+  });
   // Saved = built but never finished (the previous app showed attempted ones under Past exams).
   const savedList = (saved.data ?? []).filter((s) => s.attemptCount === 0 || s.inProgress);
   const create = routes.customTestCreate(exam.slug);
@@ -34,10 +41,12 @@ export function CustomTests() {
     <div className="flex flex-col gap-6 px-6">
       <header>
         <h1 className="text-[32px] leading-10 font-bold text-neutral-900">Custom Tests</h1>
-        <p className="text-brand-950/80 text-[16px]">Make your own practice test from any chapter, or pick up a test you saved earlier.</p>
+        <p className="text-brand-950/80 text-[16px]">
+          Make your own practice test from any chapter, or pick up a test you saved earlier.
+        </p>
       </header>
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="from-brand-400 to-brand-800 text-on-brand flex flex-col gap-6 rounded-[24px] bg-linear-to-br p-5 shadow-card">
+        <section className="from-brand-400 to-brand-800 text-on-brand shadow-card flex flex-col gap-6 rounded-[24px] bg-linear-to-br p-5">
           <div className="flex items-center gap-4">
             <span className="bg-on-brand/20 flex size-10 items-center justify-center rounded-lg">
               <ClipboardList aria-hidden className="size-5" />
@@ -49,8 +58,13 @@ export function CustomTests() {
             <p className="text-on-brand/70 mb-3 text-[11px] font-semibold tracking-wider">HOW IT WORKS</p>
             <ol className="flex flex-col">
               {STEPS.map((step, i) => (
-                <li key={step.title} className="border-on-brand/15 flex items-center gap-4 border-b py-3 last:border-b-0">
-                  <span className="border-on-brand flex size-7 shrink-0 items-center justify-center rounded-full border text-xs">{i + 1}</span>
+                <li
+                  key={step.title}
+                  className="border-on-brand/15 flex items-center gap-4 border-b py-3 last:border-b-0"
+                >
+                  <span className="border-on-brand flex size-7 shrink-0 items-center justify-center rounded-full border text-xs">
+                    {i + 1}
+                  </span>
                   <span>
                     <span className="block text-[16px] font-medium">{step.title}</span>
                     <span className="text-on-brand/70 text-xs">{step.text}</span>
@@ -59,14 +73,21 @@ export function CustomTests() {
               ))}
             </ol>
           </div>
-          <Link href={create} className="bg-accent-400 text-brand-950 mt-auto flex w-fit items-center gap-2 rounded-full px-6 py-4 text-[16px] font-semibold">
+          <Link
+            href={create}
+            className="bg-accent-400 text-brand-950 mt-auto flex w-fit items-center gap-2 rounded-full px-6 py-4 text-[16px] font-semibold"
+          >
             Create a custom test
             <ArrowRight aria-hidden className="size-4" />
           </Link>
         </section>
 
         <section className={cx(panel, 'flex flex-col gap-4 p-5')}>
-          <div role="tablist" aria-label="Your custom tests" className="bg-brand-50 grid grid-cols-2 gap-1 rounded-full p-1">
+          <div
+            role="tablist"
+            aria-label="Your custom tests"
+            className="bg-brand-50 grid grid-cols-2 gap-1 rounded-full p-1"
+          >
             {(
               [
                 ['saved', 'Saved exams', savedList.length],
@@ -79,16 +100,23 @@ export function CustomTests() {
                 role="tab"
                 aria-selected={tab === key}
                 onClick={() => setTab(key)}
-                className={cx('flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold', tab === key ? 'bg-brand text-on-brand' : 'text-brand')}
+                className={cx(
+                  'flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold',
+                  tab === key ? 'bg-brand text-on-brand' : 'text-brand',
+                )}
               >
                 {label}
-                <span className={cx('rounded-full px-2 text-[11px]', tab === key ? 'bg-on-brand/20' : 'bg-brand-100')}>{count}</span>
+                <span className={cx('rounded-full px-2 text-[11px]', tab === key ? 'bg-on-brand/20' : 'bg-brand-100')}>
+                  {count}
+                </span>
               </button>
             ))}
           </div>
           {tab === 'saved' ? (
             <>
-              <p className="text-foreground-muted text-sm">Tests you saved to take later. Tap topics to see what each one covers.</p>
+              <p className="text-foreground-muted text-sm">
+                Tests you saved to take later. Tap topics to see what each one covers.
+              </p>
               {saved.isPending ? (
                 <GridSkeleton count={1} />
               ) : saved.isError ? (
@@ -99,8 +127,13 @@ export function CustomTests() {
                     <Bookmark aria-hidden className="text-brand size-5" />
                   </span>
                   <p className="text-xl font-semibold">No saved tests yet</p>
-                  <p className="text-foreground-muted max-w-xs text-sm">After you create a test, choose Save for later and it will wait for you here.</p>
-                  <Link href={create} className="bg-brand text-on-brand mt-6 flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold">
+                  <p className="text-foreground-muted max-w-xs text-sm">
+                    After you create a test, choose Save for later and it will wait for you here.
+                  </p>
+                  <Link
+                    href={create}
+                    className="bg-brand text-on-brand mt-6 flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold"
+                  >
                     Create your first test
                     <ArrowRight aria-hidden className="size-4" />
                   </Link>
@@ -108,15 +141,24 @@ export function CustomTests() {
               ) : (
                 <ul className="flex flex-col gap-3">
                   {savedList.map((test) => (
-                    <li key={test.setId} className="border-neutral-150 flex items-center justify-between gap-3 rounded-xl border p-4">
+                    <li
+                      key={test.setId}
+                      className="border-neutral-150 flex items-center justify-between gap-3 rounded-xl border p-4"
+                    >
                       <div className="min-w-0">
                         <p className="truncate font-semibold">{test.title}</p>
                         <p className="text-foreground-muted text-xs">
-                          {test.subject} · {test.questionCount} Qs · <span className="capitalize">{test.difficulty}</span>
+                          {test.subject} · {test.questionCount} Qs ·{' '}
+                          <span className="capitalize">{test.difficulty}</span>
                         </p>
-                        {test.topics.length > 0 && <p className="text-foreground-muted truncate text-xs">{test.topics.join(', ')}</p>}
+                        {test.topics.length > 0 && (
+                          <p className="text-foreground-muted truncate text-xs">{test.topics.join(', ')}</p>
+                        )}
                       </div>
-                      <Link href={routes.testPlayer(exam.slug, 'custom', test.setId)} className="bg-brand text-on-brand shrink-0 rounded-lg px-4 py-2 text-sm font-semibold">
+                      <Link
+                        href={routes.testPlayer(exam.slug, 'custom', test.setId)}
+                        className="bg-brand text-on-brand shrink-0 rounded-lg px-4 py-2 text-sm font-semibold"
+                      >
                         {test.inProgress ? 'Resume' : 'Start'}
                       </Link>
                     </li>
@@ -129,11 +171,16 @@ export function CustomTests() {
           ) : past.isError ? (
             <LoadError error={past.error} />
           ) : past.data.length === 0 ? (
-            <p className="text-foreground-muted py-8 text-center text-sm">You haven&apos;t finished a custom test yet.</p>
+            <p className="text-foreground-muted py-8 text-center text-sm">
+              You haven&apos;t finished a custom test yet.
+            </p>
           ) : (
             <ul className="flex flex-col gap-3">
               {past.data.map((a) => (
-                <li key={a.attemptId} className="border-neutral-150 flex items-center justify-between gap-3 rounded-xl border p-4">
+                <li
+                  key={a.attemptId}
+                  className="border-neutral-150 flex items-center justify-between gap-3 rounded-xl border p-4"
+                >
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{a.title}</p>
                     <p className="text-foreground-muted text-xs">
@@ -142,13 +189,22 @@ export function CustomTests() {
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <p className="text-sm">
-                      Marks: <span className="font-semibold">{a.obtained} / {a.total}</span>
+                      Marks:{' '}
+                      <span className="font-semibold">
+                        {a.obtained} / {a.total}
+                      </span>
                     </p>
                     <div className="flex gap-2">
-                      <Link href={routes.testResult(exam.slug, 'custom', a.attemptId)} className="border-neutral-150 text-brand rounded-lg border px-3 py-1 text-xs font-semibold">
+                      <Link
+                        href={routes.testResult(exam.slug, 'custom', a.attemptId)}
+                        className="border-neutral-150 text-brand rounded-lg border px-3 py-1 text-xs font-semibold"
+                      >
                         Review
                       </Link>
-                      <Link href={routes.testPlayer(exam.slug, 'custom', a.setId)} className="bg-brand text-on-brand rounded-lg px-3 py-1 text-xs font-semibold">
+                      <Link
+                        href={routes.testPlayer(exam.slug, 'custom', a.setId)}
+                        className="bg-brand text-on-brand rounded-lg px-3 py-1 text-xs font-semibold"
+                      >
                         Retake
                       </Link>
                     </div>
@@ -169,7 +225,10 @@ const MAX_TOPICS = 5;
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const STEP_LABELS = ['Subject', 'Chapter', 'Topics'];
 
-/** Subject → chapter → topics + difficulty → generate → player (previous app's neet/custom-test/create). */
+/**
+ * Subject → chapter → topics + difficulty → generate → "Test Generated Successfully!" (take it now → player, or save
+ * for later → the Custom Test page, where it is listed) (previous app's neet/custom-test/create).
+ */
 export function CustomTestCreate() {
   const exam = useExam();
   const router = useRouter();
@@ -178,8 +237,13 @@ export function CustomTestCreate() {
   const [topics, setTopics] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [step, setStep] = useState(0);
+  /** The set just created, while the "Test Generated Successfully!" modal is open. */
+  const [created, setCreated] = useState<string | null>(null);
 
-  const subjects = useQuery({ queryKey: ['test-library', exam.slug, 'custom-subjects'], queryFn: () => libraryApi.customSubjects(exam) });
+  const subjects = useQuery({
+    queryKey: ['test-library', exam.slug, 'custom-subjects'],
+    queryFn: () => libraryApi.customSubjects(exam),
+  });
   const chapters = useQuery({
     queryKey: ['test-library', exam.slug, 'custom-chapters', subject?.id],
     queryFn: () => libraryApi.customChapters(exam, subject!.id),
@@ -192,10 +256,10 @@ export function CustomTestCreate() {
   });
   const generate = useMutation({
     mutationFn: () => libraryApi.generateCustomTest(exam, { moduleId: chapterId!, lectureIds: topics, difficulty }),
-    onSuccess: ({ setId }) => {
-      if (setId) router.push(routes.testPlayer(exam.slug, 'custom', setId));
-    },
+    // A created test asks first: take it now, or keep it for later on the Custom Test page (as board).
+    onSuccess: ({ setId }) => setCreated(setId ?? null),
   });
+  const chapterName = chapters.data?.find((c) => c.id === chapterId)?.name ?? '';
 
   const canContinue = step === 0 ? !!subject : step === 1 ? !!chapterId : topics.length > 0;
   const summary =
@@ -207,18 +271,43 @@ export function CustomTestCreate() {
         ? chapterId
           ? { title: chapters.data?.find((c) => c.id === chapterId)?.name ?? '', text: 'Next: choose topics' }
           : { title: 'No chapter selected', text: 'Pick one chapter to continue' }
-        : { title: `${topics.length} of ${MAX_TOPICS} topics selected`, text: 'Choose the difficulty and create your test' };
+        : {
+            title: `${topics.length} of ${MAX_TOPICS} topics selected`,
+            text: 'Choose the difficulty and create your test',
+          };
 
   const choice = (selected: boolean) =>
-    cx('bg-surface flex items-center justify-between gap-3 rounded-2xl border p-5 text-left', selected ? 'border-brand ring-brand ring-1' : 'border-neutral-150');
+    cx(
+      'bg-surface flex items-center justify-between gap-3 rounded-2xl border p-5 text-left',
+      selected ? 'border-brand ring-brand ring-1' : 'border-neutral-150',
+    );
   const tick = (selected: boolean) => (
-    <span aria-hidden className={cx('flex size-7 shrink-0 items-center justify-center rounded-full border', selected ? 'bg-brand border-brand text-on-brand' : 'border-brand-300')}>
+    <span
+      aria-hidden
+      className={cx(
+        'flex size-7 shrink-0 items-center justify-center rounded-full border',
+        selected ? 'bg-brand border-brand text-on-brand' : 'border-brand-300',
+      )}
+    >
       {selected && <Check className="size-4" />}
     </span>
   );
 
   return (
     <div className="flex flex-col gap-6 pb-32">
+      <BoardCustomGenerated
+        open={created !== null}
+        course={chapterName}
+        itemLabel="Chapter"
+        saveHint="Find it under Custom Test"
+        difficulty={difficulty}
+        topicsCount={topics.length}
+        onTakeNow={() => created && router.push(routes.testPlayer(exam.slug, 'custom', created))}
+        onSaveForLater={() => {
+          setCreated(null);
+          router.push(routes.customTest(exam.slug));
+        }}
+      />
       <div className="bg-surface flex items-center justify-between gap-4 rounded-2xl p-2 pr-4 shadow-sm">
         <button
           type="button"
@@ -232,10 +321,22 @@ export function CustomTestCreate() {
           {STEP_LABELS.map((label, i) => (
             <li key={label} className="flex items-center gap-2" aria-current={i === step ? 'step' : undefined}>
               {i > 0 && <span aria-hidden className="bg-neutral-150 hidden h-px w-8 sm:block" />}
-              <span className={cx('flex size-7 items-center justify-center rounded-full text-xs font-semibold', i <= step ? 'bg-brand text-on-brand' : 'bg-brand-75 text-foreground-muted')}>
+              <span
+                className={cx(
+                  'flex size-7 items-center justify-center rounded-full text-xs font-semibold',
+                  i <= step ? 'bg-brand text-on-brand' : 'bg-brand-75 text-foreground-muted',
+                )}
+              >
                 {i + 1}
               </span>
-              <span className={cx('hidden font-semibold sm:inline', i === step ? 'text-brand' : 'text-foreground-muted font-medium')}>{label}</span>
+              <span
+                className={cx(
+                  'hidden font-semibold sm:inline',
+                  i === step ? 'text-brand' : 'text-foreground-muted font-medium',
+                )}
+              >
+                {label}
+              </span>
             </li>
           ))}
         </ol>
@@ -244,7 +345,9 @@ export function CustomTestCreate() {
       {step === 0 && (
         <section aria-labelledby="pick-subject" className="flex flex-col gap-4 px-5">
           <div>
-            <h1 id="pick-subject" className="text-2xl font-semibold text-neutral-900">Which subject do you want to practise?</h1>
+            <h1 id="pick-subject" className="text-2xl font-semibold text-neutral-900">
+              Which subject do you want to practise?
+            </h1>
             <p className="text-foreground-soft">Pick one subject. Next you will pick a chapter and its topics.</p>
           </div>
           {subjects.isPending ? (
@@ -284,7 +387,9 @@ export function CustomTestCreate() {
 
       {step === 1 && (
         <section aria-labelledby="pick-chapter" className="flex flex-col gap-4 px-5">
-          <h1 id="pick-chapter" className="text-2xl font-semibold text-neutral-900">Pick one {subject?.name} chapter</h1>
+          <h1 id="pick-chapter" className="text-2xl font-semibold text-neutral-900">
+            Pick one {subject?.name} chapter
+          </h1>
           {chapters.isPending ? (
             <GridSkeleton />
           ) : chapters.isError ? (
@@ -318,7 +423,9 @@ export function CustomTestCreate() {
       {step === 2 && (
         <section aria-labelledby="pick-topics" className="flex flex-col gap-4 px-5">
           <div>
-            <h1 id="pick-topics" className="text-2xl font-semibold text-neutral-900">Choose the topics</h1>
+            <h1 id="pick-topics" className="text-2xl font-semibold text-neutral-900">
+              Choose the topics
+            </h1>
             <p className="text-foreground-soft">Select at least 1 topic and up to {MAX_TOPICS}.</p>
           </div>
           {topicList.isPending ? (
@@ -355,7 +462,10 @@ export function CustomTestCreate() {
                   type="button"
                   aria-pressed={difficulty === d}
                   onClick={() => setDifficulty(d)}
-                  className={cx('rounded-full border px-5 py-2 text-sm font-semibold capitalize', difficulty === d ? 'bg-brand text-on-brand border-brand' : 'border-neutral-150 bg-surface')}
+                  className={cx(
+                    'rounded-full border px-5 py-2 text-sm font-semibold capitalize',
+                    difficulty === d ? 'bg-brand text-on-brand border-brand' : 'border-neutral-150 bg-surface',
+                  )}
                 >
                   {d}
                 </button>

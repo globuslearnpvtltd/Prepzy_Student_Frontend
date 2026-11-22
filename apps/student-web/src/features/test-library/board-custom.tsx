@@ -506,7 +506,7 @@ export function BoardCustomTestBuilder({
             <div className="flex gap-3">
               {(
                 [
-                  [chapter && topicIds.length ? 1 : 0, 'Chapters'],
+                  [chapter ? 1 : 0, 'Chapters'],
                   [topicIds.length, 'Topics'],
                 ] as const
               ).map(([value, label]) => (
@@ -528,9 +528,11 @@ export function BoardCustomTestBuilder({
                 </div>
               </div>
             )}
-            {chapter && selectedTopics.length > 0 && (
+            {chapter && (
               <div className="flex flex-col gap-2">
-                <p className="text-xs font-bold text-neutral-500">SELECTED TOPICS</p>
+                <p className="text-xs font-bold text-neutral-500">
+                  {selectedTopics.length > 0 ? 'SELECTED TOPICS' : 'CHAPTER'}
+                </p>
                 <div className="border-brand-150 bg-surface flex flex-col gap-3 rounded-[20px] border-2 p-6">
                   <p className="text-xs font-bold text-neutral-700">{titleCase(chapter.name)}</p>
                   {selectedTopics.map((t) => (

@@ -11,7 +11,8 @@ import { boardSubjectArt } from './subject-art';
  * The board subject card of the dashboard's "My Subjects": name, a count line and the subject illustration; on hover
  * it fills with the brand colour, grows slightly and the text and illustration turn white. Every board subject grid
  * (dashboard / Learn, Assessments, the syllabus picker) uses this card, so they look and hover the same.
- * A card is a link (`href`) or a button (`onClick`).
+ * A card is a link (`href`) or a button (`onClick`). Every card is at least as tall as one with a two-line title
+ * (the title is clamped to two lines), and cards in a grid stretch to the tallest, so all cards are the same height.
  */
 export interface SubjectCardItem {
   key: string;
@@ -26,14 +27,20 @@ export interface SubjectCardItem {
 }
 
 const cardClass =
-  'group border-line hover:bg-brand relative flex min-h-[96px] w-full flex-col overflow-hidden rounded-xl border-2 px-6 py-4 text-left transition-all duration-300 hover:scale-105';
+  'group border-line hover:bg-brand relative flex h-full min-h-[124px] w-full flex-col overflow-hidden rounded-xl border-2 px-6 py-4 text-left transition-all duration-300 hover:scale-105';
 
 export function SubjectCard({ title, meta, subject, href, onClick }: Omit<SubjectCardItem, 'key'>) {
   const art = boardSubjectArt(subject ?? title);
   const body = (
     <>
-      <span className="text-foreground group-hover:text-on-brand relative z-10 line-clamp-2 text-[22px] leading-7 font-semibold">{title}</span>
-      {meta && <span className="text-foreground group-hover:text-on-brand relative z-10 mt-2 text-[14px] font-bold">{meta}</span>}
+      <span className="text-foreground group-hover:text-on-brand relative z-10 line-clamp-2 text-[22px] leading-7 font-semibold">
+        {title}
+      </span>
+      {meta && (
+        <span className="text-foreground group-hover:text-on-brand relative z-10 mt-2 text-[14px] font-bold">
+          {meta}
+        </span>
+      )}
       <Image
         src={art.src}
         alt=""
@@ -78,10 +85,14 @@ export function SubjectCardGrid({
     <>
       <ul
         aria-label={label}
-        className={cx('grid grid-cols-1 gap-3 md:gap-5', columns === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3', className)}
+        className={cx(
+          'grid auto-rows-fr grid-cols-1 gap-3 md:gap-5',
+          columns === 2 ? 'md:grid-cols-2' : 'md:grid-cols-3',
+          className,
+        )}
       >
         {items.map(({ key, ...card }, index) => (
-          <li key={key} className={cx(collapse && index >= 3 && !showAll && 'max-md:hidden')}>
+          <li key={key} className={cx('flex', collapse && index >= 3 && !showAll && 'max-md:hidden')}>
             <SubjectCard {...card} />
           </li>
         ))}

@@ -14,6 +14,7 @@ import { SolverChat } from './solver-chat';
 import { DesktopBack, SolverHeader } from './solver-header';
 import { AskDoubt, StartOptions } from './start-steps';
 import { SubjectPicker } from './subject-picker';
+import { canGoBackInApp } from '@/shared/lib/history';
 
 export type SolverStep = 'subject' | 'start' | 'ask' | 'question-bank' | 'chat';
 
@@ -23,17 +24,15 @@ const STEPS: readonly SolverStep[] = ['subject', 'start', 'ask', 'question-bank'
  * Which step to show: the URL decides (so the browser's and the phone's back gesture move between steps), the stored
  * selection only says whether that step is possible.
  */
-export function resolveStep(param: string | null, state: { hasSubject: boolean; hasBook: boolean; hasProblem: boolean }): SolverStep {
+export function resolveStep(
+  param: string | null,
+  state: { hasSubject: boolean; hasBook: boolean; hasProblem: boolean },
+): SolverStep {
   if (param === 'question-bank' && state.hasSubject && state.hasBook) return 'question-bank';
   if (param === 'chat' && state.hasProblem) return 'chat';
   if ((param === 'ask' || param === 'chat') && state.hasSubject) return 'ask';
   if (param === 'start' && state.hasSubject) return 'start';
   return 'subject';
-}
-
-/** Whether the tab has an earlier page of this site to go back to (Navigation API; unknown elsewhere). */
-function canGoBackInApp() {
-  return (window as { navigation?: { canGoBack?: boolean } }).navigation?.canGoBack === true;
 }
 
 /** The solver step the current one was opened from (`from` in the URL), when it was opened inside the solver. */
@@ -171,13 +170,22 @@ export function DoubtSolverScreen() {
         <SolverChat key={chatKey} onAskNew={askNew} onAskAtlas={() => router.push(routes.atlas(exam.slug))} />
         {historyDrawer}
         {leaving && (
-          <div role="alertdialog" aria-modal="true" aria-label="Leave this problem?" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Leave this problem?"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          >
             <div aria-hidden className="bg-socrates-overlay/35 absolute inset-0" onClick={() => setLeaving(false)} />
             <div className="bg-surface shadow-socrates-sheet relative w-full max-w-[360px] rounded-xl p-5 text-center">
               <p className="text-socrates-ink font-serif text-[19px] font-semibold">Leave this problem?</p>
               <p className="text-socrates-muted mt-2 text-[13px]">You can find it again in Previous doubts.</p>
               <div className="mt-5 flex gap-2.5">
-                <button type="button" onClick={() => setLeaving(false)} className="border-socrates-line text-brand flex-1 rounded-full border py-2 text-[14px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setLeaving(false)}
+                  className="border-socrates-line text-brand flex-1 rounded-full border py-2 text-[14px] font-semibold"
+                >
                   Stay
                 </button>
                 <button
@@ -223,11 +231,21 @@ export function DoubtSolverScreen() {
         onQuestionBank={step === 'subject' ? () => setBankRequest((n) => n + 1) : openBank}
       />
       {step === 'start' && <DesktopBack onClick={() => back('subject')} />}
-      <div className={`flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pb-8 md:py-10 ${step === 'subject' ? 'pt-[16vh] md:pt-10' : 'max-md:px-0 max-md:pb-0 md:pt-8'}`}>
+      <div
+        className={`flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pb-8 md:py-10 ${step === 'subject' ? 'pt-[16vh] md:pt-10' : 'max-md:px-0 max-md:pb-0 md:pt-8'}`}
+      >
         {step === 'subject' ? (
-          <SubjectPicker onNext={() => go('start')} onQuestionBank={() => go('question-bank')} questionBankRequest={bankRequest} />
+          <SubjectPicker
+            onNext={() => go('start')}
+            onQuestionBank={() => go('question-bank')}
+            questionBankRequest={bankRequest}
+          />
         ) : (
-          <StartOptions onAsk={() => go('ask')} onQuestionBank={() => go('question-bank')} onChangeSubject={changeSubject} />
+          <StartOptions
+            onAsk={() => go('ask')}
+            onQuestionBank={() => go('question-bank')}
+            onChangeSubject={changeSubject}
+          />
         )}
       </div>
     </div>

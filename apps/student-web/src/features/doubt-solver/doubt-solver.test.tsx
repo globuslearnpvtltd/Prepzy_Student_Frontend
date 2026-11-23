@@ -186,8 +186,10 @@ describe('Ask Socrates flow', () => {
     server.use(plan());
     useSolver.getState().chooseBook(physicsBook);
     navigation.searchParams = new URLSearchParams('step=start');
-    renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    const { queryClient } = renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
     expect(screen.getByRole('heading', { name: 'How do you want to start?' })).toBeInTheDocument();
+    // Let the plan and access queries settle first: a late re-render would re-read the mocked URL mid-test.
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
     await userEvent.click(screen.getByRole('button', { name: /Ask your own doubt/ }));
     expect(navigation.push).toHaveBeenCalledWith('/cbse/doubt-solver?step=ask&from=start');
     navigation.searchParams = new URLSearchParams('step=start');

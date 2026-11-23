@@ -261,7 +261,8 @@ MOCKS['/api/v4/languages'] = {
 // Mediums each exam offers (from its class_subject_mapping rows): the dialog lists these.
 MOCKS['/api/v4/languages/board/1'] = MOCKS['/api/v4/languages'];
 MOCKS['/api/v4/languages/competitive/2'] = { success: true, message: 'Exam languages fetched', data: [{ id: 1, name: 'english' }] };
-// Institute feature restrictions: nothing switched off (e2e/feature-restrictions.spec.ts overrides it).
+// Institute feature restrictions (any ?class_id=, mocks match the path): nothing switched off
+// (e2e/feature-restrictions.spec.ts overrides it, per class too).
 MOCKS['/api/v4/feature-access/board/1'] = { success: true, message: 'Feature access fetched', data: { restricted: [] } };
 MOCKS['/api/v4/feature-access/competitive/2'] = MOCKS['/api/v4/feature-access/board/1'];
 MOCKS['/api/v4/student/exams/purchased'] = MOCKS['/api/v1/student/exams/purchased'];

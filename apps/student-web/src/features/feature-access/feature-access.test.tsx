@@ -4,11 +4,12 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { delay, http, HttpResponse } from 'msw';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { usePlanSelection } from '@/features/auth';
 import { ExamProvider } from '@/shared/hooks/use-exam';
 import { apiClient } from '@/shared/lib/api-client';
 import { isFeatureRestricted } from '@/shared/lib/errors';
 import { testExam } from '@/test/exams';
-import { restrictFeatures } from '@/test/feature-access';
+import { accessClassId, restrictFeatures } from '@/test/feature-access';
 import { createTestQueryClient, renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { navigation } from '@/test/setup';
@@ -73,6 +74,20 @@ describe('feature catalog and api', () => {
     await expect(featureAccessApi.restricted(cbse)).resolves.toEqual(['mock_exam']);
     expect(url).toBe('/api/v4/feature-access/board/1');
   });
+
+  it('sends the class as class_id, and no param without one', async () => {
+    const searches: string[] = [];
+    server.use(
+      http.get(`${API}/api/v4/feature-access/:category/:examId`, ({ request }) => {
+        searches.push(new URL(request.url).search);
+        return HttpResponse.json({ success: true, data: { restricted: [] } });
+      }),
+    );
+    await featureAccessApi.restricted(cbse, 12);
+    await featureAccessApi.restricted(cbse, null);
+    await featureAccessApi.restricted(cbse);
+    expect(searches).toEqual(['?class_id=12', '', '']);
+  });
 });
 
 describe('useFeatureAccess', () => {
@@ -105,6 +120,86 @@ describe('useFeatureAccess', () => {
     const { result } = renderHook(() => useFeatureAccess(null), { wrapper: wrapper() });
     expect(result.current.isLoading).toBe(false);
     expect(result.current.isRestricted('search')).toBe(false);
+  });
+
+  describe('per class (the goal switcher’s plan)', () => {
+    const plan = (planId: number, classId: number) => ({
+      plan_id: planId, exam_id: 1, class_id: classId, class_name: `CLASS ${classId}`, stream_name: '',
+      duration_months: 12, expiry_date: '2027-05-01', status: 'active',
+    });
+    const plansHandler = (plans: unknown[], wait = 0) =>
+      http.get(`${API}/api/v4/student/plans/active`, async () => {
+        if (wait) await delay(wait);
+        return HttpResponse.json({ success: true, data: { plans } });
+      });
+
+    beforeEach(() => usePlanSelection.setState({ planId: null }));
+    afterEach(() => {
+      usePlanSelection.setState({ planId: null });
+      localStorage.clear();
+    });
+
+    it('sends the class on screen and updates the locks when the goal switcher changes class', async () => {
+      const sent: (number | null)[] = [];
+      server.use(
+        plansHandler([plan(7, 20), plan(8, 10)]),
+        http.get(`${API}/api/v4/feature-access/:category/:examId`, ({ request }) => {
+          const classId = accessClassId(request);
+          sent.push(classId);
+          return HttpResponse.json({ success: true, data: { restricted: classId === 20 ? ['notes', 'quiz'] : [] } });
+        }),
+      );
+      const queryClient = createTestQueryClient();
+      const { result } = renderHook(() => useFeatureAccess(), { wrapper: wrapper(queryClient) });
+      await waitFor(() => expect(result.current.isRestricted('notes')).toBe(true));
+      expect(sent.at(-1)).toBe(20);
+      expect(queryClient.getQueryData(['feature-access', 1, 20])).toEqual(['notes', 'quiz']);
+
+      // The student picks Class 10 in the goal switcher: its own list (nothing restricted) replaces the NEET one.
+      act(() => usePlanSelection.getState().select(8));
+      await waitFor(() => expect(result.current.isRestricted('notes')).toBe(false));
+      expect(sent.at(-1)).toBe(10);
+      expect(result.current.isLoading).toBe(false);
+
+      // Back to the restricted class: cached, locked again at once.
+      act(() => usePlanSelection.getState().select(7));
+      expect(result.current.isRestricted('quiz')).toBe(true);
+    });
+
+    it('keeps the previous class’s locks while the new class’s list loads (no blink)', async () => {
+      server.use(
+        plansHandler([plan(7, 20), plan(8, 10)]),
+        http.get(`${API}/api/v4/feature-access/:category/:examId`, async ({ request }) => {
+          const classId = accessClassId(request);
+          if (classId === 10) await delay(30);
+          return HttpResponse.json({ success: true, data: { restricted: classId === 10 ? [] : ['notes'] } });
+        }),
+      );
+      const { result } = renderHook(() => useFeatureAccess(), { wrapper: wrapper() });
+      await waitFor(() => expect(result.current.isRestricted('notes')).toBe(true));
+      act(() => usePlanSelection.getState().select(8));
+      expect(result.current.isRestricted('notes')).toBe(true);
+      expect(result.current.isLoading).toBe(false);
+      await waitFor(() => expect(result.current.isRestricted('notes')).toBe(false));
+    });
+
+    it('asks without class_id while the plans load, and when there is no active plan', async () => {
+      const sent: (number | null)[] = [];
+      server.use(
+        plansHandler([], 20),
+        http.get(`${API}/api/v4/feature-access/:category/:examId`, ({ request }) => {
+          sent.push(accessClassId(request));
+          return HttpResponse.json({ success: true, data: { restricted: ['search'] } });
+        }),
+      );
+      const queryClient = createTestQueryClient();
+      const { result } = renderHook(() => useFeatureAccess(), { wrapper: wrapper(queryClient) });
+      // Not blocked on the plans: the class-less list answers first.
+      await waitFor(() => expect(result.current.isRestricted('search')).toBe(true));
+      await waitFor(() => expect(queryClient.getQueryState(['auth', 'plans', 1])?.status).toBe('success'));
+      expect(sent).toEqual([null]);
+      expect(queryClient.getQueryData(['feature-access', 1, null])).toEqual(['search']);
+    });
   });
 
   it('guards actions: runs them when allowed, else opens the dialog', async () => {

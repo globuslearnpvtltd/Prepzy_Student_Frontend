@@ -12,9 +12,14 @@ export function toRestricted(data: unknown): RestrictableFeature[] {
 }
 
 export const featureAccessApi = {
-  /** Features the student's institute switched off for this exam (GET /api/v4/feature-access/:category/:examId). */
-  async restricted(exam: ExamRef): Promise<RestrictableFeature[]> {
-    const body = await apiClient.get<Envelope<unknown>>(`/api/v4/feature-access/${exam.category}/${exam.examId}`);
+  /**
+   * Features the student's institute switched off for this exam and class
+   * (GET /api/v4/feature-access/:category/:examId?class_id=). Without a class the backend applies its own rule.
+   */
+  async restricted(exam: ExamRef, classId?: number | null): Promise<RestrictableFeature[]> {
+    const body = await apiClient.get<Envelope<unknown>>(`/api/v4/feature-access/${exam.category}/${exam.examId}`, {
+      params: typeof classId === 'number' ? { class_id: classId } : undefined,
+    });
     return toRestricted(unwrapData(body));
   },
 };

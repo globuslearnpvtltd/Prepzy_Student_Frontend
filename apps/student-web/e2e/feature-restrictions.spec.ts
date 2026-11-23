@@ -1,4 +1,5 @@
 import { expect, signIn, test } from './fixtures';
+import { plansFor } from '../visual/mocks';
 import { mockStudentApi } from './student-mocks';
 
 /**
@@ -32,6 +33,35 @@ test('board: a restricted sidebar item is padlocked and opens the institute dial
   await dialog.getByRole('button', { name: 'Got it' }).click();
   await expect(dialog).toBeHidden();
   await expect(page).toHaveURL(/\/cbse\/dashboard$/);
+});
+
+test('board: locks follow the class picked in the goal switcher (sent as class_id)', async ({ page, context }) => {
+  await signIn(context, 'cbse');
+  const board = plansFor('board');
+  const class12 = board.data.plans[0]!;
+  const class10 = { ...class12, plan_id: 4, class_id: 10, class_name: 'CLASS 10', stream_name: '' };
+  const sent: (string | null)[] = [];
+  await mockStudentApi(page, 'board', {
+    'GET /api/v4/student/plans/active': { ...board, data: { plans: [class12, class10] } },
+    // The institute restricted Class 12 only (e.g. its own plan); the student's Class 10 stays open.
+    'GET /api/v4/feature-access/board/1': (_body: unknown, url: URL) => {
+      sent.push(url.searchParams.get('class_id'));
+      return restricted(...(url.searchParams.get('class_id') === '12' ? ['notes', 'summary_videos'] : []));
+    },
+  });
+  await page.goto('/cbse/dashboard');
+
+  const sidebar = page.locator('aside').getByRole('navigation', { name: 'Main' });
+  await expect(sidebar.getByRole('button', { name: /^Notes/ })).toHaveAttribute('aria-disabled', 'true');
+  await expect(sidebar.getByRole('link', { name: 'Notes' })).toHaveCount(0);
+  expect(sent).toContain('12');
+
+  await page.getByRole('button', { name: /^My goals: CBSE · Class 12/ }).click();
+  await page.getByRole('menuitem', { name: /^CBSE Class 10,/ }).click();
+  await expect(page.getByRole('button', { name: /^My goals: CBSE · Class 10/ })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name: 'Notes' })).toBeVisible();
+  await expect(sidebar.getByRole('button', { name: /^Notes/ })).toHaveCount(0);
+  expect(sent).toContain('10');
 });
 
 test('a restricted page opened by URL says "Not enabled by your institute"', async ({ page, context }) => {

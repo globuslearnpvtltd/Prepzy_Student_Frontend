@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient, type Query } from '@tanstack/react-query';
 import { create } from 'zustand';
-import { authApi, authKeys, pickActivePlan, useCurrentUser, usePlanSelection, type ActivePlan, type Student } from '@/features/auth';
+import { authKeys, useCurrentUser, useScreenClass, type Student } from '@/features/auth';
 import { classLabel } from '@/features/plans';
 import type { ExamRef } from '@/shared/config/exams';
 import { useOptionalExam } from '@/shared/hooks/use-exam';
@@ -33,22 +33,6 @@ export function useExamLanguages(exam: Partial<ExamRef> | null) {
     staleTime: 10 * 60_000,
     enabled: ready,
   });
-}
-
-/**
- * The class on screen: the student's current plan for the exam (the class picked in the goal switcher, else the first
- * active one; same query and cache as useActivePlan). `settled` is false while the plans load.
- */
-export function useScreenClass(exam: Partial<ExamRef> | null): { plan: ActivePlan | null; settled: boolean } {
-  const ready = hasExamId(exam);
-  const selectedId = usePlanSelection((state) => state.planId);
-  const plans = useQuery({
-    queryKey: authKeys.plans(ready ? exam.examId : 0),
-    queryFn: () => authApi.activePlans((exam as ExamRef).examId),
-    staleTime: 5 * 60_000,
-    enabled: ready,
-  });
-  return { plan: pickActivePlan(plans.data ?? [], selectedId), settled: !ready || !plans.isPending };
 }
 
 /** The mediums of one class's books in the exam (its class_subject_mapping rows); empty when it has none. */

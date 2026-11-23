@@ -12,6 +12,7 @@ export {
   useCurrentUser,
   useLogout,
   usePurchasedExams,
+  useScreenClass,
   useSessionExpiryRedirect,
 } from './hooks';
 export type { ActivePlan, ClassOption, ExamOption, PurchasedExam, Student, StudentLanguage } from './model';

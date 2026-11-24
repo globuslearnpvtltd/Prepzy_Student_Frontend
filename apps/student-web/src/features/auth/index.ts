@@ -13,7 +13,7 @@ export {
   useLogout,
   usePurchasedExams,
   useScreenClass,
-  useSessionExpiryRedirect,
+  useSessionExpiry,
 } from './hooks';
 export type { ActivePlan, ClassOption, ExamOption, PurchasedExam, Student, StudentLanguage } from './model';
 export { isValidPhone, normalizePhone, planName, planTier, toStudentLanguage } from './model';

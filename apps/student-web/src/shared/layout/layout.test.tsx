@@ -239,14 +239,14 @@ describe('board shell', () => {
     const cbse = within(menu).getByRole('group', { name: 'CBSE' });
     expect(within(cbse).getAllByRole('menuitem').map((i) => i.getAttribute('aria-label'))).toEqual([
       'CBSE Class 12 PCB, Topper plan · Valid till 1 May 2027, current goal',
-      'CBSE Class 11, Free plan',
+      'CBSE Class 11, Basic plan',
       'CBSE Class 10, Topper plan · Valid till 1 May 2027 · expired',
     ]);
     expect(within(cbse).getByRole('menuitem', { name: /Class 12 PCB/ })).toHaveAttribute('aria-current', 'true');
     // Expired plans are listed but can't be switched to.
     expect(within(cbse).getByRole('menuitem', { name: /Class 10/ })).toHaveAttribute('data-disabled');
     const neet = within(menu).getByRole('group', { name: 'NEET-UG' });
-    expect(within(neet).getByRole('menuitem', { name: 'NEET-UG Class 12, Free plan' })).toBeInTheDocument();
+    expect(within(neet).getByRole('menuitem', { name: 'NEET-UG Class 12, Basic plan' })).toBeInTheDocument();
 
     expect(within(menu).getByRole('menuitem', { name: 'Manage plans' })).toHaveAttribute('href', '/manage-plans');
     expect(within(menu).getByRole('menuitem', { name: 'Add another goal' })).toHaveAttribute('href', '/purchase?exam=cbse');
@@ -262,7 +262,7 @@ describe('board shell', () => {
     renderShell('cbse');
     const [pill] = await screen.findAllByRole('button', { name: /My goals/ });
     await userEvent.click(pill!);
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'NEET-UG Class 12, Free plan' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'NEET-UG Class 12, Basic plan' }));
     expect(localStorage.getItem('selectedPlanId')).toBe('7');
     expect(navigation.push).toHaveBeenCalledWith('/neet/dashboard');
   });

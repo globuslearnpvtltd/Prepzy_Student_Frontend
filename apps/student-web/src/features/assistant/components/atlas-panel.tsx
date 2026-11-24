@@ -247,7 +247,6 @@ export function AtlasPanel({ exam, surface, expanded, onExpand, onClose }: Atlas
               placeholder="Ask your Question..."
               onSend={send}
               disabled={chat.loading || chat.loadError}
-              allowVoice
               allowInk
               inkDraftKey={`${isLecture ? 'lecture' : 'atlas'}:${chat.chatId ?? 'new'}`}
               onLiveChat={voice ? talkLive : undefined}

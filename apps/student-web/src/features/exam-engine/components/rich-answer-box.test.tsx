@@ -2,7 +2,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import type { WrittenAnswer } from '../model';
@@ -132,7 +132,7 @@ describe('writing pad in the written answer', () => {
   });
 
   it('keeps the page when the answer already has ten pictures, and when the upload fails', async () => {
-    const error = vi.spyOn(toast, 'error');
+    const error = vi.spyOn(notify, 'error');
     const full = Array.from({ length: 10 }, (_, i) => ({ url: `https://cdn/${i}.png`, publicId: `p${i}` }));
     sessionStorage.setItem('prepzy-ink:answer:a1:q4', DRAFT);
     renderWithProviders(<Harness initial={{ text: '', images: full }} onChange={() => undefined} inkDraftKey="answer:a1:q4" />, { exam: cbse });
@@ -159,7 +159,7 @@ describe('writing pad in the written answer', () => {
   });
 
   it('refuses photos beyond the limit', async () => {
-    const error = vi.spyOn(toast, 'error');
+    const error = vi.spyOn(notify, 'error');
     const nine = Array.from({ length: 9 }, (_, i) => ({ url: `https://cdn/${i}.png`, publicId: `p${i}` }));
     renderWithProviders(<Harness initial={{ text: '', images: nine }} onChange={() => undefined} />, { exam: cbse });
     const input = await screen.findByTestId('answer-gallery');

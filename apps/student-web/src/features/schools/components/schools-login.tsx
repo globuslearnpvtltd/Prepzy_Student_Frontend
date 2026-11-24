@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Image from 'next/image';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import type { z } from 'zod';
 import { userMessage } from '@/shared/lib/errors';
 import { useRequestTeacherOtp, useVerifyTeacherOtp } from '../hooks';
@@ -174,7 +174,7 @@ function OtpStep({ email, onBack }: { email: string; onBack: () => void }) {
           disabled={resend.isPending}
           onClick={() => {
             verify.reset();
-            resend.mutate(email, { onSuccess: () => toast.success('A new code is on its way.') });
+            resend.mutate(email, { onSuccess: () => notify.success('A new code is on its way.') });
           }}
           className="text-brand-700 underline underline-offset-2"
         >

@@ -204,7 +204,7 @@ describe('plan names and cards', () => {
     expect(priceSection([free]).rows[1]!.values).toEqual(['Forever']);
     // The comparison table heads each column with the plan's name (display_name, else the same rule).
     expect([free, monthly, six, annual].map((plan) => plan.name)).toEqual(['Basic', 'Topper Monthly', 'Topper 6 Months', 'Topper Academic']);
-    expect([free, monthly, six, annual].map(tierPill)).toEqual(['Free plan', 'Monthly plan', '6 Months plan', 'Annual plan']);
+    expect([free, monthly, six, annual].map(tierPill)).toEqual(['Basic plan', 'Monthly plan', '6 Months plan', 'Annual plan']);
     expect([free, monthly, annual].map(priceCadence)).toEqual(['no payment', 'per month', 'one-time']);
     expect(columnEyebrow(free)).toBe('Essential');
     expect(columnEyebrow({ ...six, badge: null })).toBe('Topper');

@@ -4,7 +4,7 @@ import { Button, cx, Dialog, DialogContent, DialogDescription, DialogFooter, Dia
 import { useMutation } from '@tanstack/react-query';
 import { ImagePlus, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { userMessage } from '@/shared/lib/errors';
 import { REPORT_SECTIONS, reportProblem, type ReportSection } from '../report';
 import { RichText } from './rich-text';
@@ -29,13 +29,13 @@ export function ReportProblem({ questionId, questionHtml }: { questionId: string
   const send = useMutation({
     mutationFn: () => reportProblem({ questionId, section, description, image }),
     onSuccess: () => {
-      toast.success('Problem reported successfully');
+      notify.success('Problem reported successfully');
       setOpen(false);
       setDescription('');
       setImage(null);
       setSection('Question');
     },
-    onError: (error) => toast.error(userMessage(error, 'Could not send your report. Please try again.')),
+    onError: (error) => notify.error(userMessage(error, 'Could not send your report. Please try again.')),
   });
 
   return (

@@ -105,3 +105,26 @@ describe('chart tooltips (previous app: the value on hover)', () => {
     expect(tips[1]!.className).toContain('group-hover:flex');
   });
 });
+
+describe('LineChart subject names', () => {
+  it('gives each name its own slot (halfway to its neighbours) and wraps long names instead of overlapping', () => {
+    render(
+      <LineChart
+        caption="Scores"
+        categories={['ENGLISH', 'SOCIAL SCIENCE - HINDI', 'MATHEMATICS', 'SCIENCE']}
+        series={[{ name: 'Current Attempt', tone: 'strong', values: [10, 20, 30, 40] }]}
+      />
+    );
+    const labels = screen.getAllByTestId('line-label');
+    // 4 points at 0, 33.3, 66.7, 100 %: the middle slots are 33.3 % wide; the outer ones reach into the margins.
+    expect(labels[0]!.style.left).toBe('-30px');
+    expect(labels[0]!.style.width).toBe('calc(16.6667% + 30px)');
+    expect(parseFloat(labels[1]!.style.left)).toBeCloseTo(16.667, 2);
+    expect(labels[1]!.style.width).toBe('calc(33.3333%)');
+    expect(labels[2]!.style.width).toBe('calc(33.3333%)');
+    expect(labels[3]!.style.width).toContain('40px');
+    expect(labels[1]!.className).toContain('line-clamp-2');
+    expect(labels[1]!.className).not.toContain('whitespace-nowrap');
+    expect(labels[1]).toHaveAttribute('title', 'SOCIAL SCIENCE - HINDI');
+  });
+});

@@ -260,7 +260,7 @@ export function toPlans(apiPlans: ApiPlan[], context: PlanContext = {}, now: Dat
           bundles,
         }),
       tier,
-      durationName: plan.duration_months === 0 ? 'Free' : durationLabel(plan.duration_months),
+      durationName: plan.duration_months === 0 ? 'Basic' : durationLabel(plan.duration_months),
       badge,
       price: plan.price,
       mrp: plan.cost_price > plan.price ? plan.cost_price : null,
@@ -401,7 +401,7 @@ export const columnEyebrow = (plan: Plan) => plan.badge?.label ?? (plan.isFree ?
 
 export const tierPill = (plan: Plan) =>
   plan.tier === 'basic'
-    ? 'Free plan'
+    ? 'Basic plan'
     : plan.tier === 'monthly'
       ? 'Monthly plan'
       : plan.tier === 'yearly'

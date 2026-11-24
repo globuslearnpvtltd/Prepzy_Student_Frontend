@@ -255,7 +255,7 @@ describe('checkout', () => {
       }),
     );
     await openReview(/^Basic CBSE$/);
-    await userEvent.click(screen.getByRole('button', { name: /Activate free plan/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Activate Basic plan/ }));
     expect(await screen.findByText('Payment Successful')).toBeInTheDocument();
     expect(body).toEqual({ plan_id: 10 });
     expect(options).toBeNull();

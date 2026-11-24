@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { useExam } from '@/shared/hooks/use-exam';
 import { userMessage } from '@/shared/lib/errors';
 import { learnApi } from './api';
@@ -81,11 +81,11 @@ export function useMarkComplete(kind: 'video' | 'notes', moduleId: string) {
   return useMutation({
     mutationFn: () => learnApi.markComplete(exam, kind, moduleId),
     onSuccess: (message) => {
-      toast.success(message ?? 'Marked as completed');
+      notify.success(message ?? 'Marked as completed');
       void queryClient.invalidateQueries({ queryKey: learnKeys.all });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
     onError: (error) =>
-      toast.error(userMessage(error, kind === 'video' ? 'Failed to mark video as completed' : 'Failed to mark notes as completed')),
+      notify.error(userMessage(error, kind === 'video' ? 'Failed to mark video as completed' : 'Failed to mark notes as completed')),
   });
 }

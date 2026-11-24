@@ -1,7 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { authKeys, usePlanSelection, type Student } from '@/features/auth';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
@@ -13,7 +13,7 @@ import { ExamLanguageSync } from './components/exam-language-sync';
 import { effectiveLanguage, isContentQuery, languageKeys, useMediumDialog } from './hooks';
 import { mediumLabel } from './names';
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn(), custom: vi.fn(), dismiss: vi.fn() } }));
+vi.mock('@/shared/ui/toast', () => ({ notify: { success: vi.fn(), error: vi.fn(), info: vi.fn(), dismiss: vi.fn() } }));
 
 const LANGUAGES = [
   { id: 1, name: 'english' },
@@ -64,8 +64,8 @@ const classLanguages = () =>
 
 beforeEach(() => {
   saved = [];
-  vi.mocked(toast.info).mockClear();
-  vi.mocked(toast.success).mockClear();
+  vi.mocked(notify.info).mockClear();
+  vi.mocked(notify.success).mockClear();
   useMediumDialog.setState({ open: false });
 });
 
@@ -186,7 +186,7 @@ describe('ChangeMediumDialog', () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(saved).toEqual([{ language_id: 2 }]);
-    expect(toast.success).toHaveBeenCalledWith('Switched to हिन्दी');
+    expect(notify.success).toHaveBeenCalledWith('Switched to हिन्दी');
     expect(queryClient.getQueryData<Student>(authKeys.me)?.language).toEqual({ id: 2, name: 'hindi' });
     expect(queryClient.getQueryState(['learn', 'textbooks'])?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(['profile', 'account'])?.isInvalidated).toBe(false);
@@ -206,7 +206,7 @@ describe('ChangeMediumDialog', () => {
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('This language is not available');
     expect(onClose).not.toHaveBeenCalled();
-    expect(toast.success).not.toHaveBeenCalled();
+    expect(notify.success).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByRole('radio', { name: /English/ }));
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -316,7 +316,7 @@ describe('the class picked in the goal switcher', () => {
     // Class 12 has Hindi books only.
     act(() => usePlanSelection.setState({ planId: 2 }));
     await waitFor(() => expect(saved).toEqual([{ language_id: 2, exam_id: 1, class_id: 12 }]));
-    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(`Showing ${CBSE.label} Class 12 in हिन्दी`));
+    await waitFor(() => expect(notify.info).toHaveBeenCalledWith(`Showing ${CBSE.label} Class 12 in हिन्दी`));
   });
 });
 
@@ -335,7 +335,7 @@ describe('ExamLanguageSync (entering or switching exams)', () => {
     queryClient.setQueryData(['learn', 'subjects', 12], ['science']);
 
     await waitFor(() => expect(saved).toEqual([{ language_id: 2, exam_id: 4 }]));
-    await waitFor(() => expect(toast.info).toHaveBeenCalledWith('Showing Jharkhand Board in हिन्दी'));
+    await waitFor(() => expect(notify.info).toHaveBeenCalledWith('Showing Jharkhand Board in हिन्दी'));
     expect(queryClient.getQueryData<Student>(authKeys.me)?.language).toEqual({ id: 2, name: 'hindi' });
     expect(queryClient.getQueryState(['learn', 'subjects', 12])?.isInvalidated).toBe(true);
 
@@ -376,6 +376,6 @@ describe('ExamLanguageSync (entering or switching exams)', () => {
     await waitFor(() => expect(saved).toHaveLength(1));
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(saved).toHaveLength(1);
-    expect(toast.info).not.toHaveBeenCalled();
+    expect(notify.info).not.toHaveBeenCalled();
   });
 });

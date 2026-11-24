@@ -612,15 +612,19 @@ export function CreatePlanScreen() {
     );
   }
 
-  const insight =
+  // Competitive plans had no step-1 box in the previous NEET app.
+  const revisionFrom = status.data.revisionWindowFrom ?? '1 January';
+  const insight: { title: string; body: string } | null =
     step === 1
-      ? {
-          title: 'How your plan will change',
-          body:
-            status.data.allowedPlanTypes.length === 1
-              ? 'From 1 January only Revise is available — your plan focuses on quick recall of what you have already been taught.'
-              : 'Learn & Practice builds concepts first. From 1 January only Revise can be created.',
-        }
+      ? exam.category === 'competitive'
+        ? null
+        : {
+            title: 'How your plan will change',
+            body:
+              status.data.allowedPlanTypes.length === 1
+                ? `From ${revisionFrom} only Revise is available — your plan focuses on quick recall of what you have already been taught.`
+                : `Learn & Practice builds concepts first. From ${revisionFrom} only Revise can be created.`,
+          }
       : step === 2 || !targetDate
         ? {
             title: 'Built around your daily time',
@@ -696,6 +700,7 @@ export function CreatePlanScreen() {
               examDate={status.data.examDate}
             />
           )}
+          {insight && (
           <div className="bg-success-50 border-success-400 flex items-start gap-3 rounded-lg border p-4 md:gap-[10px] md:rounded-[14px] md:p-3">
             <span className="bg-surface border-success-100 flex size-8 shrink-0 items-center justify-center rounded-sm border md:size-auto md:border-0 md:bg-transparent">
               <Info aria-hidden className="text-success-400 size-[18px]" />
@@ -709,6 +714,7 @@ export function CreatePlanScreen() {
               </span>
             </div>
           </div>
+          )}
         </div>
         <div className="flex shrink-0 flex-col gap-2 px-6 pt-[14px] pb-8 md:pb-6">
           <button

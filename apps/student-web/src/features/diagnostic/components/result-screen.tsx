@@ -2,14 +2,17 @@
 
 import { cx } from '@prepzy/design-system';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useClassContext, usePlanStatus } from '@/features/study-plan';
-import { Notice, ScreenLoader } from '@/features/study-plan/ui';
+import { BackButton, Breadcrumb, Notice, ScreenLoader } from '@/features/study-plan/ui';
 import { routes } from '@/shared/config/routes';
+import { subjectLabel } from '@/shared/layout/shell-api';
 import { diagnosticApi, type DiagnosticResult, type SubjectStrength } from '../api';
+import { CompetitiveHowYouLearn, CompetitiveOverview, CompetitiveSubjects } from './competitive-report';
+import { SCALES } from './report-scales';
 
 const STEPS = [
   { key: 'overview', label: 'Overview', sub: 'Your preparation at a glance' },
@@ -17,80 +20,6 @@ const STEPS = [
   { key: 'how', label: 'How You Learn', sub: 'Your learning & test style' },
 ] as const;
 type StepKey = (typeof STEPS)[number]['key'];
-
-const SCALES = {
-  band: [
-    {
-      key: 'below_basic',
-      label: 'Below Basic',
-      meaning:
-        'The basics in these chapters are still being built. Starting from the concept rather than the practice is what will move this fastest.',
-    },
-    {
-      key: 'basic',
-      label: 'Basic',
-      meaning:
-        'You have the core ideas, but they are not yet steady enough to rely on under time pressure. Regular practice on the same chapters will firm them up.',
-    },
-    {
-      key: 'proficient',
-      label: 'Proficient',
-      meaning:
-        'You handle most of this comfortably. The gains now come from the specific gaps rather than from covering everything again.',
-    },
-    {
-      key: 'advanced',
-      label: 'Advanced',
-      meaning:
-        'You are on top of these chapters. Harder questions and full-length timed sets are the useful next step.',
-    },
-  ],
-  pace: [
-    {
-      key: 'rushing',
-      label: 'Rushing',
-      meaning:
-        'You finished well ahead of the time the paper allows. That spare time is worth spending on a second read of the questions you were unsure about.',
-    },
-    {
-      key: 'normal',
-      label: 'Normal',
-      meaning: 'You used your time well — neither rushing nor running short. Keep that rhythm in the real paper.',
-    },
-    {
-      key: 'careful',
-      label: 'Careful',
-      meaning:
-        'You spent longer on each question than the paper allows. Timed practice will help you reach the end without leaving questions behind.',
-    },
-  ],
-  thinking: [
-    {
-      key: 'conceptual',
-      label: 'Conceptual',
-      meaning:
-        'You did best on questions that test whether you understand the idea, rather than ones that ask you to compute. Your plan leads with the explanation before the drill.',
-    },
-    {
-      key: 'numerical',
-      label: 'Numerical',
-      meaning:
-        'You did best where there was a clear method to follow step by step. Your plan leans on worked examples so the method is visible before you practise it.',
-    },
-    {
-      key: 'case_based',
-      label: 'Case Based',
-      meaning:
-        'You did best when an idea was set in a real situation and you had to work out what applied. Your plan uses applied questions to build on that.',
-    },
-    {
-      key: 'balanced',
-      label: 'No clear style',
-      meaning:
-        'No single question type stood out — your accuracy was close across them. That is a fine place to be; your plan keeps a balance rather than favouring one kind.',
-    },
-  ],
-};
 
 const PACE_COPY: Record<string, string> = {
   rushing: 'You moved quickly through the paper. A short review after each test will catch the slips.',
@@ -106,7 +35,7 @@ export const thinkingReasonCopy = (reason: string | null) =>
       : 'You performed evenly across question types.';
 
 /** Strongest and weakest subject; a lone subject at 0% counts as "needs time". */
-export function pickExtremes(subjects: SubjectStrength[]) {
+export function pickExtremes<T extends Pick<SubjectStrength, 'pct'>>(subjects: T[]): { strongest: T | null; weakest: T | null } {
   const ranked = [...subjects].sort((a, b) => b.pct - a.pct);
   if (ranked.length === 1)
     return ranked[0]!.pct === 0 ? { strongest: null, weakest: ranked[0]! } : { strongest: ranked[0]!, weakest: null };
@@ -174,10 +103,10 @@ function ProfileCard({ className }: { className?: string }) {
   );
 }
 
-function WhyThisMatters({ className }: { className?: string }) {
+function WhyThisMatters({ className, upper = false }: { className?: string; upper?: boolean }) {
   return (
     <div className={cx('border-accent-100 bg-accent-50 flex flex-col gap-1 rounded-xl border px-5 py-4', className)}>
-      <span className="text-accent-400 text-[16px] font-bold">Why this matters</span>
+      <span className="text-accent-400 text-[16px] font-bold">{upper ? 'WHY THIS MATTERS' : 'Why this matters'}</span>
       <span className="text-[13px] leading-5 text-neutral-600">
         Your results shape your plan. Atlas uses these insights to decide where you need more practice, revision and
         study time.
@@ -246,6 +175,8 @@ export function DiagnosticResultScreen() {
   const status = usePlanStatus(classId);
   const [step, setStep] = useState<StepKey>('overview');
   const slug = exam?.slug ?? '';
+  // Competitive exams (NEET) get their own report tabs, a back bar and "Physics" for "NEET-PHYSICS".
+  const competitive = exam?.category === 'competitive';
 
   if (!isPending && !classId)
     return <Notice title="No active class" body="Pick a class from the sidebar to see your diagnostic report." />;
@@ -260,7 +191,9 @@ export function DiagnosticResultScreen() {
       />
     );
 
-  const data = result.data;
+  const data: DiagnosticResult = competitive
+    ? { ...result.data, subjects: result.data.subjects.map((s) => ({ ...s, name: subjectLabel(s.name) })) }
+    : result.data;
   const built = status.data ? !status.data.canCreate && status.data.hasPlan : false;
   const cta = built
     ? {
@@ -286,8 +219,25 @@ export function DiagnosticResultScreen() {
     ? data.thinking.leaning!
     : 'balanced';
 
+  const backBar = competitive && (
+    <>
+      <div className="flex items-center gap-4 md:h-20 md:rounded-[24px] md:border md:border-brand-75 md:bg-surface md:px-5 md:shadow-[0px_16px_40px_rgba(61,52,139,0.08)]">
+        <BackButton href={routes.dashboard(slug)} />
+        <nav aria-label="Breadcrumb" className="hidden items-center gap-[10px] md:flex">
+          <Link href={routes.dashboard(slug)} className="text-brand text-[14px] font-bold hover:opacity-70">
+            Dashboard
+          </Link>
+          <ChevronRight aria-hidden className="size-4 text-neutral-600" />
+          <span className="text-[14px] font-semibold text-neutral-600">Diagnostic report</span>
+        </nav>
+      </div>
+      <Breadcrumb dashboardHref={routes.dashboard(slug)} current="Diagnostic report" className="md:hidden" />
+    </>
+  );
+
   return (
     <div className="flex w-full flex-col gap-4">
+      {backBar}
       {expired}
       <div className="flex flex-col gap-5 md:gap-6 md:rounded-[28px] md:bg-neutral-50 md:p-8 lg:flex-row lg:items-stretch">
         <aside className={cx(panel, 'hidden w-full shrink-0 flex-col gap-5 self-start p-6 md:flex lg:w-[331px]')}>
@@ -333,7 +283,7 @@ export function DiagnosticResultScreen() {
               );
             })}
           </nav>
-          <WhyThisMatters />
+          <WhyThisMatters upper={competitive} />
         </aside>
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <ProfileCard className="md:hidden" />
@@ -364,7 +314,14 @@ export function DiagnosticResultScreen() {
               </button>
             ))}
           </div>
-          {step === 'overview' && (
+          {competitive && step === 'overview' && (
+            <CompetitiveOverview result={data} strongest={strongest} weakest={weakest} onSeePace={() => setStep('how')} />
+          )}
+          {competitive && step === 'subjects' && (
+            <CompetitiveSubjects subjects={data.subjects} chapters={data.chapters} strongest={strongest} weakest={weakest} />
+          )}
+          {competitive && step === 'how' && <CompetitiveHowYouLearn result={data} />}
+          {!competitive && step === 'overview' && (
             <div className="border-brand-175 bg-brand-50 flex flex-col gap-4 rounded-2xl border p-6">
               <div className="flex gap-4">
                 <span className="bg-brand text-on-brand flex size-10 shrink-0 items-center justify-center rounded-full font-bold">
@@ -395,7 +352,7 @@ export function DiagnosticResultScreen() {
               </div>
             </div>
           )}
-          {step === 'subjects' && (
+          {!competitive && step === 'subjects' && (
             <div className={cx(panel, 'flex flex-col gap-4 p-5')}>
               {[...data.subjects]
                 .sort((a, b) => b.pct - a.pct)
@@ -433,7 +390,7 @@ export function DiagnosticResultScreen() {
                 })}
             </div>
           )}
-          {step === 'how' && (
+          {!competitive && step === 'how' && (
             <div className="flex flex-col gap-4">
               <Scale
                 title="Where you stand"
@@ -457,7 +414,7 @@ export function DiagnosticResultScreen() {
               />
             </div>
           )}
-          <WhyThisMatters className="md:hidden" />
+          <WhyThisMatters className="md:hidden" upper={competitive} />
           <div
             className={cx(
               panel,

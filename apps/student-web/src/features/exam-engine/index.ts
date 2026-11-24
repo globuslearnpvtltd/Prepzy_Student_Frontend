@@ -4,5 +4,5 @@ export { SetCard } from './components/set-card';
 export { useTestContext, useTestSets } from './hooks';
 export { isTestTypeKey, TEST_TYPES } from './test-types';
 export { resolveTestType } from './route-params';
-export type { TestSetSummary } from './model';
+export type { ExamResult, Outcome, TestSetSummary } from './model';
 export { transcribeAudio, useVoiceAnswer, type RecorderState } from './transcribe';

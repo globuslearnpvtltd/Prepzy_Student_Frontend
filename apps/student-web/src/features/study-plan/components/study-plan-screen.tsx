@@ -3,19 +3,24 @@
 import { cx } from '@prepzy/design-system';
 import { ArrowLeft, ArrowRight, BookMarked, CalendarDays, Check, ChevronRight, Clock } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import type { ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
+import { resolveDailyPractice } from '@/shared/layout/competitive-navigation';
 import {
   dayDots,
   formatDailyTime,
   formatDayHeading,
   formatFinishDate,
   initialDate,
+  isFutureDay,
   monthCells,
   monthLabel,
   planPercent,
   taskHref,
   toIso,
   toSentenceCase,
+  unlockMessage,
   type PlanDay,
   type PlanTask,
 } from '../api';
@@ -321,18 +326,33 @@ function TaskRow({
   );
 }
 
+const errorText = (error: unknown) => (error instanceof Error && error.message ? error.message : 'Something went wrong. Please try again.');
+
+/** Opens the live daily practice paper in a new tab (resolved after the click, so the tab is opened first). */
+function openDailyPractice(exam: ExamConfig) {
+  const tab = window.open('about:blank', '_blank');
+  void resolveDailyPractice(exam).then((href) => {
+    if (tab) {
+      tab.opener = null;
+      tab.location.href = href;
+    } else {
+      window.open(href, '_blank', 'noopener');
+    }
+  });
+}
+
 function DayPanel({
   classId,
   planId,
   date,
   day,
-  examSlug,
+  exam,
 }: {
   classId: number;
   planId: number;
   date: string;
   day: PlanDay | null;
-  examSlug: string;
+  exam: ExamConfig;
 }) {
   const tasks = useDayTasks(planId, date);
   const setTask = useSetTask(classId, planId, date);
@@ -341,13 +361,31 @@ function DayPanel({
   const isRest = !!day?.isRestDay;
   const done = !!day?.isCompleted || (list.length > 0 && list.every((t) => t.isCompleted));
   const canComplete = !isRest && list.length > 0 && !done && !tasks.isFetching;
+  // Competitive plans (as the previous NEET app): a future day's tasks can be opened but not completed yet.
+  const competitive = exam.category === 'competitive';
+  const locked = competitive && isFutureDay(date);
+  const warnLocked = () => toast.error(unlockMessage(date), { id: 'study-plan-future-day' });
+  const onError = competitive ? { onError: (error: unknown) => toast.error(errorText(error), { id: 'study-plan-error' }) } : undefined;
 
   const open = (task: PlanTask) => {
-    const href = taskHref(examSlug, task);
+    const href = taskHref(exam.slug, task, exam.category);
     if (!href) return;
     saveReturnDate(date);
-    window.open(href, '_blank', 'noopener');
-    if (task.status === 'todo') setTask.mutate({ taskId: task.id, status: 'in_progress' });
+    if (competitive && task.target?.type === 'dpp') openDailyPractice(exam);
+    else window.open(href, '_blank', 'noopener');
+    if (task.status === 'todo' && !locked) setTask.mutate({ taskId: task.id, status: 'in_progress' }, onError);
+  };
+  const toggle = (task: PlanTask) => {
+    if (!task.isCompleted && locked) return warnLocked();
+    setTask.mutate(
+      { taskId: task.id, status: task.isCompleted ? (task.isStarted ? 'in_progress' : 'todo') : 'completed' },
+      onError,
+    );
+  };
+  const finishDay = () => {
+    if (!day) return;
+    if (locked) return warnLocked();
+    completeDay.mutate(day.dayId, onError);
   };
   const message = (text: string) => (
     <div className="flex min-h-[180px] items-center justify-center rounded-md bg-neutral-50 p-5 text-center text-[13px] leading-5 font-medium text-neutral-900/50">
@@ -377,21 +415,16 @@ function DayPanel({
                   <TaskRow
                     key={task.id}
                     task={task}
-                    href={taskHref(examSlug, task)}
+                    href={taskHref(exam.slug, task, exam.category)}
                     onOpen={() => open(task)}
-                    onToggle={() =>
-                      setTask.mutate({
-                        taskId: task.id,
-                        status: task.isCompleted ? (task.isStarted ? 'in_progress' : 'todo') : 'completed',
-                      })
-                    }
+                    onToggle={() => toggle(task)}
                   />
                 ))}
       </div>
       <button
         type="button"
         disabled={!canComplete || completeDay.isPending}
-        onClick={() => day && completeDay.mutate(day.dayId)}
+        onClick={finishDay}
         className={cx(
           'text-on-brand flex h-[52px] w-full items-center justify-center rounded-[14px] px-5 text-[16px] font-bold disabled:cursor-not-allowed',
           canComplete ? 'bg-brand shadow-[0px_8px_20px_rgba(61,52,139,0.12)] hover:opacity-90' : 'bg-brand-300',
@@ -459,7 +492,7 @@ export function StudyPlanScreen() {
         <MonthCalendar days={days} selected={date} onSelect={setSelected} />
         <div className="flex min-w-0 flex-1 xl:relative">
           <div className="flex w-full xl:absolute xl:inset-0">
-            <DayPanel classId={classId!} planId={header.planId} date={date} day={day} examSlug={exam.slug} />
+            <DayPanel classId={classId!} planId={header.planId} date={date} day={day} exam={exam} />
           </div>
         </div>
       </div>

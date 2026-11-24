@@ -2,7 +2,7 @@
 
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
-import type { Journey, JourneyState } from '../api';
+import type { Journey, JourneyState, PlanCategory } from '../api';
 import { useDashboardJourney } from '../hooks';
 import { DiagnosticCardArt } from './diagnostic-card-art';
 import { FinishLineCard } from './finish-line-card';
@@ -31,8 +31,8 @@ const NOTEBOOK_STATES = new Set<JourneyState>(['take_diagnostic', 'resume_diagno
 const SLIM_A = new Set<JourneyState>(['tasks_partial', 'tasks_done', 'catch_up']);
 const SLIM_B = new Set<JourneyState>(['build_plan', 'rest_day', 'halfway']);
 
-/** Copy and destination for each journey state (previous dashboard JourneyCard). */
-export function journeyCopy(data: Journey, exam: string): CardCopy | null {
+/** Copy and destination for each journey state (previous dashboard JourneyCard; competitive: NEETJourneyCard). */
+export function journeyCopy(data: Journey, exam: string, category: PlanCategory = 'board'): CardCopy | null {
   const plan = routes.studyPlan(exam);
   switch (data.state) {
     case 'take_diagnostic':
@@ -54,9 +54,10 @@ export function journeyCopy(data: Journey, exam: string): CardCopy | null {
         art: 'clipboard',
       };
     case 'build_plan':
+      // Competitive: no plan exists yet in this state, so the copy invites building one.
       return {
-        lead: 'Your next steps just got clearer',
-        hand: 'STUDY PLAN IS READY!',
+        lead: category === 'competitive' ? 'Your diagnostic test is done' : 'Your next steps just got clearer',
+        hand: category === 'competitive' ? 'BUILD YOUR STUDY PLAN!' : 'STUDY PLAN IS READY!',
         cta: 'Build My Plan',
         href: routes.studyPlanChapters(exam),
       };
@@ -128,7 +129,7 @@ export function JourneyCard({ className }: { className?: string }) {
   const exam = useExam();
   const journey = useDashboardJourney();
   if (!journey.data) return null;
-  const copy = journeyCopy(journey.data, exam.slug);
+  const copy = journeyCopy(journey.data, exam.slug, exam.category);
   if (!copy) return null;
   const { state } = journey.data;
 

@@ -114,7 +114,7 @@ describe('ExamPlayer', () => {
     expect(screen.getByRole('link', { name: /Back to Mock Exams/ })).toHaveAttribute('href', '/neet/mock-tests');
   });
 
-  it('shows "Not enabled by your institute" when the backend refuses the test type (403 FEATURE_RESTRICTED)', async () => {
+  it('shows "Not available" when the backend refuses the test type (403 FEATURE_RESTRICTED)', async () => {
     server.use(
       http.get(`${API}/api/v4/student/plans/active`, () =>
         HttpResponse.json({
@@ -130,7 +130,7 @@ describe('ExamPlayer', () => {
       ),
     );
     renderWithProviders(<ExamPlayer testType="mock" setId="4" />, { exam: neet });
-    expect(await screen.findByRole('heading', { name: 'Not enabled by your institute' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Not available' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/neet/dashboard');
   });
 

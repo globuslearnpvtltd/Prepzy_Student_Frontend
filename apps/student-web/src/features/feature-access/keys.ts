@@ -70,9 +70,9 @@ export const assessmentFeature = (type: string | null | undefined): Restrictable
 
 /** What a restricted entry point says (tooltip, dialog, full-screen message). */
 export const RESTRICTED_COPY = {
-  tooltip: 'Not enabled by your institute',
-  dialogTitle: 'Not enabled by your institute',
-  dialog: "This feature isn't enabled for your account by your institute. Please contact your institute.",
-  screenTitle: 'Not enabled by your institute',
-  screen: 'Contact your institute to use this feature.',
+  tooltip: 'Not available',
+  dialogTitle: 'Not available',
+  dialog: "This feature isn't enabled for your account. Please contact your admin to get access.",
+  screenTitle: 'Not available',
+  screen: "This feature isn't enabled for your account. Please contact your admin to get access.",
 } as const;

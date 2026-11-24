@@ -778,7 +778,7 @@ describe('institute feature restrictions in the shell', () => {
     renderShell('cbse');
     await screen.findByText('Page');
     const [sidebar, bottomBar] = screen.getAllByRole('navigation', { name: 'Main' });
-    await waitFor(() => expect(within(sidebar!).getAllByLabelText('Not enabled by your institute')).toHaveLength(2));
+    await waitFor(() => expect(within(sidebar!).getAllByLabelText('Not available')).toHaveLength(2));
     expect(within(sidebar!).queryByRole('link', { name: /Notes/ })).not.toBeInTheDocument();
     expect(within(sidebar!).getByRole('link', { name: 'Learn' })).toHaveAttribute('href', '/cbse/learn');
     await userEvent.click(within(sidebar!).getByRole('button', { name: /Study Plan/ }));
@@ -793,7 +793,7 @@ describe('institute feature restrictions in the shell', () => {
     expect(useFeatureRestrictedDialog.getState().feature).toBe('atlas_chat');
 
     // Search is off: the box is a locked button.
-    const search = screen.getAllByRole('button', { name: 'Search (not enabled by your institute)' })[0]!;
+    const search = screen.getAllByRole('button', { name: 'Search (not available)' })[0]!;
     expect(screen.queryByRole('combobox', { name: 'Search topics' })).not.toBeInTheDocument();
     useFeatureRestrictedDialog.setState({ open: false, feature: null });
     await userEvent.click(search);
@@ -853,11 +853,11 @@ describe('institute feature restrictions in the shell', () => {
     expect(useFeatureRestrictedDialog.getState()).toMatchObject({ open: true, feature: 'atlas_chat' });
   });
 
-  it('shows "Not enabled by your institute" for a restricted page opened by URL', async () => {
+  it('shows "Not available" for a restricted page opened by URL', async () => {
     navigation.pathname = '/cbse/syllabus';
     server.use(purchased(['cbse', 'CBSE']), account, plans(boardPlan()), studyPlan(true), restrictFeatures('syllabus'));
     renderShell('cbse');
-    expect(await screen.findByRole('heading', { name: 'Not enabled by your institute' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Not available' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/cbse/dashboard');
     expect(screen.queryByText('Page')).not.toBeInTheDocument();
   });
@@ -873,7 +873,7 @@ describe('institute feature restrictions in the shell', () => {
     renderShell('neet');
     await screen.findByText('Page');
     const [rail] = screen.getAllByRole('navigation', { name: 'Main' });
-    await waitFor(() => expect(within(rail!).getAllByLabelText('Not enabled by your institute')).toHaveLength(2));
+    await waitFor(() => expect(within(rail!).getAllByLabelText('Not available')).toHaveLength(2));
     expect(within(rail!).queryByRole('link', { name: 'Mock Tests' })).not.toBeInTheDocument();
     expect(within(rail!).getByRole('link', { name: 'PYQ Library' })).toHaveAttribute('href', '/neet/pyq-library');
     await userEvent.click(within(rail!).getByRole('button', { name: 'Daily Practice' }));

@@ -87,10 +87,10 @@ describe('BoardAssessments: institute restrictions', () => {
     expect(useFeatureRestrictedDialog.getState().feature).toBe('mock_exam');
     expect(screen.getByRole('tab', { name: 'Past Year Exams' })).toHaveAttribute('aria-selected', 'true');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Customize Test (not enabled by your institute)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Customize Test (not available)' }));
     expect(useFeatureRestrictedDialog.getState().feature).toBe('custom_exam');
     expect(screen.queryByRole('dialog', { name: 'Create Custom Test' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Saved Tests (not enabled by your institute)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Saved Tests (not available)' })).toBeInTheDocument();
   });
 
   it('says so when both paper kinds are off, and ignores ?open=custom-test', async () => {
@@ -98,7 +98,7 @@ describe('BoardAssessments: institute restrictions', () => {
     server.use(plan, restrictFeatures('mock_exam', 'pyq_exam', 'custom_exam'));
     window.history.replaceState(null, '', '/cbse/assessments?open=custom-test');
     renderWithProviders(<BoardAssessments />, { exam: cbse });
-    expect(await screen.findByText('Contact your institute to use this feature.')).toBeInTheDocument();
+    expect(await screen.findByText("This feature isn't enabled for your account. Please contact your admin to get access.")).toBeInTheDocument();
     await waitFor(() => expect(window.location.search).toBe(''));
     expect(screen.queryByRole('dialog', { name: 'Create Custom Test' })).not.toBeInTheDocument();
     expect(useFeatureRestrictedDialog.getState().feature).toBe('custom_exam');

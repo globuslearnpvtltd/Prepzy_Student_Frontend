@@ -156,7 +156,7 @@ function AccessGate({ exam, children }: { exam: ExamConfig; children: React.Reac
   return (
     <>
       <ExamLanguageSync exam={exam} />
-      {/* A page the student's institute switched off shows "Not enabled by your institute" instead. */}
+      {/* A page the student's institute switched off shows "Not available" instead. */}
       <FeatureRouteGate>{children}</FeatureRouteGate>
     </>
   );

@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -407,6 +408,32 @@ describe('Checkout payment outcomes', () => {
     expect(screen.getAllByText(/^Valid until /).length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('button', { name: 'Back to home' }));
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/neet/dashboard'));
+  });
+
+  it('refetches the institute feature locks as soon as a payment succeeds (a self-purchase lifts them)', async () => {
+    const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+    server.use(...handlers(), neetOrder(), http.post(billingUrl(neet, '/orders/order_n/verify'), () => billingOk({ order_id: 'order_n', status: 'paid', purchase: {} })));
+    await reviewNeetMonthly();
+    await userEvent.click(screen.getAllByRole('button', { name: /Pay ₹588.82/ })[0]!);
+    await waitFor(() => expect(sheet).not.toBeNull());
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['feature-access'] });
+
+    sheet!.options.handler({ razorpay_payment_id: 'pay_s', razorpay_order_id: 'order_n', razorpay_signature: 's' });
+    expect(await screen.findByText('Payment Successful')).toBeInTheDocument();
+    // Before the student leaves the success screen.
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['feature-access'] }));
+    expect(navigation.replace).not.toHaveBeenCalled();
+    invalidate.mockRestore();
+  });
+
+  it('a 100% coupon order refetches the locks too', async () => {
+    const invalidate = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+    server.use(...handlers(), neetOrder({ order_id: 'free-000042', status: 'paid', amount_paise: 0, currency: 'INR', key_id: null, purchase: {} }));
+    await reviewNeetMonthly();
+    await userEvent.click(screen.getAllByRole('button', { name: /Pay ₹588.82/ })[0]!);
+    expect(await screen.findByText('Payment Successful')).toBeInTheDocument();
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['feature-access'] }));
+    invalidate.mockRestore();
   });
 
   it('shows the server message of a blocked renewal (409) and dismisses it', async () => {

@@ -70,7 +70,7 @@ interface RestrictedDialogState {
   hide: () => void;
 }
 
-/** The "not enabled by your institute" dialog (one host in app/providers.tsx). Locks and API errors open it. */
+/** The "not available" dialog (one host in app/providers.tsx). Locks and API errors open it. */
 export const useFeatureRestrictedDialog = create<RestrictedDialogState>((set) => ({
   open: false,
   feature: null,

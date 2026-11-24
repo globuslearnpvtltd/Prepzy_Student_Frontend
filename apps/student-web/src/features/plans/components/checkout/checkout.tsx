@@ -5,6 +5,7 @@ import { BookOpen, CalendarDays, Check, GraduationCap, Target } from 'lucide-rea
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { rememberedExam, rememberExam, useCurrentUser } from '@/features/auth';
+import { featureAccessKeys } from '@/features/feature-access';
 import { examSlugOf, type ExamCategory, type ExamRef } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { StatusScreen } from '@/shared/layout/status-screens';
@@ -178,6 +179,13 @@ export function Checkout() {
     describe: (plan) => `${plan.name} · ${plan.durationName} · ${contextLabel}`,
     prefill: { name: user.data?.firstName ?? '', contact: user.data?.phone ?? '', email: user.data?.email ?? '' },
   });
+
+  // A purchase of the student's own lifts their institute's restrictions for its classes (backend, after commit):
+  // refetch the locks at once (verify, 100% coupon, a re-checked pending payment), not on the next page load.
+  const succeededPlan = payment.succeeded;
+  useEffect(() => {
+    if (succeededPlan) void queryClient.invalidateQueries({ queryKey: featureAccessKeys.all });
+  }, [succeededPlan, queryClient]);
 
   const resetPlan = () => {
     setPriceId(null);

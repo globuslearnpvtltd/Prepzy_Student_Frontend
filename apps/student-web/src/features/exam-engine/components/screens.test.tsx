@@ -660,7 +660,7 @@ describe('ResultView: institute restrictions', () => {
       ),
     );
     renderWithProviders(<ResultView testType="mock" attemptId="77" />, { exam: neet });
-    const locked = await screen.findByRole('button', { name: 'Discuss with Vedica (not enabled by your institute)' });
+    const locked = await screen.findByRole('button', { name: 'Discuss with Vedica (not available)' });
     await userEvent.click(locked);
     expect(useFeatureRestrictedDialog.getState()).toMatchObject({ open: true, feature: 'review_chat' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

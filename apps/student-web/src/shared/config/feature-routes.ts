@@ -3,7 +3,7 @@ import type { TestTypeKey } from './exams';
 
 /**
  * Which institute-restrictable feature(s) a page of an exam belongs to, so opening a restricted page's URL directly
- * shows "Not enabled by your institute" (FeatureRouteGate in ExamFrame). A page with several features is blocked only
+ * shows "Not available" (FeatureRouteGate in ExamFrame). A page with several features is blocked only
  * when all of them are restricted. Pages that mix features (dashboard, learn, a chapter, the tests hub) aren't gated:
  * their entry points are locked one by one. The coverage test (feature-routes.test.ts) lists every page.
  */

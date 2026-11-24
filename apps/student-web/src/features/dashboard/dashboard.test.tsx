@@ -368,7 +368,7 @@ describe('competitive dashboard (NEET)', () => {
 });
 
 describe('institute feature restrictions on the dashboards', () => {
-  const locked = (name: string) => screen.findByRole('button', { name: `${name} (not enabled by your institute)` });
+  const locked = (name: string) => screen.findByRole('button', { name: `${name} (not available)` });
 
   it('board: locks Socrates, Atlas, syllabus, trends, restricted tests and the journey card; a click explains why', async () => {
     useFeatureRestrictedDialog.setState({ open: false, feature: null });
@@ -399,7 +399,7 @@ describe('institute feature restrictions on the dashboards', () => {
 
     await user.click(solve);
     expect(useFeatureRestrictedDialog.getState()).toMatchObject({ open: true, feature: 'doubt_solver' });
-    expect(await screen.findByText(/isn't enabled for your account by your institute/)).toBeInTheDocument();
+    expect(await screen.findByText(/isn't enabled for your account/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /See plans/ })).not.toBeInTheDocument();
   });
 

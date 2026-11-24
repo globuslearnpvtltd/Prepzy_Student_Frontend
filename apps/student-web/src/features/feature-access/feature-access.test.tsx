@@ -238,15 +238,15 @@ describe('FeatureLock', () => {
       </>,
       { exam: cbse },
     );
-    const locked = await screen.findByRole('button', { name: 'Notes (not enabled by your institute)' });
+    const locked = await screen.findByRole('button', { name: 'Notes (not available)' });
     expect(locked).toHaveAttribute('aria-disabled', 'true');
-    expect(locked).toHaveAttribute('title', 'Not enabled by your institute');
+    expect(locked).toHaveAttribute('title', 'Not available');
     expect(screen.queryByRole('link', { name: 'Notes' })).not.toBeInTheDocument();
-    expect(screen.getAllByLabelText('Not enabled by your institute').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Not available').length).toBeGreaterThan(0);
 
     await user.click(locked);
     expect(await screen.findByRole('dialog')).toHaveTextContent(
-      "This feature isn't enabled for your account by your institute. Please contact your institute.",
+      "This feature isn't enabled for your account. Please contact your admin to get access.",
     );
     await user.click(screen.getByRole('button', { name: 'Got it' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -271,7 +271,7 @@ describe('FeatureLock', () => {
     );
     const edge = await screen.findByRole('button', { name: /^Search \(/ });
     expect(edge.tagName).toBe('SPAN');
-    expect(edge.querySelector('[title="Not enabled by your institute"] svg')).not.toBeNull();
+    expect(edge.querySelector('[title="Not available"] svg')).not.toBeNull();
     const none = await screen.findByRole('button', { name: /^Read \(/ });
     expect(none.querySelector('svg')).toBeNull();
   });
@@ -309,7 +309,7 @@ describe('FeatureRestrictedDialog and the API', () => {
 
     // An action (POST) also explains why.
     await act(() => apiClient.post('/api/v4/search/board/1/lectures', { query: 'x' }).catch(() => undefined));
-    expect(await screen.findByRole('dialog')).toHaveTextContent('Not enabled by your institute');
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Not available');
     expect(useFeatureRestrictedDialog.getState().feature).toBe('search');
     await waitFor(() => expect(accessCalls).toBe(3));
   });
@@ -325,8 +325,8 @@ describe('FeatureRouteGate and FeatureDisabledScreen', () => {
       </FeatureRouteGate>,
       { exam: cbse },
     );
-    expect(await screen.findByRole('heading', { name: 'Not enabled by your institute' })).toBeInTheDocument();
-    expect(screen.getByText('Contact your institute to use this feature.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Not available' })).toBeInTheDocument();
+    expect(screen.getByText("This feature isn't enabled for your account. Please contact your admin to get access.")).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute('href', '/cbse/dashboard');
     expect(screen.queryByText('Mock papers')).not.toBeInTheDocument();
   });

@@ -188,15 +188,15 @@ describe('Chapter page', () => {
     );
     renderWithProviders(<ModuleScreen courseId="5" moduleId="2" />, { exam: cbse });
     const locked = (name: RegExp) => screen.findByRole('button', { name });
-    expect(await locked(/^Video Lecture: Mirrors and Images \(not enabled/)).toHaveAttribute('aria-disabled', 'true');
-    expect(await locked(/^Summary Video: Summary \(not enabled/)).toBeInTheDocument();
+    expect(await locked(/^Video Lecture: Mirrors and Images \(not available/)).toHaveAttribute('aria-disabled', 'true');
+    expect(await locked(/^Summary Video: Summary \(not available/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Mirrors and Images/ })).not.toBeInTheDocument();
     // Quizzes and notes stay open.
     expect(screen.getByRole('link', { name: /Mirror Quiz/ })).toHaveAttribute('href', '/cbse/tests/quiz/20');
     expect(screen.getByRole('link', { name: /Chapter Notes/ })).toHaveAttribute('href', '/cbse/notes/5?module_id=2');
 
     await userEvent.click(screen.getByRole('tab', { name: 'Practice' }));
-    expect(await locked(/^Unit Test: Unit Test 1 \(not enabled/)).toBeInTheDocument();
+    expect(await locked(/^Unit Test: Unit Test 1 \(not available/)).toBeInTheDocument();
     expect(await locked(/^Chapter PYQ's: 2 board questions/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /1 question with solutions/ })).toBeInTheDocument();
   });

@@ -52,7 +52,7 @@ export function FeatureRouteGate({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * The one "not enabled by your institute" dialog (mounted next to LimitDialog). Locked entry points open it; so does
+ * The one "not available" dialog (mounted next to LimitDialog). Locked entry points open it; so does
  * a 403 FEATURE_RESTRICTED from an action (POST, stream…). Page loads that get one (GET) only refresh the access list:
  * their pages show their own state, and a dialog popping up on load would be noise.
  */

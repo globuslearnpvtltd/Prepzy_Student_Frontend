@@ -217,7 +217,7 @@ export function ReviewStep({
   const totalSaved = chosen.saved + discount;
   const pay = quote ? `Pay ${formatAmount(quote.totalAmount)}` : 'Pay now';
   const blocked = chosen.isCurrent;
-  const payLabel = busy ? 'Working on it…' : blocked ? 'Current active plan' : chosen.isFree ? 'Activate free plan' : pay;
+  const payLabel = busy ? 'Working on it…' : blocked ? 'Current active plan' : chosen.isFree ? 'Activate Basic plan' : pay;
 
   return (
     <>

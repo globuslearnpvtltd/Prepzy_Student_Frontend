@@ -150,15 +150,10 @@ describe('Parent', () => {
     expect(otp).not.toHaveBeenCalled();
   });
 
-  it('removes the parent and puts them back with Undo', async () => {
-    let restoreBody: unknown = null;
+  it('removes the parent and confirms with a toast that only has Close', async () => {
     server.use(
       http.get(`${API}/api/v4/student/mentor`, () => ok({ mentor_data: MENTOR })),
       http.delete(`${API}/api/v4/student/mentor`, () => ok({ undo_token: 'undo-1' })),
-      http.post(`${API}/api/v4/student/mentor/restore`, async ({ request }) => {
-        restoreBody = await request.json();
-        return ok({ mentor_data: MENTOR });
-      }),
     );
     renderWithProviders(<ParentScreen />, { exam: cbse });
     await userEvent.click(await screen.findByRole('button', { name: 'Remove' }));
@@ -168,11 +163,9 @@ describe('Parent', () => {
     expect(await screen.findByText('Add a parent')).toBeInTheDocument();
     const removed = toastAt(-1);
     expect(removed.text).toContain('Asha Kumar removed');
-    await userEvent.click(within(removed.view!.container).getByRole('button', { name: 'Undo' }));
+    expect(within(removed.view!.container).queryByRole('button', { name: 'Undo' })).toBeNull();
+    expect(within(removed.view!.container).getByRole('button', { name: 'Close' })).toBeInTheDocument();
     removed.unmount();
-
-    await waitFor(() => expect(restoreBody).toEqual({ undo_token: 'undo-1' }));
-    expect(await screen.findByText('Asha Kumar')).toBeInTheDocument();
   });
 
   it('cancel without a parent goes back to My Account', async () => {

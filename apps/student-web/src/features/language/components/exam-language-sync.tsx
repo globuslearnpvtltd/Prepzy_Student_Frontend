@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { useCurrentUser } from '@/features/auth';
 import { classLabel } from '@/features/plans';
 import type { ExamConfig } from '@/shared/config/exams';
@@ -40,7 +40,7 @@ export function useExamLanguageSync(exam: ExamConfig) {
     tried.current = key;
     mutate(targetId, {
       onSuccess: (language) => {
-        toast.info(`Showing ${where} in ${mediumLabel(language.name).native}`);
+        notify.info(`Showing ${where} in ${mediumLabel(language.name).native}`);
       },
     });
   }, [targetId, isPending, exam.examId, classId, where, mutate]);

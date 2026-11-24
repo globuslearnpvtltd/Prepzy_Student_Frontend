@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { cx } from '@prepzy/design-system';
 import { Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { z } from 'zod';
 import { userMessage } from '@/shared/lib/errors';
 import { useChangePassword } from '../hooks';
@@ -40,7 +40,7 @@ export function ChangePasswordScreen() {
   const submit = form.handleSubmit((values) =>
     change.mutate(values, {
       onSuccess: () => {
-        toast.success('Password Successfully Updated!');
+        notify.success('Password Successfully Updated!');
         form.reset();
       },
     }),

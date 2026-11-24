@@ -19,25 +19,28 @@ describe('middleware', () => {
   });
 
   it('sends signed-in students away from login to their exam', () => {
-    expect(run('/login', { accessToken: 't', prepzy_exam: 'neet' })).toBe('https://app.prepzy.ai/neet/dashboard');
-    expect(run('/login', { accessToken: 't' })).toBe('https://app.prepzy.ai/cbse/dashboard');
-    expect(run('/login?exam=neet-ug', { accessToken: 't' })).toBe('https://app.prepzy.ai/neet/dashboard');
+    expect(run('/login', { prepzyAccessToken: 't', prepzy_exam: 'neet' })).toBe('https://app.prepzy.ai/neet/dashboard');
+    expect(run('/login', { prepzyAccessToken: 't' })).toBe('https://app.prepzy.ai/cbse/dashboard');
+    expect(run('/login?exam=neet-ug', { prepzyAccessToken: 't' })).toBe('https://app.prepzy.ai/neet/dashboard');
     // Any exam's slice works (the exam layout 404s one that is not active); junk falls back to the default exam.
-    expect(run('/login', { accessToken: 't', prepzy_exam: 'jee-main' })).toBe('https://app.prepzy.ai/jee-main/dashboard');
-    expect(run('/login', { accessToken: 't', prepzy_exam: '../x' })).toBe('https://app.prepzy.ai/cbse/dashboard');
+    expect(run('/login', { prepzyAccessToken: 't', prepzy_exam: 'jee-main' })).toBe('https://app.prepzy.ai/jee-main/dashboard');
+    expect(run('/login', { prepzyAccessToken: 't', prepzy_exam: '../x' })).toBe('https://app.prepzy.ai/cbse/dashboard');
   });
 
   it('keeps onboarding steps reachable while the session is being created', () => {
-    expect(run('/setup', { accessToken: 't' })).toBeNull();
-    expect(run('/exam-selection', { accessToken: 't' })).toBeNull();
+    expect(run('/setup', { prepzyAccessToken: 't' })).toBeNull();
+    expect(run('/exam-selection', { prepzyAccessToken: 't' })).toBeNull();
   });
 
   it('routes the root URL', () => {
     expect(run('/')).toBe('https://app.prepzy.ai/login');
-    expect(run('/', { accessToken: 't', prepzy_exam: 'cbse' })).toBe('https://app.prepzy.ai/cbse/dashboard');
+    expect(run('/', { prepzyAccessToken: 't', prepzy_exam: 'cbse' })).toBe('https://app.prepzy.ai/cbse/dashboard');
   });
 
   it('lets signed-in students through to app pages', () => {
+    expect(run('/cbse/dashboard', { prepzyAccessToken: 't' })).toBeNull();
+    // the previous app's cookie still counts until the backend swaps it for this app's own
     expect(run('/cbse/dashboard', { accessToken: 't' })).toBeNull();
+    expect(run('/login', { accessToken: 't' })).toBe('https://app.prepzy.ai/cbse/dashboard');
   });
 });

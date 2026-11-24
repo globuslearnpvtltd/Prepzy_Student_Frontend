@@ -3,6 +3,7 @@
 import { cx } from '@prepzy/design-system';
 import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, useMemo } from 'react';
+import { ActivityTracker } from '@/features/activity/ui';
 import { AtlasHost } from '@/features/assistant/ui';
 import { rememberExam, usePurchasedExams } from '@/features/auth';
 import { ExamLanguageSync } from '@/features/language/ui';
@@ -155,6 +156,7 @@ function AccessGate({ exam, children }: { exam: ExamConfig; children: React.Reac
   return (
     <>
       <ExamLanguageSync exam={exam} />
+      <ActivityTracker />
       {children}
     </>
   );

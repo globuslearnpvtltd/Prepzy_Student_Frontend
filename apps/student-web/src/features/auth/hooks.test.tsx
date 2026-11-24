@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
 import { apiClient } from '@/shared/lib/api-client';
@@ -17,7 +17,7 @@ import {
   usePlanSelection,
   usePlans,
   usePurchasedExams,
-  useSessionExpiryRedirect,
+  useSessionExpiry,
 } from './hooks';
 
 type JsdomGlobal = { jsdom: { reconfigure: (options: { url: string }) => void } };
@@ -80,42 +80,69 @@ describe('useLogout', () => {
   });
 });
 
-describe('useSessionExpiryRedirect', () => {
+describe('useSessionExpiry', () => {
   const unauthorized = () => http.get(`${API}/api/v4/student/account`, () => HttpResponse.json({}, { status: 401 }));
+  const fail = () => apiClient.get('/api/v4/student/account').catch(() => undefined);
 
-  it('redirects students to login once, however many requests fail', async () => {
+  it('opens the dialog (no redirect yet); Log in again clears the cache and opens login once', async () => {
     server.use(unauthorized());
+    setUrl('http://localhost:3000/cbse/dashboard');
     const { queryClient, wrapper } = setup();
     queryClient.setQueryData(authKeys.me, { accountId: 1 });
-    renderHook(() => useSessionExpiryRedirect(), { wrapper });
-    await Promise.allSettled([apiClient.get('/api/v4/student/account'), apiClient.get('/api/v4/student/account')]);
+    const { result } = renderHook(() => useSessionExpiry(), { wrapper });
+    expect(result.current.expired).toBe(false);
+
+    await Promise.allSettled([fail(), fail()]);
+    await waitFor(() => expect(result.current.expired).toBe(true));
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(queryClient.getQueryData(authKeys.me)).toEqual({ accountId: 1 });
+
+    act(() => result.current.logIn());
     expect(navigation.replace).toHaveBeenCalledTimes(1);
     expect(navigation.replace).toHaveBeenCalledWith('/login');
     expect(queryClient.getQueryData(authKeys.me)).toBeUndefined();
+    expect(result.current.expired).toBe(false);
   });
 
-  it("sends portal users to their portal's login by base path", async () => {
+  it('stays closed on the login and sign-up pages', async () => {
+    server.use(unauthorized());
+    setUrl('http://localhost:3000/login');
+    const { result } = renderHook(() => useSessionExpiry(), { wrapper: setup().wrapper });
+    await fail();
+    expect(result.current.expired).toBe(false);
+  });
+
+  it("sends portal users to their portal's login (by base path and by subdomain); not on the portal's login", async () => {
     server.use(unauthorized());
     setUrl('http://localhost:3000/schools/dashboard');
-    renderHook(() => useSessionExpiryRedirect(), { wrapper: setup().wrapper });
-    await apiClient.get('/api/v4/student/account').catch(() => undefined);
-    expect(navigation.replace).toHaveBeenCalledWith('/schools/login');
-  });
+    const schools = renderHook(() => useSessionExpiry(), { wrapper: setup().wrapper });
+    await fail();
+    await waitFor(() => expect(schools.result.current.expired).toBe(true));
+    act(() => schools.result.current.logIn());
+    expect(navigation.replace).toHaveBeenLastCalledWith('/schools/login');
+    schools.unmount();
 
-  it("sends portal users to their portal's login by subdomain", async () => {
-    server.use(unauthorized());
     setUrl('http://parents.prepzy.test/dashboard');
-    renderHook(() => useSessionExpiryRedirect(), { wrapper: setup().wrapper });
-    await apiClient.get('/api/v4/student/account').catch(() => undefined);
-    expect(navigation.replace).toHaveBeenCalledWith('/parents/login');
+    const parents = renderHook(() => useSessionExpiry(), { wrapper: setup().wrapper });
+    await fail();
+    await waitFor(() => expect(parents.result.current.expired).toBe(true));
+    act(() => parents.result.current.logIn());
+    expect(navigation.replace).toHaveBeenLastCalledWith('/parents/login');
+    parents.unmount();
+
+    setUrl('http://parents.prepzy.test/login');
+    const login = renderHook(() => useSessionExpiry(), { wrapper: setup().wrapper });
+    await fail();
+    expect(login.result.current.expired).toBe(false);
   });
 
   it('stops listening after unmount', async () => {
     server.use(unauthorized());
-    const { unmount } = renderHook(() => useSessionExpiryRedirect(), { wrapper: setup().wrapper });
+    setUrl('http://localhost:3000/cbse/dashboard');
+    const { result, unmount } = renderHook(() => useSessionExpiry(), { wrapper: setup().wrapper });
     unmount();
-    await apiClient.get('/api/v4/student/account').catch(() => undefined);
-    expect(navigation.replace).not.toHaveBeenCalled();
+    await fail();
+    expect(result.current.expired).toBe(false);
   });
 });
 

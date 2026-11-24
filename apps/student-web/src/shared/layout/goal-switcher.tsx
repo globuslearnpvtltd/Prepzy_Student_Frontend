@@ -58,9 +58,9 @@ export interface GoalGroup {
 const formatDate = (iso: string) =>
   new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
 
-/** "Topper plan · Valid till 30 Apr 2027"; free plans: "Free plan". */
+/** "Topper plan · Valid till 30 Apr 2027"; free (0-month) plans: "Basic plan" (the Basic plan of the naming convention). */
 export function goalSubtitle(plan: ActivePlan): string {
-  if (plan.durationMonths === 0) return 'Free plan';
+  if (plan.durationMonths === 0) return 'Basic plan';
   const tier = `${planTier(plan)} plan`;
   const valid = plan.expiryDate && !Number.isNaN(new Date(plan.expiryDate).getTime());
   return valid ? `${tier} · Valid till ${formatDate(plan.expiryDate!)}` : tier;

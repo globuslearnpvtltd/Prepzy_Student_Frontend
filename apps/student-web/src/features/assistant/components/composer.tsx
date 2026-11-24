@@ -1,9 +1,8 @@
 'use client';
 
 import { cx } from '@prepzy/design-system';
-import { ArrowUp, Keyboard, Loader2, Mic, PenLine, Plus, Square, X } from 'lucide-react';
+import { ArrowUp, Keyboard, Loader2, PenLine, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useVoiceAnswer } from '@/features/exam-engine';
 import { InkPad, useInkDoc, useInkVersion } from '@/features/ink';
 import { userMessage } from '@/shared/lib/errors';
 import { MATH_SYMBOLS } from '@/shared/ui/math-symbols';
@@ -17,8 +16,6 @@ export interface ComposerProps {
   disabled?: boolean;
   /** "+" button: attach one photo. */
   allowImage?: boolean;
-  /** Mic button: speak the question (transcribed by the backend). */
-  allowVoice?: boolean;
   /**
    * Pen button: write the question by hand (finger, stylus, mouse, trackpad). The writing is sent as the
    * message's image, exactly like a photo, so nothing changes on the backend. Off unless asked for.
@@ -50,7 +47,6 @@ export function Composer({
   onSend,
   disabled,
   allowImage = true,
-  allowVoice = false,
   allowInk = false,
   inkDraftKey,
   inkTitle = 'Write your question',
@@ -147,11 +143,6 @@ export function Composer({
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [text]);
-
-  const voice = useVoiceAnswer(
-    (spoken) => setText((current) => (current ? `${current} ${spoken}` : spoken)),
-    (cause) => setError(userMessage(cause)),
-  );
 
   const canSend = !disabled && !preparing && (!!text.trim() || (imageOnly && (!!image || hasInk)));
   const submit = async () => {
@@ -334,23 +325,6 @@ export function Composer({
           {toolbarSlot}
           <span className="flex-1" />
           {onLiveChat && !inkFull && <LiveChatButton onClick={onLiveChat} active={liveActive} disabled={disabled || liveDisabled} />}
-          {allowVoice && voice.supported && !inkFull && (
-            <button
-              type="button"
-              aria-label={voice.state === 'recording' ? 'Stop recording' : 'Speak your question'}
-              className={cx(roundButton, voice.state === 'recording' && 'bg-danger-50 text-danger-600')}
-              disabled={disabled || voice.state === 'transcribing'}
-              onClick={() => (voice.state === 'recording' ? voice.stop() : void voice.start())}
-            >
-              {voice.state === 'transcribing' ? (
-                <Loader2 aria-hidden className="size-4 animate-spin" />
-              ) : voice.state === 'recording' ? (
-                <Square aria-hidden className="size-3.5" />
-              ) : (
-                <Mic aria-hidden className="size-4" />
-              )}
-            </button>
-          )}
           {(canSend || preparing) && (
             <button
               type="button"

@@ -4,7 +4,7 @@ import { cx } from '@prepzy/design-system';
 import { Circle, CircleCheck } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { userMessage } from '@/shared/lib/errors';
 import { useChangeLanguage, useCurrentLanguage, useMediumDialog, useMediumOptions } from '../hooks';
 import { mediumLabel } from '../names';
@@ -70,7 +70,7 @@ export function ChangeMediumDialog({ onClose }: { onClose: () => void }) {
     if (!selected || !canSwitch) return;
     change.mutate(selected.id, {
       onSuccess: (language) => {
-        toast.success(`Switched to ${mediumLabel(language.name).native}`);
+        notify.success(`Switched to ${mediumLabel(language.name).native}`);
         onClose();
       },
     });

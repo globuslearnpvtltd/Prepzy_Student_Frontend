@@ -9,7 +9,10 @@ import { useMemo } from 'react';
 const MATH_PATTERN = /\$[^$]+\$|\\\(|\\\[/;
 
 const MATHJAX_CONFIG = {
+  loader: { load: ['[tex]/mathtools'] },
   tex: {
+    packages: { '[+]': ['mathtools'] },
+    macros: { cosec: '\\operatorname{cosec}' },
     inlineMath: [
       ['$', '$'],
       ['\\(', '\\)'],
@@ -27,10 +30,12 @@ const MathHtml = dynamic(
   () =>
     import('better-react-mathjax').then(({ MathJax, MathJaxContext }) => {
       function MathHtmlImpl({ html, className }: { html: string; className?: string }) {
+        const inner = useMemo(() => ({ __html: html }), [html]);
         return (
           <MathJaxContext config={MATHJAX_CONFIG}>
             <MathJax dynamic hideUntilTypeset="first">
-              <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
+              {/* <div className={className} dangerouslySetInnerHTML={{ __html: html }} /> */}
+              <div className={className} dangerouslySetInnerHTML={inner} />
             </MathJax>
           </MathJaxContext>
         );
@@ -46,11 +51,13 @@ export function RichText({ html, className }: { html: string | null | undefined;
     () => (html && typeof window !== 'undefined' ? DOMPurify.sanitize(html, { USE_PROFILES: { html: true } }) : ''),
     [html],
   );
+  const inner = useMemo(() => ({ __html: clean }), [clean]);
   if (!clean) return null;
   const classes = cx('rich-text', className);
   return MATH_PATTERN.test(clean) ? (
     <MathHtml html={clean} className={classes} />
   ) : (
-    <div className={classes} dangerouslySetInnerHTML={{ __html: clean }} />
+    // <div className={classes} dangerouslySetInnerHTML={{ __html: clean }} />
+    <div className={classes} dangerouslySetInnerHTML={inner} />
   );
 }

@@ -19,6 +19,7 @@ import {
   NcertQuestionsScreen,
 } from './ui';
 import { testExam } from '@/test/exams';
+import { restrictFeatures } from '@/test/feature-access';
 
 const cbse = testExam('cbse');
 const ok = (data: unknown) => HttpResponse.json({ success: true, data });
@@ -165,6 +166,39 @@ describe('Chapter page', () => {
     expect(within(drawer).getByRole('link', { name: /The Human Eye/ })).toHaveAttribute('href', '/cbse/learn/5/3');
     expect(within(drawer).getByRole('link', { name: 'Mid Term' })).toHaveAttribute('href', '/cbse/tests/mid/90');
     fireEvent.keyDown(document, { key: 'Escape' });
+  });
+
+  it('padlocks the cards of features the institute switched off', async () => {
+    server.use(
+      outline,
+      chapter(
+        [
+          { category: 'lecture', id: 8, title: 'mirrors and images', isCompleted: true },
+          { category: 'assessment', id: 20, type: 'quiz', title: 'mirror quiz' },
+          { category: 'assessment', id: 21, type: 'unit_test', title: 'unit test 1' },
+        ],
+        [
+          { type: 'video', id: 31, student_side_active: 1 },
+          { type: 'notes', id: 32, student_side_active: 1 },
+        ],
+      ),
+      http.get(`${API}/api/v4/learn/modules/2/pyqs`, () => ok({ questions })),
+      http.get(`${API}/api/v4/learn/modules/2/ncert-questions/count`, () => ok({ total: 1 })),
+      restrictFeatures('video_lectures', 'summary_videos', 'unit_test', 'chapter_pyq'),
+    );
+    renderWithProviders(<ModuleScreen courseId="5" moduleId="2" />, { exam: cbse });
+    const locked = (name: RegExp) => screen.findByRole('button', { name });
+    expect(await locked(/^Video Lecture: Mirrors and Images \(not available/)).toHaveAttribute('aria-disabled', 'true');
+    expect(await locked(/^Summary Video: Summary \(not available/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Mirrors and Images/ })).not.toBeInTheDocument();
+    // Quizzes and notes stay open.
+    expect(screen.getByRole('link', { name: /Mirror Quiz/ })).toHaveAttribute('href', '/cbse/tests/quiz/20');
+    expect(screen.getByRole('link', { name: /Chapter Notes/ })).toHaveAttribute('href', '/cbse/notes/5?module_id=2');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Practice' }));
+    expect(await locked(/^Unit Test: Unit Test 1 \(not available/)).toBeInTheDocument();
+    expect(await locked(/^Chapter PYQ's: 2 board questions/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /1 question with solutions/ })).toBeInTheDocument();
   });
 
   it('opens on Practice from ?tab=practice and shows empty states', async () => {

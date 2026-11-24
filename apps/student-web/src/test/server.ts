@@ -12,4 +12,9 @@ export const EXAM_CATALOG = [
 /** Mock backend for tests. Each test adds the handlers it needs with server.use(...). */
 export const server = setupServer(
   http.get(`${API}/api/v4/exams`, () => HttpResponse.json({ success: true, message: 'Exams fetched', data: EXAM_CATALOG })),
+  // Institute feature restrictions (?class_id= optional): nothing restricted unless a test says otherwise
+  // (features/feature-access; restrictFeatures / restrictFeatures.perClass in src/test/feature-access.ts).
+  http.get(`${API}/api/v4/feature-access/:category/:examId`, () =>
+    HttpResponse.json({ success: true, message: 'Feature access fetched', data: { restricted: [] } }),
+  ),
 );

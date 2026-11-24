@@ -15,6 +15,8 @@ import { CompletedDialog, SubmitDialog, SubmittingScreen } from './submit-flow';
 import { TestHub } from './test-hub';
 import { TestSets } from './test-sets';
 import { testExam } from '@/test/exams';
+import { useFeatureRestrictedDialog } from '@/features/feature-access';
+import { restrictFeatures } from '@/test/feature-access';
 
 vi.mock('@/features/assistant/ui', () => ({
   ReviewChat: ({ onClose, context }: { onClose: () => void; context: { questionId: string; attemptId: string } }) => (
@@ -630,5 +632,37 @@ describe('submit flow', () => {
     expect(screen.getAllByText('—')).toHaveLength(2);
     expect(screen.queryByText('Partially Correct')).not.toBeInTheDocument();
     expect(screen.queryByText(/Total Questions/)).not.toBeInTheDocument();
+  });
+});
+
+describe('ResultView: institute restrictions', () => {
+  it('padlocks "Discuss with Vedica" when the review chat is switched off', async () => {
+    useFeatureRestrictedDialog.setState({ open: false, feature: null });
+    server.use(
+      restrictFeatures('review_chat'),
+      http.get(`${API}/api/v4/assessments/competitive/2/mock/attempts/:attemptId/result`, () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            summary: { name: 'Full mock 1', total_marks: 4, total_marks_obtained: 4, set_id: 4 },
+            questions: [
+              {
+                question_id: 1,
+                question_text: 'Q1',
+                options: [{ option_id: 5, text: 'A' }],
+                selected_option_id: 5,
+                correct_option_id: 5,
+                is_correct: true,
+              },
+            ],
+          },
+        }),
+      ),
+    );
+    renderWithProviders(<ResultView testType="mock" attemptId="77" />, { exam: neet });
+    const locked = await screen.findByRole('button', { name: 'Discuss with Vedica (not available)' });
+    await userEvent.click(locked);
+    expect(useFeatureRestrictedDialog.getState()).toMatchObject({ open: true, feature: 'review_chat' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

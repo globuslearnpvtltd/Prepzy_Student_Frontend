@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { DEFAULT_EXAM, examSlugOf, type ExamConfig } from '@/shared/config/exams';
+import { DEFAULT_EXAM, examSlugOf, type ExamConfig, type ExamRef } from '@/shared/config/exams';
 import { portalForHost, portalForPath } from '@/shared/config/portals';
 import { routes } from '@/shared/config/routes';
 import { onApiEvent } from '@/shared/lib/api-client';
@@ -64,6 +64,23 @@ export function usePlans(exam: ExamConfig) {
 export function pickActivePlan(plans: ActivePlan[], selectedId: number | null): ActivePlan | null {
   const active = plans.filter((plan) => plan.status === 'active');
   return active.find((plan) => plan.planId === selectedId) ?? active[0] ?? null;
+}
+
+/**
+ * The class on screen: the student's current plan for the exam (the class picked in the goal switcher, else the first
+ * active one; same query and cache as useActivePlan). `settled` is false while the plans load. Used by the medium
+ * (features/language) and the institute feature locks (features/feature-access).
+ */
+export function useScreenClass(exam: Partial<ExamRef> | null): { plan: ActivePlan | null; settled: boolean } {
+  const ready = typeof exam?.examId === 'number';
+  const selectedId = usePlanSelection((state) => state.planId);
+  const plans = useQuery({
+    queryKey: authKeys.plans(ready ? exam!.examId! : 0),
+    queryFn: () => authApi.activePlans(exam!.examId!),
+    staleTime: 5 * 60_000,
+    enabled: ready,
+  });
+  return { plan: pickActivePlan(plans.data ?? [], selectedId), settled: !ready || !plans.isPending };
 }
 
 /** The student's current plan for an exam: the class they picked in the class switcher, or the first active one. */

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useState } from 'react';
+import { FeatureLock } from '@/features/feature-access/ui';
 import type { ExamCategory, TestTypeKey } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
@@ -116,17 +117,25 @@ function DiscussCard({ question }: { question: ResultQuestion }) {
         <p className={cx('text-md font-semibold', c.tone)}>{c.title}</p>
         <p className="text-foreground-muted text-xs">{c.text}</p>
       </div>
-      {ids?.assessmentId ? (
-        <button type="button" onClick={() => setOpen(true)} className={discussButton}>
-          <MessageSquare aria-hidden className="size-5" />
-          Discuss with Vedica
-        </button>
-      ) : (
-        <Link href={routes.doubtSolver(exam.slug)} className={discussButton}>
-          <MessageSquare aria-hidden className="size-5" />
-          Discuss with Vedica
-        </Link>
-      )}
+      {/* The review chat (and its live voice) or, without a paper id, the solver: the institute may switch it off. */}
+      <FeatureLock
+        feature={ids?.assessmentId ? 'review_chat' : 'doubt_solver'}
+        label="Discuss with Vedica"
+        className="shrink-0"
+        badge="edge"
+      >
+        {ids?.assessmentId ? (
+          <button type="button" onClick={() => setOpen(true)} className={discussButton}>
+            <MessageSquare aria-hidden className="size-5" />
+            Discuss with Vedica
+          </button>
+        ) : (
+          <Link href={routes.doubtSolver(exam.slug)} className={discussButton}>
+            <MessageSquare aria-hidden className="size-5" />
+            Discuss with Vedica
+          </Link>
+        )}
+      </FeatureLock>
       {open && ids?.assessmentId && (
         <ReviewChat
           open

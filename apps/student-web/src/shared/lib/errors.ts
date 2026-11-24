@@ -27,6 +27,11 @@ export class ApiError extends Error {
     return this.status === 429 && this.code !== 'TOO_MANY_REQUESTS';
   }
 
+  /** The student's institute switched this feature off (403 FEATURE_RESTRICTED); not a plan limit. */
+  get isFeatureRestricted() {
+    return this.status === 403 && this.code === 'FEATURE_RESTRICTED';
+  }
+
   /** Network failures and 5xx are worth retrying; 4xx are not. */
   get isRetryable() {
     return this.status === 0 || this.status >= 500;
@@ -34,6 +39,9 @@ export class ApiError extends Error {
 }
 
 export const isApiError = (error: unknown): error is ApiError => error instanceof ApiError;
+
+/** A 403 FEATURE_RESTRICTED: the institute switched the feature off (see features/feature-access). */
+export const isFeatureRestricted = (error: unknown): error is ApiError => isApiError(error) && error.isFeatureRestricted;
 
 /** A message that is safe to show to the user. */
 /** Server errors whose message is written for students (others may describe internals, so they get the fallback). */

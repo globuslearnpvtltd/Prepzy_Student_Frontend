@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ContinueAssessment, SolverDiscovery, SyllabusCards } from '@/features/dashboard';
 import { useTestContext } from '@/features/exam-engine';
+import { RESTRICTED_COPY, showFeatureRestricted, useFeatureAccess, type RestrictableFeature } from '@/features/feature-access';
+import { FeatureLock, LockBadge } from '@/features/feature-access/ui';
 import { titleCase } from '@/features/learn';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
@@ -38,14 +40,19 @@ const setsRoute = (kind: BoardPaperKind, exam: string, subjectId: string) =>
 /** Board Assessments hub (previous app's [exam]/(dashboard)/assessments). */
 export function BoardAssessments() {
   const [sheet, setSheet] = useState<'create' | 'saved' | null>(null);
-  // Study-plan tasks link here with ?open=custom-test to open the builder straight away (as before).
+  const access = useFeatureAccess();
+  const customLocked = access.isRestricted('custom_exam');
+  // Study-plan tasks link here with ?open=custom-test to open the builder straight away (as before), unless the
+  // institute switched custom tests off (then the dialog says so).
   useEffect(() => {
+    if (access.isLoading) return;
     const url = new URL(window.location.href);
     if (url.searchParams.get('open') !== 'custom-test') return;
-    setSheet('create');
+    if (customLocked) showFeatureRestricted('custom_exam');
+    else setSheet('create');
     url.searchParams.delete('open');
     window.history.replaceState(window.history.state, '', url.pathname + url.search);
-  }, []);
+  }, [access.isLoading, customLocked]);
   return (
     <div className="flex flex-col gap-5 md:flex-row">
       <div className="flex w-full flex-col gap-[30px] md:w-[70%] md:gap-10">
@@ -66,20 +73,24 @@ export function BoardAssessments() {
             <p className="text-sm">Select specific chapters and topics (e.g., 4-5 topics) to build a dynamic test.</p>
           </div>
           <div className="flex flex-col gap-5 md:flex-row">
-            <button
-              type="button"
-              onClick={() => setSheet('create')}
-              className="bg-brand text-on-brand flex w-full items-center justify-center rounded-2xl px-6 py-4 text-sm font-semibold"
-            >
-              Customize Test
-            </button>
-            <button
-              type="button"
-              onClick={() => setSheet('saved')}
-              className="border-brand text-brand bg-surface flex w-full items-center justify-center rounded-2xl border px-6 py-4 text-sm font-semibold"
-            >
-              Saved Tests
-            </button>
+            <FeatureLock feature="custom_exam" label="Customize Test" badge="edge" className="w-full">
+              <button
+                type="button"
+                onClick={() => setSheet('create')}
+                className="bg-brand text-on-brand flex w-full items-center justify-center rounded-2xl px-6 py-4 text-sm font-semibold"
+              >
+                Customize Test
+              </button>
+            </FeatureLock>
+            <FeatureLock feature="custom_exam" label="Saved Tests" badge="edge" className="w-full">
+              <button
+                type="button"
+                onClick={() => setSheet('saved')}
+                className="border-brand text-brand bg-surface flex w-full items-center justify-center rounded-2xl border px-6 py-4 text-sm font-semibold"
+              >
+                Saved Tests
+              </button>
+            </FeatureLock>
           </div>
           <BoardCustomTestBuilder open={sheet === 'create'} onOpenChange={(open) => setSheet(open ? 'create' : null)} />
           <BoardSavedTests
@@ -110,14 +121,25 @@ export function BoardAssessments() {
   );
 }
 
+const KIND_FEATURE: Record<BoardPaperKind, RestrictableFeature> = { mock: 'mock_exam', pyq: 'pyq_exam' };
+
 function FullLengthExams() {
   const exam = useExam();
   const { context } = useTestContext();
-  const [kind, setKind] = useState<BoardPaperKind>('mock');
+  const { isRestricted } = useFeatureAccess();
+  const [picked, setKind] = useState<BoardPaperKind>('mock');
+  // A tab the institute switched off can't be the open one (the other opens first when only one is allowed).
+  const kind: BoardPaperKind =
+    isRestricted(KIND_FEATURE[picked]) && !isRestricted(KIND_FEATURE[picked === 'mock' ? 'pyq' : 'mock'])
+      ? picked === 'mock'
+        ? 'pyq'
+        : 'mock'
+      : picked;
+  const kindLocked = isRestricted(KIND_FEATURE[kind]);
   const subjects = useQuery({
     queryKey: ['test-library', exam.slug, 'board-subjects', kind, context?.classId],
     queryFn: () => libraryApi.boardSubjects(exam, context!.classId, kind),
-    enabled: !!context,
+    enabled: !!context && !kindLocked,
   });
   const copy = KIND_COPY[kind];
   return (
@@ -130,21 +152,27 @@ function FullLengthExams() {
         aria-label="Exam type"
         className="border-neutral-150 bg-surface grid grid-cols-2 gap-2 rounded-[20px] border-2 p-2"
       >
-        {(['mock', 'pyq'] as const).map((k) => (
-          <button
-            key={k}
-            type="button"
-            role="tab"
-            aria-selected={kind === k}
-            onClick={() => setKind(k)}
-            className={cx(
-              'rounded-[14px] py-3 text-[16px] font-medium md:text-lg',
-              kind === k ? 'border-brand bg-brand-150 text-brand border-2' : 'text-neutral-900',
-            )}
-          >
-            {KIND_COPY[k].tab}
-          </button>
-        ))}
+        {(['mock', 'pyq'] as const).map((k) => {
+          const locked = isRestricted(KIND_FEATURE[k]);
+          return (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={kind === k}
+              aria-disabled={locked || undefined}
+              onClick={() => (locked ? showFeatureRestricted(KIND_FEATURE[k]) : setKind(k))}
+              className={cx(
+                'flex items-center justify-center gap-2 rounded-[14px] py-3 text-[16px] font-medium md:text-lg',
+                kind === k ? 'border-brand bg-brand-150 text-brand border-2' : 'text-neutral-900',
+                locked && 'cursor-not-allowed opacity-60',
+              )}
+            >
+              {KIND_COPY[k].tab}
+              {locked && <LockBadge />}
+            </button>
+          );
+        })}
       </div>
       <div className="border-brand bg-surface flex items-center gap-6 rounded-[20px] border-2 border-l-8 p-6">
         <span className="border-neutral-150 flex size-[79px] shrink-0 items-center justify-center rounded-full border-2">
@@ -155,7 +183,9 @@ function FullLengthExams() {
           <p className="text-sm font-medium text-neutral-900">{copy.text(exam.label)}</p>
         </div>
       </div>
-      {subjects.isPending ? (
+      {kindLocked ? (
+        <EmptyState title={RESTRICTED_COPY.screenTitle} text={RESTRICTED_COPY.screen} />
+      ) : subjects.isPending ? (
         <GridSkeleton />
       ) : subjects.isError ? (
         <LoadError error={subjects.error} />

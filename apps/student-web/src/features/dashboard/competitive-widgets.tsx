@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useCurrentUser } from '@/features/auth';
+import { FeatureLock } from '@/features/feature-access/ui';
 import { routes } from '@/shared/config/routes';
 import { useLiveDpp } from '@/shared/layout/shell-api';
 import { ProgressRing } from '@/shared/ui/charts';
@@ -283,17 +284,21 @@ export function TodaysDpp() {
         </>
       )}
 
-      {/* Start button */}
+      {/* Start button (locked when the institute switched daily practice off) */}
+      <div className="mt-2 sm:mt-6">
+      <FeatureLock feature="practice_dpp" label="Today's DPP" badge="edge">
       <Link
         href={href}
         aria-disabled={loading || query.isError || undefined}
         className={cx(
-          'bg-brand hover:bg-dpp-hover active:bg-dpp-active text-on-brand mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-1.5 text-md font-bold transition-colors sm:mt-6 sm:py-3',
+          'bg-brand hover:bg-dpp-hover active:bg-dpp-active text-on-brand flex w-full items-center justify-center gap-2 rounded-xl py-1.5 text-md font-bold transition-colors sm:py-3',
           (loading || query.isError) && 'pointer-events-none cursor-not-allowed opacity-50',
         )}
       >
         {dpp || loading ? action : 'Open Daily Practice'}
       </Link>
+      </FeatureLock>
+      </div>
     </section>
   );
 }
@@ -326,12 +331,16 @@ export function AskSocrates() {
           <p className="text-on-brand/75 mt-3 text-[13px] sm:mt-4 sm:text-[14px]">
             Solve NEET questions with clear, step-by-step explanations and instant concept guidance.
           </p>
-          <Link
-            href={routes.doubtSolver(exam.slug)}
-            className="from-accent-300 to-accent-700 text-on-brand mt-6 inline-flex w-full items-center justify-center rounded-[13px] bg-linear-to-b px-6 py-2.5 text-[15px] font-semibold shadow-cta-dark"
-          >
-            Start Solving
-          </Link>
+          <div className="mt-6 w-full">
+          <FeatureLock feature="doubt_solver" label="Start Solving" badge="edge">
+            <Link
+              href={routes.doubtSolver(exam.slug)}
+              className="from-accent-300 to-accent-700 text-on-brand inline-flex w-full items-center justify-center rounded-[13px] bg-linear-to-b px-6 py-2.5 text-[15px] font-semibold shadow-cta-dark"
+            >
+              Start Solving
+            </Link>
+          </FeatureLock>
+          </div>
         </div>
         <div className="relative hidden items-center md:flex" aria-hidden="true">
           <div className="w-full space-y-3">

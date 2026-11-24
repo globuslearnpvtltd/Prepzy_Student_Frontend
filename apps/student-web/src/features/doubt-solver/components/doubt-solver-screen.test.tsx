@@ -69,7 +69,10 @@ describe('DoubtSolverScreen navigation', () => {
     server.use(plan);
     useSolver.getState().chooseBook(physicsBook);
     navigation.searchParams = new URLSearchParams('step=start');
-    const { unmount } = renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    const first = renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    // Let the plan and access queries settle first: a late re-render would re-read the mocked URL mid-test.
+    await waitFor(() => expect(first.queryClient.isFetching()).toBe(0));
+    const { unmount } = first;
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(navigation.replace).toHaveBeenLastCalledWith('/cbse/doubt-solver');
     navigation.searchParams = new URLSearchParams('step=start');
@@ -114,7 +117,8 @@ describe('DoubtSolverScreen navigation', () => {
 
     // Opened directly (a shared link): no history to go back to, so the start options.
     navigation.searchParams = new URLSearchParams('step=question-bank');
-    renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    const { queryClient } = renderWithProviders(<DoubtSolverScreen />, { exam: cbse });
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
     await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
     expect(navigation.replace).toHaveBeenLastCalledWith('/cbse/doubt-solver?step=start');
     await userEvent.click(screen.getByTitle('Change subject'));

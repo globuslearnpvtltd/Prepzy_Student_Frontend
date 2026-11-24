@@ -5,6 +5,8 @@ import { Play } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useActivePlan } from '@/features/auth';
+import { RESTRICTED_COPY, showFeatureRestricted, useFeatureAccess } from '@/features/feature-access';
+import { LockBadge } from '@/features/feature-access/ui';
 import { LiveVoiceLayer, LiveVoiceProvider, useLiveVoice, type VoiceConfig } from '@/features/live-voice';
 import type { ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
@@ -69,26 +71,33 @@ export function ChatLauncher({
   image,
   onOpen,
   className,
+  locked = false,
 }: {
   label: string;
   image?: string | null;
   onOpen: () => void;
   className?: string;
+  /** The institute switched this chat off: dimmed, no ripple, a padlock; `onOpen` should explain (dialog). */
+  locked?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
+      aria-disabled={locked || undefined}
+      title={locked ? RESTRICTED_COPY.tooltip : undefined}
       onClick={onOpen}
       className={cx(
-        'chat-wave bg-brand shadow-brand-glow fixed right-6 bottom-[80px] z-10 size-[60px] rounded-full md:right-10 md:bottom-10',
+        'bg-brand shadow-brand-glow fixed right-6 bottom-[80px] z-10 size-[60px] rounded-full md:right-10 md:bottom-10',
+        locked ? 'cursor-not-allowed' : 'chat-wave',
         className,
       )}
     >
-      <span className="block size-full overflow-hidden rounded-full">
+      <span className={cx('block size-full overflow-hidden rounded-full', locked && 'opacity-60 grayscale')}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={image ?? ATLAS_IMAGE} alt="" className="size-full object-cover object-top" />
       </span>
+      {locked && <LockBadge size="sm" className="absolute -top-1 -right-1" />}
     </button>
   );
 }
@@ -103,14 +112,26 @@ export function AtlasHost() {
   const pathname = usePathname() ?? '';
   const params = useSearchParams();
   const { open, expanded, askSheet, openAtlas, close, setExpanded, setAskSheet } = useAtlas();
+  const access = useFeatureAccess(exam);
+  const atlasLocked = access.isRestricted('atlas_chat');
+  const solverLocked = access.isRestricted('doubt_solver');
 
+  // `?atlas=1` opens Atlas once the access list is known; it's dropped (ignored) when the institute switched Atlas off.
   useEffect(() => {
-    if (params?.get('atlas') !== '1') return;
-    openAtlas();
+    if (params?.get('atlas') !== '1' || access.isLoading) return;
+    if (!atlasLocked) openAtlas();
     const next = new URLSearchParams(params.toString());
     next.delete('atlas');
     router.replace(next.size ? `${pathname}?${next}` : pathname, { scroll: false });
-  }, [params, pathname, router, openAtlas]);
+  }, [params, pathname, router, openAtlas, access.isLoading, atlasLocked]);
+
+  // Any other way of opening Atlas (open-Atlas event, a "Use Atlas" link …) explains the lock instead.
+  useEffect(() => {
+    if (open && atlasLocked) {
+      close();
+      showFeatureRestricted('atlas_chat');
+    }
+  }, [open, atlasLocked, close]);
 
   useEffect(() => {
     window.addEventListener(OPEN_ATLAS_EVENT, openAtlas);
@@ -138,8 +159,12 @@ export function AtlasHost() {
   return (
     // The provider lives here so a live talk keeps running while the student moves between pages.
     <LiveVoiceProvider config={voiceConfig}>
-      <AtlasLiveLauncher show={launcher && !open} onOpen={openAtlas} />
-      <ChatOverlay open={open} expanded={expanded} onClose={close}>
+      {atlasLocked ? (
+        launcher && <ChatLauncher label="Ask Atlas" locked onOpen={() => showFeatureRestricted('atlas_chat')} />
+      ) : (
+        <AtlasLiveLauncher show={launcher && !open} onOpen={openAtlas} />
+      )}
+      <ChatOverlay open={open && !atlasLocked} expanded={expanded} onClose={close}>
         <AtlasPanel exam={exam} surface={DASHBOARD} expanded={expanded} onExpand={setExpanded} onClose={close} />
       </ChatOverlay>
       <LiveVoiceLayer chatOpen={open} onOpenChat={openAtlas} expanded={expanded} />
@@ -147,6 +172,7 @@ export function AtlasHost() {
       {askSheet && (
         <AskOptionsSheet
           exam={exam}
+          locked={{ atlas: atlasLocked, socrates: solverLocked }}
           onClose={() => setAskSheet(false)}
           onAtlas={openAtlas}
           onSocrates={() => {
@@ -200,11 +226,14 @@ export function AskOptionsSheet({
   onClose,
   onAtlas,
   onSocrates,
+  locked = {},
 }: {
   exam: ExamConfig;
   onClose: () => void;
   onAtlas: () => void;
   onSocrates: () => void;
+  /** Options the student's institute switched off: shown with a padlock, a click explains why. */
+  locked?: { atlas?: boolean; socrates?: boolean };
 }) {
   const [video, setVideo] = useState(false);
   return (
@@ -221,13 +250,27 @@ export function AskOptionsSheet({
           Two ways to solve, in any subject.
         </p>
         <div className="mt-[34px] grid grid-cols-2 gap-2.5">
-          {OPTIONS.map((option) => (
+          {OPTIONS.map((option) => {
+            const isLocked = !!locked[option.key];
+            return (
             <button
               key={option.key}
               type="button"
-              onClick={option.key === 'atlas' ? onAtlas : onSocrates}
-              className="border-socrates-line flex flex-col rounded-[18px] border p-2 text-left transition-transform active:scale-[0.98]"
+              onClick={
+                isLocked
+                  ? () => showFeatureRestricted(option.key === 'atlas' ? 'atlas_chat' : 'doubt_solver')
+                  : option.key === 'atlas'
+                    ? onAtlas
+                    : onSocrates
+              }
+              aria-disabled={isLocked || undefined}
+              title={isLocked ? RESTRICTED_COPY.tooltip : undefined}
+              className={cx(
+                'border-socrates-line relative flex flex-col rounded-[18px] border p-2 text-left transition-transform active:scale-[0.98]',
+                isLocked && 'cursor-not-allowed opacity-60',
+              )}
             >
+              {isLocked && <LockBadge className="absolute top-3 right-3 z-[1]" />}
               <div className="relative h-[96px] w-full" style={{ clipPath: 'inset(-80px 0 0 0 round 0 0 14px 14px)' }}>
                 <div className="from-socrates-panel-from to-socrates-panel-to absolute inset-0 rounded-[14px] bg-linear-to-b" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -255,7 +298,8 @@ export function AskOptionsSheet({
                 </div>
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
         {video ? (
           <p className="text-socrates-muted mt-3 text-center text-[12px]">

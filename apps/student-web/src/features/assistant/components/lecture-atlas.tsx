@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useActivePlan } from '@/features/auth';
+import { showFeatureRestricted, useFeatureAccess } from '@/features/feature-access';
 import { LiveVoiceLayer, LiveVoiceProvider, useLiveVoice, type VoiceConfig } from '@/features/live-voice';
 import { useExam } from '@/shared/hooks/use-exam';
 import { assistantApi, type AtlasSurface } from '../api';
@@ -36,10 +37,14 @@ export function LectureAtlas({ courseId, moduleId, lectureId, children, onActivi
     () => ({ kind: 'lecture', courseId: Number(courseId), moduleId: toNumber(moduleId), lectureId: toNumber(lectureId) }),
     [courseId, moduleId, lectureId],
   );
+  // The institute may switch the lecture tutor (and its live voice) off: then a locked launcher explains why.
+  const access = useFeatureAccess(exam);
+  const locked = access.isRestricted('lecture_chat');
   const avatar = useQuery({
     queryKey: atlasKeys.avatar(exam.slug, surface),
     queryFn: () => assistantApi.avatar(exam, surface),
     staleTime: Infinity,
+    enabled: !access.isLoading && !locked,
   });
   const plan = useActivePlan(exam);
   // Board lectures: course + lecture. NEET video steps: course + module (chapter); class_id feeds the meter.
@@ -54,6 +59,15 @@ export function LectureAtlas({ courseId, moduleId, lectureId, children, onActivi
     setOpen(false);
     setExpanded(false);
   };
+  if (locked) {
+    const explain = () => showFeatureRestricted('lecture_chat');
+    return (
+      <>
+        {children?.(explain)}
+        <ChatLauncher label={`Ask ${avatar.data?.name ?? 'your tutor'}`} image={avatar.data?.image} locked onOpen={explain} />
+      </>
+    );
+  }
   return (
     // Leaving the lecture unmounts the provider, which hangs up (and saves) a running call.
     <LiveVoiceProvider config={voiceConfig}>

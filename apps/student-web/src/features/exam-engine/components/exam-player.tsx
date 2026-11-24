@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { FeatureDisabledScreen } from '@/features/feature-access/ui';
 import type { TestTypeKey } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { PageSpinner, StatusScreen } from '@/shared/layout/status-screens';
-import { isApiError, userMessage } from '@/shared/lib/errors';
+import { isApiError, isFeatureRestricted, userMessage } from '@/shared/lib/errors';
 import type { TestAdapter } from '../adapters';
 import { countStatuses } from '../attempt';
 import { useAdapter, useCountdown, useExamAttempt, useExamSession, useTestContext } from '../hooks';
@@ -47,6 +48,8 @@ export function ExamPlayer({ testType, setId }: { testType: TestTypeKey; setId: 
   if (!context)
     return <StatusScreen title="No active plan" description="You need an active plan to take this test." action={back} />;
   if (session.error instanceof AlreadySubmittedError) return <PageSpinner label="Opening your result" />;
+  // The institute switched this test type off (e.g. unit tests but not quizzes, which share the route).
+  if (session.isError && isFeatureRestricted(session.error)) return <FeatureDisabledScreen />;
   if (session.isError) {
     const limited = isApiError(session.error) && session.error.isRateLimited;
     return (

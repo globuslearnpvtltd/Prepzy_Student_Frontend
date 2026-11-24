@@ -1,5 +1,7 @@
 'use client';
 
+import type { RestrictableFeature } from '@/features/feature-access';
+import { FeatureLock } from '@/features/feature-access/ui';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import type { Journey, JourneyState } from '../api';
@@ -26,6 +28,9 @@ const lines = (...bodyLines: string[]) => ({ body: bodyLines.join(' '), bodyLine
 
 /** States the previous app drew as the notebook artwork (desktop DiagnosticCardArt, phone MobileNotebookCard). */
 const NOTEBOOK_STATES = new Set<JourneyState>(['take_diagnostic', 'resume_diagnostic', 'plan_ended']);
+
+/** States whose main step is the diagnostic test (the rest open the study plan). */
+const DIAGNOSTIC_STATES = new Set<JourneyState>(['take_diagnostic', 'resume_diagnostic']);
 
 /** Slim cards: shell A (inline on phones) for task counts, shell B (stacked on phones) for the rest. */
 const SLIM_A = new Set<JourneyState>(['tasks_partial', 'tasks_done', 'catch_up']);
@@ -203,9 +208,13 @@ export function JourneyCard({ className }: { className?: string }) {
     );
   })();
 
+  // The card's main step (diagnostic test or study plan) may be switched off by the student's institute.
+  const feature: RestrictableFeature = DIAGNOSTIC_STATES.has(state) ? 'diagnostic_test' : 'study_plan';
   return (
     <section aria-label="Your study journey" className={className}>
-      {body}
+      <FeatureLock feature={feature} label={copy.cta}>
+        {body}
+      </FeatureLock>
     </section>
   );
 }

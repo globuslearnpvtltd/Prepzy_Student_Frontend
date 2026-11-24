@@ -6,6 +6,8 @@ import { BookOpenCheck, Check, ChevronRight, ClipboardList, Download, FileClock,
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
+import { assessmentFeature, type RestrictableFeature } from '@/features/feature-access';
+import { FeatureLock } from '@/features/feature-access/ui';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { activityHref, assessmentLabel, formatTitle, learnApi, type ChapterQuestion } from '../api';
@@ -33,6 +35,7 @@ function ItemCard({
   label,
   title,
   trailing,
+  feature,
 }: {
   href: string;
   icon: ReactNode;
@@ -40,9 +43,12 @@ function ItemCard({
   label: string;
   title: string;
   trailing?: ReactNode;
+  /** The institute may switch this kind of item off (padlock, dialog on click). */
+  feature?: RestrictableFeature | null;
 }) {
   return (
     <li className="w-full">
+      <FeatureLock feature={feature} label={`${label}: ${title}`}>
       <Link
         href={href}
         className="group border-learn-card bg-surface flex w-full items-center justify-between gap-3 rounded-xl border-[1.5px] p-3.5 shadow-card transition-shadow hover:shadow-lg md:p-5"
@@ -70,6 +76,7 @@ function ItemCard({
         </span>
         {trailing}
       </Link>
+      </FeatureLock>
     </li>
   );
 }
@@ -116,6 +123,7 @@ export function ModuleScreen({ courseId, moduleId }: { courseId: string; moduleI
           href={activityHref(exam.slug, courseId, { category: 'assessment', id: item.id, moduleId, type: item.type })}
           icon={<ClipboardList aria-hidden className={iconSize} />}
           tone="quiz"
+          feature={assessmentFeature(item.type)}
           label={assessmentLabel(item.type)}
           title={formatTitle(item.title)}
           trailing={
@@ -130,6 +138,7 @@ export function ModuleScreen({ courseId, moduleId }: { courseId: string; moduleI
           href={routes.lecture(exam.slug, courseId, moduleId, item.id)}
           icon={<Video aria-hidden className={iconSize} />}
           tone="brand"
+          feature="video_lectures"
           label="Video Lecture"
           title={formatTitle(item.title)}
           trailing={
@@ -180,6 +189,7 @@ export function ModuleScreen({ courseId, moduleId }: { courseId: string; moduleI
               href={routes.chapterPyqs(exam.slug, courseId, moduleId)}
               icon={<FileClock aria-hidden className={iconSize} />}
               tone="quiz"
+              feature="chapter_pyq"
               label="Chapter PYQ's"
               title={pyqSummary(pyqs.data ?? [])}
             />
@@ -202,6 +212,7 @@ export function ModuleScreen({ courseId, moduleId }: { courseId: string; moduleI
                   href={notes ? routes.notesView(exam.slug, courseId, moduleId) : routes.summaryVideo(exam.slug, summary.id)}
                   icon={notes ? <FileText aria-hidden className={iconSize} /> : <Film aria-hidden className={iconSize} />}
                   tone="brand"
+                  feature={notes ? 'notes' : 'summary_videos'}
                   label={notes ? 'Chapter Notes' : 'Summary Video'}
                   title={notes ? 'Chapter notes' : 'Summary'}
                   trailing={

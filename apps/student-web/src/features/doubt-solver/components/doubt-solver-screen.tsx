@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useActivePlan } from '@/features/auth';
 import { Drawer, HistoryList } from '@/features/assistant/ui';
+import { useFeatureGuard } from '@/features/feature-access';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { stripDiagrams, type SolvePayload } from '../api';
@@ -53,6 +54,7 @@ function useHydrated() {
 export function DoubtSolverScreen() {
   const exam = useExam();
   const router = useRouter();
+  const { guard } = useFeatureGuard();
   const params = useSearchParams();
   const hydrated = useHydrated();
   const plan = useActivePlan(exam);
@@ -167,7 +169,7 @@ export function DoubtSolverScreen() {
           onNewProblem={newProblem}
           onHistory={() => setHistoryOpen(true)}
         />
-        <SolverChat key={chatKey} onAskNew={askNew} onAskAtlas={() => router.push(routes.atlas(exam.slug))} />
+        <SolverChat key={chatKey} onAskNew={askNew} onAskAtlas={guard('atlas_chat', () => router.push(routes.atlas(exam.slug)))} />
         {historyDrawer}
         {leaving && (
           <div

@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { Toaster } from 'sonner';
 import { useSessionExpiryRedirect } from '@/features/auth';
+import { FeatureRestrictedDialog } from '@/features/feature-access/ui';
 import { LimitDialog } from '@/shared/layout/limit-dialog';
 import { createQueryClient } from '@/shared/lib/query-client';
 
@@ -25,6 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <SessionWatcher />
       {children}
       <LimitDialog />
+      <FeatureRestrictedDialog />
       <Toaster position="top-center" richColors closeButton />
       <Devtools />
     </QueryClientProvider>

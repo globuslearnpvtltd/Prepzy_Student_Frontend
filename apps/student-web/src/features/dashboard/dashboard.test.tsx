@@ -10,6 +10,9 @@ import { Dashboard, DASHBOARD_WIDGETS } from './dashboard';
 import { toBars } from './performance-widgets';
 import { boardSubjectArt, competitiveSubjectArt } from './subject-art';
 import { testExam } from '@/test/exams';
+import { useFeatureRestrictedDialog } from '@/features/feature-access';
+import { FeatureRestrictedDialog } from '@/features/feature-access/ui';
+import { restrictFeatures } from '@/test/feature-access';
 
 const cbse = testExam('cbse');
 const neet = testExam('neet');
@@ -361,6 +364,51 @@ describe('competitive dashboard (NEET)', () => {
     expect(screen.getByRole('link', { name: 'Open Daily Practice' })).toHaveAttribute('href', '/neet/daily-practice');
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByRole('heading', { name: 'Meera Shah' })).not.toBeInTheDocument();
+  });
+});
+
+describe('institute feature restrictions on the dashboards', () => {
+  const locked = (name: string) => screen.findByRole('button', { name: `${name} (not available)` });
+
+  it('board: locks Socrates, Atlas, syllabus, trends, restricted tests and the journey card; a click explains why', async () => {
+    useFeatureRestrictedDialog.setState({ open: false, feature: null });
+    server.use(
+      ...boardHandlers(),
+      http.get(`${API}/api/v4/study-plan/classes/12/dashboard`, () =>
+        HttpResponse.json({ success: true, data: { state: 'take_diagnostic', width: 'full' } }),
+      ),
+      restrictFeatures('doubt_solver', 'atlas_chat', 'syllabus', 'pyq_trends', 'mock_exam', 'diagnostic_test'),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <>
+        <Dashboard />
+        <FeatureRestrictedDialog />
+      </>,
+      { exam: cbse },
+    );
+    const solve = await locked('Start Solving');
+    expect(await locked('Use Atlas')).toBeInTheDocument();
+    expect(await locked('View Syllabus')).toBeInTheDocument();
+    expect(await locked('View Trend Analysis')).toBeInTheDocument();
+    expect(await locked('Resume Mock Exam Class 12')).toBeInTheDocument();
+    expect(await locked('Start Diagnostic Test')).toBeInTheDocument();
+    // Final papers aren't restricted: still a link.
+    expect(screen.getByRole('link', { name: /Resume Course Test/ })).toHaveAttribute('href', '/cbse/tests/final/9');
+    expect(screen.queryByRole('link', { name: 'Start Solving' })).not.toBeInTheDocument();
+
+    await user.click(solve);
+    expect(useFeatureRestrictedDialog.getState()).toMatchObject({ open: true, feature: 'doubt_solver' });
+    expect(await screen.findByText(/isn't enabled for your account/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /See plans/ })).not.toBeInTheDocument();
+  });
+
+  it("competitive: locks today's DPP and Ask Socrates", async () => {
+    server.use(...neetHandlers(), restrictFeatures('practice_dpp', 'doubt_solver'));
+    renderWithProviders(<Dashboard />, { exam: neet });
+    expect(await locked("Today's DPP")).toBeInTheDocument();
+    expect(await locked('Start Solving')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Start Now' })).not.toBeInTheDocument();
   });
 });
 

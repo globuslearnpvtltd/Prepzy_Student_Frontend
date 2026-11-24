@@ -74,7 +74,38 @@ describe('apiClient', () => {
     off1();
     off2();
     expect(unauthorized).toHaveBeenCalledTimes(1);
-    expect(rateLimited).toHaveBeenCalledWith(expect.objectContaining({ message: 'Slow down' }));
+    expect(rateLimited).toHaveBeenCalledWith(expect.objectContaining({ message: 'Slow down' }), {
+      method: 'GET',
+      path: '/api/busy',
+    });
+  });
+
+  it('notifies featureRestricted listeners on 403 FEATURE_RESTRICTED (requests and streams), not on other 403s', async () => {
+    const restricted = vi.fn();
+    const limited = vi.fn();
+    const off1 = onApiEvent('featureRestricted', restricted);
+    const off2 = onApiEvent('rateLimited', limited);
+    const body = { success: false, code: 'FEATURE_RESTRICTED', message: 'Not enabled', data: null, details: { feature: 'search' } };
+    server.use(
+      http.post(`${API}/api/search`, () => HttpResponse.json(body, { status: 403 })),
+      http.post(`${API}/api/chat`, () => HttpResponse.json(body, { status: 403 })),
+      http.get(`${API}/api/forbidden`, () => HttpResponse.json({ code: 'FORBIDDEN', message: 'No' }, { status: 403 })),
+    );
+    const error = await apiClient.post('/api/search', {}).catch((e: unknown) => e);
+    await apiClient.stream('/api/chat', {}).catch(() => undefined);
+    await apiClient.get('/api/forbidden').catch(() => undefined);
+    off1();
+    off2();
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).isFeatureRestricted).toBe(true);
+    expect((error as ApiError).details).toEqual({ feature: 'search' });
+    expect(restricted).toHaveBeenCalledTimes(2);
+    expect(restricted).toHaveBeenNthCalledWith(1, expect.objectContaining({ code: 'FEATURE_RESTRICTED' }), {
+      method: 'POST',
+      path: '/api/search',
+    });
+    expect(restricted).toHaveBeenNthCalledWith(2, expect.objectContaining({ status: 403 }), { method: 'POST', path: '/api/chat' });
+    expect(limited).not.toHaveBeenCalled();
   });
 
   it('reports network failures as status 0', async () => {

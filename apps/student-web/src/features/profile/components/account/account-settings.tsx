@@ -280,7 +280,7 @@ export function AccountSettings({
             onClick={() => setShowGetApp(true)}
           />
         </div>
-        <SettingsRow name="notifications.svg" title="Notifications" subtitle="Reminders and updates" />
+        {/* <SettingsRow name="notifications.svg" title="Notifications" subtitle="Reminders and updates" /> */}
         <SettingsRow
           name="refer.svg"
           title="Refer & Earn"

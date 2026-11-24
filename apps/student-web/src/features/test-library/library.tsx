@@ -67,8 +67,8 @@ export function TestLibrary({ kind }: { kind: LibraryKind }) {
   const hasSide = ongoing.length > 0 || attempts.length > 0;
 
   return (
-    // The previous app's page added p-3 inside the layout padding (22px phones, 52px desktop with the shell's).
-    <div className="flex flex-col gap-4 p-3 lg:gap-6">
+    // Side padding only: the top spacing is the shell's, the same on every NEET page.
+    <div className="flex flex-col gap-4 px-3 lg:gap-6">
       <HubBreadcrumb label={copy.crumb} />
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>

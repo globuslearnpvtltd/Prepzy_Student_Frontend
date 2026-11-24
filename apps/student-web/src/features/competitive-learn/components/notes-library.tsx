@@ -26,7 +26,8 @@ export function NotesLibrary() {
   const loadingSubjects = planPending || subjects.isPending;
 
   return (
-    <div className="flex w-full flex-col items-start space-y-4 p-3 sm:space-y-6 lg:p-0">
+    // Side padding on phones only: the top spacing is the shell's, the same on every NEET page.
+    <div className="flex w-full flex-col items-start space-y-4 px-3 sm:space-y-6 lg:px-0">
       <Breadcrumb crumbs={[{ label: 'Dashboard', href: routes.dashboard(exam.slug) }, { label: 'Notes' }]} backHref={routes.dashboard(exam.slug)} />
       <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
         <div>

@@ -479,7 +479,7 @@ export function CustomTestCreate() {
         </section>
       )}
 
-      <footer className="bg-surface shadow-bar-up fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-4 px-6 py-4 lg:left-[76px]">
+      <footer className="bg-surface shadow-bar-up fixed inset-x-0 bottom-0 z-20 flex items-center justify-between gap-4 px-6 py-4 md:left-[92px]">
         <div>
           <p className="text-lg font-semibold">{summary.title}</p>
           <p className="text-foreground-subtle text-sm">{summary.text}</p>

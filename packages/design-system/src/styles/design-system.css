@@ -264,6 +264,12 @@
   --color-welcome-muted: #94A3B8;
   --color-welcome-ended: #FF0000;
   --color-welcome-ended-line: #F00000;
+  --color-rail-line: #EAEAF6;
+  --color-rail-active: #F1F0F9;
+  --color-rail-active-line: #DDDBF0;
+  --color-rail-active-text: #2D2A6E;
+  --color-rail-text: #82828C;
+  --color-rail-icon: #B3B5B6;
   --color-socrates-page: #F5F4FA;
   --color-socrates-ink: #241D52;
   --color-socrates-text: #1F1A4D;

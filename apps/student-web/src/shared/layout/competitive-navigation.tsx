@@ -44,18 +44,39 @@ export function remainingPercent(expiryDate: string, durationMonths: number, now
   return Math.min(100, Math.max(0, ((end.getTime() - now) / total) * 100));
 }
 
+/**
+ * NEET sidebar icons from the Figma design (public/icons/neet-sidebar), by nav item key. They're drawn as CSS masks
+ * so the active / inactive colour comes from `currentColor`. Items without a design icon keep their own.
+ */
+const DESIGN_ICONS: Partial<Record<string, string>> = {
+  dashboard: '/icons/neet-sidebar/dashboard.svg',
+  notes: '/icons/neet-sidebar/notes.svg',
+  'daily-practice': '/icons/neet-sidebar/daily-practice.svg',
+  'mock-tests': '/icons/neet-sidebar/mock-tests.svg',
+  'pyq-library': '/icons/neet-sidebar/pyq-library.svg',
+  'custom-exam': '/icons/neet-sidebar/custom-exam.svg',
+};
+
+function NavIcon({ nav, active }: { nav: NavItem; active: boolean }) {
+  const color = active ? 'text-brand' : 'text-rail-icon';
+  const src = DESIGN_ICONS[nav.key];
+  if (!src) return <nav.icon aria-hidden className={cx('size-7 shrink-0', color)} strokeWidth={2} />;
+  const mask = `url(${src}) center / contain no-repeat`;
+  return <span aria-hidden className={cx('size-6 shrink-0 bg-current', color)} style={{ mask, WebkitMask: mask }} />;
+}
+
 function PlanCard({ exam, onNavigate }: { exam: ExamConfig; onNavigate: () => void }) {
   const plan = useActivePlan(exam).data;
   const name = useActivePlanName(exam, plan);
   if (!plan) return null;
   const hasExpiry = !!plan.expiryDate && plan.durationMonths > 0 && !Number.isNaN(new Date(plan.expiryDate).getTime());
   return (
-    <div className="mt-auto px-3">
+    <div className="mt-auto pt-6">
       {/* Collapsed rail: crown only. Expanded (hover / mobile drawer): the full card. */}
-      <div className="bg-brand-50 flex h-11 w-[52px] items-center justify-center rounded-md group-hover/rail:hidden group-data-[open=true]/rail:hidden">
-        <Crown aria-hidden className="text-brand size-5" />
+      <div className="bg-rail-active border-rail-active-line flex size-16 items-center justify-center rounded-[16px] border border-solid group-hover/rail:hidden group-data-[open=true]/rail:hidden max-md:hidden">
+        <Crown aria-hidden className="text-brand size-7" />
       </div>
-      <div className="bg-brand-50 hidden w-[196px] rounded-lg p-3 group-hover/rail:block group-data-[open=true]/rail:block">
+      <div className="bg-rail-active border-rail-active-line hidden w-[199px] rounded-[16px] border border-solid p-3 group-hover/rail:block group-data-[open=true]/rail:block max-md:block">
         <span className="text-foreground-muted flex items-center gap-2 text-[12px] font-medium">
           <span className="bg-success size-2 rounded-full" />
           Active plan
@@ -85,8 +106,8 @@ function PlanCard({ exam, onNavigate }: { exam: ExamConfig; onNavigate: () => vo
 }
 
 /**
- * Competitive (NEET) sidebar: a 76px icon rail that expands to 220px on hover. On mobile it's a drawer
- * opened from the header's menu button.
+ * Competitive (NEET) sidebar (Figma "Sidebar" 823:18189): a 92px icon rail (64px icon tiles) that expands over the
+ * page to the 227px labelled sidebar on hover. On mobile it's a drawer opened from the header's menu button.
  */
 export function CompetitiveSidebar({ exam, rail = true }: { exam: ExamConfig; rail?: boolean }) {
   const pathname = usePathname();
@@ -112,13 +133,16 @@ export function CompetitiveSidebar({ exam, rail = true }: { exam: ExamConfig; ra
   const item = (nav: NavItem) => {
     const href = nav.href(exam.slug);
     const active = isActivePath(href, pathname);
+    // 64px row, 18px inset (17px + the 1px border that only the active item shows).
     const className = cx(
-      'flex h-11 w-full items-center gap-4 rounded-md px-3 text-[14px] font-medium transition-colors',
-      active ? 'bg-brand-75 text-brand' : 'text-neutral-400 hover:bg-canvas hover:text-neutral-600',
+      'flex h-16 w-full items-center gap-[10px] rounded-[16px] border border-solid px-[17px] text-[14px] transition-colors',
+      active
+        ? 'bg-rail-active border-rail-active-line text-rail-active-text font-semibold'
+        : 'text-rail-text hover:bg-canvas border-transparent font-medium',
     );
     const body = (
       <>
-        <nav.icon aria-hidden className="size-[22px] shrink-0" strokeWidth={2} />
+        <NavIcon nav={nav} active={active} />
         <span className="whitespace-nowrap opacity-0 transition-opacity delay-75 duration-200 group-hover/rail:opacity-100 group-data-[open=true]/rail:opacity-100 max-md:opacity-100">
           {nav.label}
         </span>
@@ -149,24 +173,25 @@ export function CompetitiveSidebar({ exam, rail = true }: { exam: ExamConfig; ra
   return (
     <>
       {open && <div className="bg-neutral-950/40 fixed inset-0 z-[90] md:hidden" onClick={close} aria-hidden="true" />}
-      {rail && <div className="bg-surface hidden w-[76px] shrink-0 md:block" aria-hidden="true" />}
+      {rail && <div className="bg-surface hidden w-[92px] shrink-0 md:block" aria-hidden="true" />}
       <aside
         data-open={open}
         className={cx(
-          'group/rail border-line bg-surface fixed left-0 flex flex-col overflow-hidden border-r py-6 transition-all duration-300',
-          'top-0 z-[100] h-dvh w-[220px] md:top-[76px] md:z-30 md:h-[calc(100dvh-76px)] md:w-[76px] md:translate-x-0 md:hover:w-[220px]',
+          // Same 14px side padding collapsed and expanded, so the icons don't move when the rail opens.
+          'group/rail border-rail-line bg-surface fixed left-0 flex flex-col overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border-r-2 border-solid px-[14px] py-10 transition-all duration-300',
+          'top-0 z-[100] h-dvh w-[227px] md:top-[76px] md:z-30 md:h-[calc(100dvh-76px)] md:w-[92px] md:translate-x-0 md:hover:w-[227px]',
           open ? 'translate-x-0' : '-translate-x-full',
           // Chapter pages show the chapter sidebar instead; the menu drawer still opens on mobile.
           !rail && 'md:hidden',
         )}
       >
-        <div className="mb-2 flex justify-end px-1 md:hidden">
+        <div className="-mt-6 mb-2 flex justify-end md:hidden">
           <button type="button" onClick={close} aria-label="Close menu" className="text-foreground-muted p-2">
             <X aria-hidden className="size-5" />
           </button>
         </div>
-        <nav aria-label="Main" className="px-3">
-          <ul className="flex flex-col gap-1">{navigationFor(exam).map(item)}</ul>
+        <nav aria-label="Main">
+          <ul className="flex flex-col gap-0">{navigationFor(exam).map(item)}</ul>
         </nav>
         <PlanCard exam={exam} onNavigate={close} />
       </aside>

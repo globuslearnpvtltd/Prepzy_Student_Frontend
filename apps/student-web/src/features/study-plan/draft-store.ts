@@ -9,6 +9,18 @@ export interface StudyPlanDraft {
   clear: () => void;
 }
 
+// Competitive exams start the chapter picker empty on every visit, except when the student steps back
+// from the create step (its Back / Close buttons mark that). In memory only: a reload forgets it too.
+let keepPicksOnce = false;
+export const keepPicksForReturn = () => {
+  keepPicksOnce = true;
+};
+export const takeKeepPicks = () => {
+  const keep = keepPicksOnce;
+  keepPicksOnce = false;
+  return keep;
+};
+
 export const useStudyPlanDraft = create<StudyPlanDraft>()(
   persist(
     (set) => ({

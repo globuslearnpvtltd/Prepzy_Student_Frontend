@@ -13,6 +13,7 @@ import {
   SolverDiscovery,
 } from './board-widgets';
 import { ChooseYourPlan, GetReadyExam } from './free-widgets';
+import { CompetitiveHeroRow } from './competitive-hero-row';
 import { DashboardHeroRow } from './hero-row';
 import { Divider, NeetWelcome, PracticeRow, SubjectProgressCards } from './competitive-widgets';
 import { HowYouFare, PerformanceOverview } from './performance-widgets';
@@ -48,7 +49,8 @@ export const DASHBOARD_WIDGETS: Record<ExamCategory, DashboardLayout> = {
       { className: 'w-full md:w-auto', widgets: [NeetWelcome] },
       {
         className: 'flex w-full min-w-0 flex-col items-start gap-6',
-        widgets: [SubjectProgressCards, Divider, PracticeRow, Divider, PerformanceOverview],
+        // CompetitiveHeroRow: plan + diagnostic / study plan cards, above the subjects (previous NEET dashboard).
+        widgets: [CompetitiveHeroRow, SubjectProgressCards, Divider, PracticeRow, Divider, PerformanceOverview],
       },
     ],
   },

@@ -4,7 +4,7 @@ import type { RestrictableFeature } from '@/features/feature-access';
 import { FeatureLock } from '@/features/feature-access/ui';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
-import type { Journey, JourneyState } from '../api';
+import type { Journey, JourneyState, PlanCategory } from '../api';
 import { useDashboardJourney } from '../hooks';
 import { DiagnosticCardArt } from './diagnostic-card-art';
 import { FinishLineCard } from './finish-line-card';
@@ -36,8 +36,8 @@ const DIAGNOSTIC_STATES = new Set<JourneyState>(['take_diagnostic', 'resume_diag
 const SLIM_A = new Set<JourneyState>(['tasks_partial', 'tasks_done', 'catch_up']);
 const SLIM_B = new Set<JourneyState>(['build_plan', 'rest_day', 'halfway']);
 
-/** Copy and destination for each journey state (previous dashboard JourneyCard). */
-export function journeyCopy(data: Journey, exam: string): CardCopy | null {
+/** Copy and destination for each journey state (previous dashboard JourneyCard; competitive: NEETJourneyCard). */
+export function journeyCopy(data: Journey, exam: string, category: PlanCategory = 'board'): CardCopy | null {
   const plan = routes.studyPlan(exam);
   switch (data.state) {
     case 'take_diagnostic':
@@ -59,9 +59,10 @@ export function journeyCopy(data: Journey, exam: string): CardCopy | null {
         art: 'clipboard',
       };
     case 'build_plan':
+      // Competitive: no plan exists yet in this state, so the copy invites building one.
       return {
-        lead: 'Your next steps just got clearer',
-        hand: 'STUDY PLAN IS READY!',
+        lead: category === 'competitive' ? 'Your diagnostic test is done' : 'Your next steps just got clearer',
+        hand: category === 'competitive' ? 'BUILD YOUR STUDY PLAN!' : 'STUDY PLAN IS READY!',
         cta: 'Build My Plan',
         href: routes.studyPlanChapters(exam),
       };
@@ -129,11 +130,11 @@ export function journeyCopy(data: Journey, exam: string): CardCopy | null {
  * previous app's JourneyCard did. Phone and desktop versions are both rendered and switched by CSS (md, the
  * previous useIsMobile breakpoint), so there is no hydration flash.
  */
-export function JourneyCard({ className }: { className?: string }) {
+export function JourneyCard({ className, fill = false }: { className?: string; fill?: boolean }) {
   const exam = useExam();
   const journey = useDashboardJourney();
   if (!journey.data) return null;
-  const copy = journeyCopy(journey.data, exam.slug);
+  const copy = journeyCopy(journey.data, exam.slug, exam.category);
   if (!copy) return null;
   const { state } = journey.data;
 
@@ -150,9 +151,13 @@ export function JourneyCard({ className }: { className?: string }) {
             href={copy.href}
             className="md:hidden"
           />
-          <div className="shadow-journey-card hidden w-full max-w-[553px] rounded-[24px] md:block">
+          {/* fill: grow past the art's 553px to fill the row (competitive dashboard) at the same height. */}
+          <div
+            className={`shadow-journey-card hidden w-full rounded-[24px] md:block ${fill ? '' : 'max-w-[553px]'}`}
+          >
             <DiagnosticCardArt
               className="block h-auto w-full"
+              stretch={fill}
               lead={copy.lead}
               hand={copy.hand}
               bodyLines={copy.bodyLines ?? []}

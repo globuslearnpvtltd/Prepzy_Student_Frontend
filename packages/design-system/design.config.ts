@@ -52,6 +52,7 @@ export const designConfig = defineDesignConfig({
         50: '#F8F8FC',
         100: '#F3F4F6', // learn / notes: chip and track backgrounds
         120: '#F1F5F9', // exam palette: not visited
+        130: '#ECEFF5', // diagnostic evaluating: "Did you know?" icon tile
         250: '#E2E8F0', // exam palette: not visited border
         150: '#E6E6F0', // auth dividers / outlines
         200: '#E4E7EC', // proposed: default border

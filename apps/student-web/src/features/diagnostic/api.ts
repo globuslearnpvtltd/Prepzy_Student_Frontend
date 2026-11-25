@@ -1,3 +1,4 @@
+import type { ExamResult, Outcome } from '@/features/exam-engine';
 import type { ExamRef } from '@/shared/config/exams';
 import { apiClient } from '@/shared/lib/api-client';
 import { ApiError } from '@/shared/lib/errors';
@@ -59,6 +60,30 @@ export interface SubjectStrength {
   pct: number;
   correct: number;
   questions: number;
+  /** Marks of the subject (negative marking can push `obtained` below 0). */
+  total: number;
+  obtained: number;
+  /** strong / moderate / weak */
+  band: string | null;
+}
+
+export interface ChapterStrength {
+  id: number;
+  name: string;
+  subjectId: number | null;
+  correct: number;
+  questions: number;
+  pct: number;
+}
+
+/** The score the backend returns straight after submitting (the competitive score card). */
+export interface DiagnosticSubmitSummary {
+  totalQuestions: number;
+  totalMarks: number;
+  obtained: number;
+  correct: number;
+  incorrect: number;
+  unattempted: number;
 }
 
 export interface DiagnosticResult {
@@ -70,10 +95,11 @@ export interface DiagnosticResult {
   correct: number;
   incorrect: number;
   subjects: SubjectStrength[];
+  chapters: ChapterStrength[];
   overallPercent: number;
   academicBand: string;
   pace: { band: string; takenSeconds: number; totalSeconds: number };
-  thinking: { label: string; leaning: string | null; reason: string | null };
+  thinking: { label: string; leaning: string | null; reason: string | null; accuracies: Record<string, number> };
   aiSummary: {
     summary: string[];
     strongest: { name: string; summary: string } | null;
@@ -168,11 +194,27 @@ export function toResult(raw: unknown): DiagnosticResult {
       pct: num(s.pct),
       correct: num(s.correct),
       questions: num(s.questions),
+      total: num(s.total),
+      obtained: num(s.obtained),
+      band: text(s.band),
+    })),
+    chapters: list(row.chapter_strengths).map((c) => ({
+      id: num(c.module_id),
+      name: text(c.name) ?? 'Chapter',
+      subjectId: c.subject_id === null || c.subject_id === undefined ? null : num(c.subject_id),
+      correct: num(c.correct),
+      questions: num(c.questions),
+      pct: num(c.pct),
     })),
     overallPercent: num(profiling.overall_percentage),
     academicBand: text(profiling.academic_band) ?? 'basic',
     pace: { band: text(pace.band) ?? 'normal', takenSeconds: num(pace.time_taken_seconds), totalSeconds: num(pace.total_time_seconds) },
-    thinking: { label: text(thinking.label) ?? '', leaning: text(thinking.leaning), reason: text(thinking.reason) },
+    thinking: {
+      label: text(thinking.label) ?? '',
+      leaning: text(thinking.leaning),
+      reason: text(thinking.reason),
+      accuracies: Object.fromEntries(Object.entries(obj(thinking.accuracies)).map(([k, v]) => [k, num(v)])),
+    },
     aiSummary: ai
       ? {
           summary: Array.isArray(ai.summary) ? ai.summary.map(String) : [],
@@ -181,6 +223,61 @@ export function toResult(raw: unknown): DiagnosticResult {
           howYouLearn: text(how.tagline) ? { tagline: String(how.tagline), suggestion: String(how.suggestion ?? '') } : null,
         }
       : null,
+  };
+}
+
+export function toSubmitSummary(raw: unknown): DiagnosticSubmitSummary {
+  const row = obj(obj(raw).summary);
+  const totalQuestions = num(row.total_questions);
+  const correct = num(row.correct_answers);
+  const incorrect = num(row.incorrect_answers);
+  return {
+    totalQuestions,
+    totalMarks: num(row.total_marks),
+    obtained: num(row.total_marks_obtained),
+    correct,
+    incorrect,
+    unattempted:
+      row.unattempted === undefined || row.unattempted === null
+        ? Math.max(0, totalQuestions - correct - incorrect)
+        : num(row.unattempted),
+  };
+}
+
+const OUTCOMES: Record<string, Outcome> = { correct: 'correct', incorrect: 'incorrect', not_answered: 'unattempted' };
+
+/** Review Solutions (competitive): the answers in the exam engine's result shape, so its review screen renders them. */
+export function toReviewResult(raw: unknown): ExamResult {
+  const row = obj(raw);
+  const counts = obj(row.counts);
+  return {
+    title: 'Diagnostic Test',
+    totalMarks: num(row.total_marks),
+    obtained: num(row.total_marks_obtained),
+    counts: { correct: num(counts.correct), incorrect: num(counts.incorrect), partial: 0, unattempted: num(counts.not_answered) },
+    attemptedAt: text(row.submitted_at),
+    questions: list(row.questions).map((q) => ({
+      id: String(q.question_id ?? q.question_number ?? ''),
+      kind: 'mcq' as const,
+      typeLabel: 'MCQ',
+      html: String(q.question_text ?? ''),
+      image: text(q.question_image),
+      marks: num(q.marks),
+      obtained: num(q.marks_obtained),
+      outcome: OUTCOMES[String(q.status)] ?? 'unattempted',
+      options: list(q.options).map((o, i) => ({
+        id: String(o.option_index ?? i),
+        html: String(o.option_text ?? ''),
+        image: text(o.option_image),
+        isCorrect: !!o.is_correct_answer,
+        isSelected: !!o.is_selected,
+      })),
+      answerHtml: null,
+      feedbackHtml: null,
+      sampleAnswerHtml: text(q.explanation),
+      explanationImage: text(q.explanation_image),
+      parts: [],
+    })),
   };
 }
 
@@ -281,8 +378,16 @@ export const diagnosticApi = {
     if (keepalive) apiClient.keepalive('PUT', path, { questions });
     else await apiClient.put(path, { questions });
   },
-  async submit(exam: ExamRef, assessmentId: string, questions: DiagnosticQuestion[]): Promise<void> {
-    assertOk(await apiClient.post<Envelope<unknown>>(`${diagnosticApiBase(exam)}/attempts/${assessmentId}/submit`, { questions }));
+  /** Marks the test; returns the score (the competitive score card shows it). */
+  async submit(exam: ExamRef, assessmentId: string, questions: DiagnosticQuestion[]): Promise<DiagnosticSubmitSummary> {
+    const body = assertOk(await apiClient.post<Envelope<unknown>>(`${diagnosticApiBase(exam)}/attempts/${assessmentId}/submit`, { questions }));
+    return toSubmitSummary(body.data);
+  },
+  /** Review Solutions of a finished attempt (competitive exams only; board answers 404). */
+  async review(exam: ExamRef, assessmentId: string): Promise<ExamResult> {
+    const body = assertOk(await apiClient.get<Envelope<unknown>>(`${diagnosticApiBase(exam)}/attempts/${assessmentId}/review`));
+    if (!body.data) throw new ApiError({ status: 404, code: 'NOT_FOUND', message: 'No solutions found for this test.' });
+    return toReviewResult(body.data);
   },
   /** The given attempt's report, or the class's latest (404 when there is none). */
   async result(exam: ExamRef, classId: number, assessmentId: string | null): Promise<DiagnosticResult> {

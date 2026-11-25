@@ -121,6 +121,19 @@ export function Breadcrumb({
   );
 }
 
+/** Desktop "Dashboard > …" trail that sits next to the BackButton in a header bar (competitive look); phones use Breadcrumb. */
+export function DesktopCrumb({ dashboardHref, current }: { dashboardHref: string; current: string }) {
+  return (
+    <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-[10px] md:flex">
+      <Link href={dashboardHref} className="text-brand text-[14px] font-bold whitespace-nowrap hover:opacity-70">
+        Dashboard
+      </Link>
+      <ChevronRight aria-hidden className="size-4 shrink-0 text-neutral-600" />
+      <span className="truncate text-[14px] font-semibold text-neutral-600">{current}</span>
+    </nav>
+  );
+}
+
 /** Count inside a ring that fills with progress (0–1). */
 export function ProgressRing({
   value,

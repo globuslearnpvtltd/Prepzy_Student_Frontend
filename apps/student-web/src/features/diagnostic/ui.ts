@@ -2,3 +2,4 @@
 export { DiagnosticSetupScreen } from './components/setup-screen';
 export { DiagnosticTestScreen } from './components/test-screen';
 export { DiagnosticResultScreen } from './components/result-screen';
+export { DiagnosticSolutionsScreen } from './components/competitive-solutions-screen';

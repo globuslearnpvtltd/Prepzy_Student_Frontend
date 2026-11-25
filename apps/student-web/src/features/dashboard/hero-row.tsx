@@ -7,8 +7,9 @@ import { PlanBanner, usePlanBanner } from './board-widgets';
  * Plan card + study journey card (previous app's DashboardHeroRow). When the journey card is half width,
  * wide screens show the plan card's half form on the left and the journey card on the right; otherwise
  * (and on phones) they stack. Both layouts are switched by CSS at md, the previous useIsMobile breakpoint.
+ * `fill` lets the half-width journey card grow past 553px so the two cards cover the whole row.
  */
-export function DashboardHeroRow() {
+export function DashboardHeroRow({ fill = false }: { fill?: boolean } = {}) {
   const journey = useDashboardJourney();
   const banner = usePlanBanner();
   // Nothing to show: render nothing, so the column's gap doesn't count an empty row.
@@ -26,7 +27,7 @@ export function DashboardHeroRow() {
           <PlanBanner form="half" className="hidden md:flex" />
           <PlanBanner className="md:hidden" />
         </div>
-        <JourneyCard className="min-w-0 md:flex-[553_1_0%] md:self-start" />
+        <JourneyCard fill={fill} className="min-w-0 md:flex-[553_1_0%] md:self-start" />
       </div>
     );
   }

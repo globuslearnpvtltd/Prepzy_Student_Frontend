@@ -357,6 +357,50 @@ describe('competitive dashboard (NEET)', () => {
     expect(screen.queryByRole('timer')).not.toBeInTheDocument();
   });
 
+  it('shows the study journey card with the week under it while a plan is running', async () => {
+    const day = new Date();
+    const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    server.use(
+      ...neetHandlers(),
+      http.get(`${API}/api/v4/study-plan/classes/20/dashboard`, () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            state: 'tasks_partial',
+            width: 'full',
+            task_count: 4,
+            completed_count: 2,
+            week: [{ plan_date: iso, is_today: true, task_count: 4, completed_count: 2 }],
+          },
+        }),
+      ),
+    );
+    renderWithProviders(<Dashboard />, { exam: neet });
+    const row = await screen.findByTestId('competitive-hero-row');
+    expect((await within(row).findAllByText('2 of 4 tasks')).length).toBeGreaterThan(0);
+    expect(within(row).getByText('2 of 4 tasks Left')).toBeInTheDocument();
+    for (const link of within(row).getAllByRole('link', { name: "Start today's task" })) {
+      expect(link).toHaveAttribute('href', '/neet/study-plan');
+    }
+  });
+
+  it('invites a NEET student to build the plan after the diagnostic', async () => {
+    server.use(
+      ...neetHandlers(),
+      http.get(`${API}/api/v4/study-plan/classes/20/dashboard`, () =>
+        HttpResponse.json({ success: true, data: { state: 'build_plan', width: 'full' } }),
+      ),
+    );
+    renderWithProviders(<Dashboard />, { exam: neet });
+    const row = await screen.findByTestId('competitive-hero-row');
+    expect((await within(row).findAllByText('BUILD YOUR STUDY PLAN!')).length).toBeGreaterThan(0);
+    for (const link of within(row).getAllByRole('link', { name: 'Build My Plan' })) {
+      expect(link).toHaveAttribute('href', '/neet/study-plan/chapters');
+    }
+    // A full-width card without a running plan: no week strip.
+    expect(within(row).queryByRole('link', { name: "Start today's task" })).not.toBeInTheDocument();
+  });
+
   it('explains when there is no paper today and lets the student dismiss the welcome card', async () => {
     server.use(...neetHandlers({ dpp: null }));
     renderWithProviders(<Dashboard />, { exam: neet });

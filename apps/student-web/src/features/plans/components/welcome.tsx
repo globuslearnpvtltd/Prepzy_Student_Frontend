@@ -462,7 +462,7 @@ function WelcomeContent({ exam }: { exam: ExamConfig }) {
                 )}
                 {tab === 'coupon' && coupon.applied && coupon.months && coupon.expiry && (
                   <Banner tone="ok">
-                    {coupon.months} extra months added. Your free plan now runs till <span>{formatShortDate(coupon.expiry)}</span>.
+                    {coupon.months} extra months added. Your Basic plan now runs till <span>{formatShortDate(coupon.expiry)}</span>.
                   </Banner>
                 )}
                 {tab === 'coupon' && coupon.error && <Banner tone="error">{coupon.error}</Banner>}

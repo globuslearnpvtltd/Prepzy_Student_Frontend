@@ -373,34 +373,9 @@ describe('composer', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Please choose an image file.');
   });
 
-  it('records a spoken question and puts the transcript in the box', async () => {
-    const stop = vi.fn();
-    class FakeRecorder {
-      state = 'inactive';
-      mimeType = 'audio/webm';
-      ondataavailable: ((e: { data: Blob }) => void) | null = null;
-      onstop: (() => void) | null = null;
-      stream = { getTracks: () => [{ stop }] };
-      start() {
-        this.state = 'recording';
-      }
-      stop() {
-        this.state = 'inactive';
-        this.ondataavailable?.({ data: new Blob(['a']) });
-        this.onstop?.();
-      }
-    }
-    vi.stubGlobal('MediaRecorder', FakeRecorder);
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: { getUserMedia: vi.fn(() => Promise.resolve({ getTracks: () => [{ stop }] })) },
-    });
-    server.use(http.post(`${API}/api/v4/chat/transcribe`, () => HttpResponse.json({ success: true, message: 'Audio transcribed', data: { text: 'what is torque' } })));
-    renderWithProviders(<Composer placeholder="Ask" onSend={() => undefined} allowVoice />);
-    await userEvent.click(screen.getByRole('button', { name: 'Speak your question' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));
-    await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue('what is torque'));
-    vi.unstubAllGlobals();
+  it('has no mic button (voice is the Live chat only)', () => {
+    renderWithProviders(<Composer placeholder="Ask" onSend={() => undefined} onLiveChat={() => undefined} />);
+    expect(screen.queryByRole('button', { name: 'Speak your question' })).toBeNull();
   });
 });
 

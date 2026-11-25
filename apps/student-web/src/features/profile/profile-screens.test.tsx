@@ -145,7 +145,7 @@ describe('Change password', () => {
     await userEvent.clear(screen.getByLabelText('Confirm password'));
     await userEvent.type(screen.getByLabelText('Confirm password'), 'new1');
     await userEvent.click(screen.getByRole('button', { name: 'Update' }));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Password Successfully Updated!'));
+    await waitFor(() => expect(lastToast()).toContain('Password Successfully Updated!'));
     expect(bodies[0]).toEqual({ old_password: 'old1', new_password: 'new1' });
     expect(screen.getByLabelText('Old Password')).toHaveValue('');
 

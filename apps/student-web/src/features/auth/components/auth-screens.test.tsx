@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { onApiEvent } from '@/shared/lib/api-client';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
@@ -16,7 +16,7 @@ import { OtpForm } from './otp-form';
 import { PhoneField } from './phone-field';
 import { SetupForm } from './setup-form';
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/shared/ui/toast', () => ({ notify: { success: vi.fn(), error: vi.fn(), info: vi.fn(), dismiss: vi.fn() } }));
 
 // GET /api/v4/exams: JEE Main is active in the backend but has no pages yet; reference books are not a sign-up exam.
 const EXAM_LIST = {
@@ -421,7 +421,7 @@ describe('OtpForm (more flows)', () => {
       const resend = screen.getByRole('button', { name: 'Resend OTP' });
       expect(resend).toBeEnabled();
       fireEvent.click(resend);
-      await waitFor(() => expect(toast.success).toHaveBeenCalledWith('A new code is on its way.'));
+      await waitFor(() => expect(notify.success).toHaveBeenCalledWith('A new code is on its way.'));
       expect(flow).toBe('signup');
       expect(screen.getByRole('button', { name: /Resend in 59s/ })).toBeDisabled();
     });
@@ -439,7 +439,7 @@ describe('OtpForm (more flows)', () => {
       renderWithProviders(<OtpForm />);
       await waitOutCountdown();
       fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }));
-      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+      await waitFor(() => expect(notify.error).toHaveBeenCalledWith(message));
       expect(planLimit).not.toHaveBeenCalled();
       stop();
     });
@@ -455,7 +455,7 @@ describe('OtpForm (more flows)', () => {
       renderWithProviders(<OtpForm />);
       await waitOutCountdown();
       fireEvent.click(screen.getByRole('button', { name: 'Resend OTP' }));
-      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+      await waitFor(() => expect(notify.error).toHaveBeenCalledWith(message));
     });
   });
 });

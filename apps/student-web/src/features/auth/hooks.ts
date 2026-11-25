@@ -2,11 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { DEFAULT_EXAM, examSlugOf, type ExamConfig } from '@/shared/config/exams';
-import { portalForHost, portalForPath } from '@/shared/config/portals';
-import { routes } from '@/shared/config/routes';
+import { isPortalPublicPath, portalForHost, portalForPath } from '@/shared/config/portals';
+import { isPublicPath, routes } from '@/shared/config/routes';
 import { onApiEvent } from '@/shared/lib/api-client';
 import { authApi } from './api';
 import { forgetExam } from './device';
@@ -95,19 +95,44 @@ export function useLogout() {
   });
 }
 
-/** Sends the student to login once when any request reports an expired session. */
-export function useSessionExpiryRedirect() {
+/** The login page for the current page: the portal's (by subdomain or base path) or the student app's. */
+function sessionLogin(): { login: string; isPublic: boolean } {
+  const { host, pathname } = window.location;
+  const portal = portalForHost(host) ?? portalForPath(pathname);
+  if (portal) {
+    const path = pathname.startsWith(portal.basePath) ? pathname : `${portal.basePath}${pathname === '/' ? '' : pathname}`;
+    return { login: portal.login, isPublic: isPortalPublicPath(portal, path) };
+  }
+  return { login: routes.login(), isPublic: isPublicPath(pathname) };
+}
+
+/**
+ * Any request reporting an expired session (401) opens the "Session expired" dialog once; its button clears the
+ * cached data and opens the login page (the portal's own on parents / schools / partners). Nothing happens on the
+ * login / sign-up pages themselves.
+ */
+export function useSessionExpiry(): { expired: boolean; logIn: () => void } {
   const queryClient = useQueryClient();
   const router = useRouter();
-  useEffect(() => {
-    let redirecting = false;
-    return onApiEvent('unauthorized', () => {
-      if (redirecting) return;
-      redirecting = true;
-      queryClient.clear();
-      // Parents / schools / partners go back to their own portal's login (by subdomain or base path).
-      const portal = portalForHost(window.location.host) ?? portalForPath(window.location.pathname);
-      router.replace(portal?.login ?? routes.login());
-    });
+  const [expired, setExpired] = useState(false);
+  const target = useRef(routes.login());
+
+  useEffect(
+    () =>
+      onApiEvent('unauthorized', () => {
+        const { login, isPublic } = sessionLogin();
+        if (isPublic) return;
+        target.current = login;
+        setExpired(true);
+      }),
+    [],
+  );
+
+  const logIn = useCallback(() => {
+    queryClient.clear();
+    setExpired(false);
+    router.replace(target.current);
   }, [queryClient, router]);
+
+  return { expired, logIn };
 }

@@ -226,19 +226,10 @@ export const profileApi = {
     );
   },
 
-  /** Unlinks the parent; the token undoes it for 10 minutes. */
+  /** Unlinks the parent. */
   async removeParent(): Promise<string | null> {
     const body = await apiClient.delete<Envelope<{ undo_token?: string }>>('/api/v4/student/mentor');
     return assertOk(body).data?.undo_token ?? null;
-  },
-
-  async restoreParent(undoToken: string): Promise<Parent> {
-    const body = await apiClient.post<Envelope<{ mentor_data?: unknown }>>('/api/v4/student/mentor/restore', {
-      undo_token: undoToken,
-    });
-    const parent = toParent(assertOk(body).data?.mentor_data);
-    if (!parent) throw new Error('No parent returned');
-    return parent;
   },
 
   async helpRequests(): Promise<HelpRequest[]> {

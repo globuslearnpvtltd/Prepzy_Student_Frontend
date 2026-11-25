@@ -7,7 +7,7 @@ import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Camera, Check, ImagePlus, Keyboard, Mic, PenLine, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { clearInkDraft, InkPad, useInkDoc, useInkVersion } from '@/features/ink';
 import { userMessage } from '@/shared/lib/errors';
 import { MATH_SYMBOLS } from '@/shared/ui/math-symbols';
@@ -108,7 +108,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
     if (ink.isEmpty) return true;
     if (addingInk.current) return false;
     if (latest.current.images.length >= MAX_ANSWER_IMAGES) {
-      toast.error(TOO_MANY_IMAGES);
+      notify.error(TOO_MANY_IMAGES);
       return false;
     }
     addingInk.current = true;
@@ -128,7 +128,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
       ink.reset();
       return true;
     } catch (error) {
-      toast.error(userMessage(error, "Your handwriting couldn't be added. Please try again."));
+      notify.error(userMessage(error, "Your handwriting couldn't be added. Please try again."));
       return false;
     } finally {
       addingInk.current = false;
@@ -181,7 +181,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
       editor.chain().focus('end').setImage({ src: image.url, alt: 'Uploaded answer' }).createParagraphNear().run();
       emit(editor, [...latest.current.images, image]);
     },
-    onError: (error) => toast.error(userMessage(error, 'Upload failed. Please try again.')),
+    onError: (error) => notify.error(userMessage(error, 'Upload failed. Please try again.')),
   });
 
   const voice = useVoiceAnswer(
@@ -189,13 +189,13 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
       if (!editor) return;
       editor.chain().focus('end').insertContent(editor.isEmpty ? text : ` ${text}`).run();
     },
-    (error) => toast.error(userMessage(error, 'Failed to transcribe audio')),
+    (error) => notify.error(userMessage(error, 'Failed to transcribe audio')),
   );
 
   const onFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const room = MAX_ANSWER_IMAGES - latest.current.images.length;
     const files = Array.from(event.target.files ?? []);
-    if (files.length > room) toast.error(TOO_MANY_IMAGES);
+    if (files.length > room) notify.error(TOO_MANY_IMAGES);
     for (const file of files.slice(0, Math.max(0, room))) upload.mutate(file);
     event.target.value = '';
   };

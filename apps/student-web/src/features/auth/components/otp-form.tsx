@@ -6,7 +6,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import type { z } from 'zod';
 import { DEFAULT_EXAM } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
@@ -141,9 +141,9 @@ export function OtpForm() {
     mutationFn: () => authApi.resendOtp(phone ?? '', flow),
     onSuccess: () => {
       setSecondsLeft(RESEND_SECONDS);
-      toast.success('A new code is on its way.');
+      notify.success('A new code is on its way.');
     },
-    onError: (error) => toast.error(userMessage(error)),
+    onError: (error) => notify.error(userMessage(error)),
   });
 
   const sentTo = `We sent a 6-digit code on WhatsApp to ${phone || 'your number'}.`;

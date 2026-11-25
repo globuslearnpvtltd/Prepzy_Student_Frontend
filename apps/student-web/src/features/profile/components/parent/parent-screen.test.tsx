@@ -228,20 +228,4 @@ describe('Parent: removing', () => {
     expect(within(first.container).queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
     first.unmount();
   });
-
-  it('a failed Undo explains itself', async () => {
-    server.use(
-      withParent(),
-      http.delete(`${API}/api/v4/student/mentor`, () => ok({ undo_token: 'undo-1' })),
-      http.post(`${API}/api/v4/student/mentor/restore`, () => fail(410, 'UNDO_EXPIRED', 'Undo has expired.')),
-    );
-    renderWithProviders(<ParentScreen />, { exam: cbse });
-    await userEvent.click(await screen.findByRole('button', { name: 'Remove' }));
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }));
-    await screen.findByText('Add a parent');
-    const removed = toastAt()!;
-    await userEvent.click(within(removed.container).getByRole('button', { name: 'Undo' }));
-    removed.unmount();
-    await waitFor(() => expect(lastToastText()).toContain('Undo has expired.'));
-  });
 });

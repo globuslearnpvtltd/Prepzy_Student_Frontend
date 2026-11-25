@@ -27,7 +27,10 @@ const config = [
       'no-restricted-imports': [
         'error',
         {
-          paths: [{ name: 'axios', message: 'Use apiClient from @/shared/lib/api-client (native fetch).' }],
+          paths: [
+            { name: 'axios', message: 'Use apiClient from @/shared/lib/api-client (native fetch).' },
+            { name: 'sonner', importNames: ['toast'], message: "Use notify from '@/shared/ui/toast' (the app's one toast design)." },
+          ],
           patterns: [
             {
               group: ['@/features/*/*', '!@/features/*/ui'],
@@ -39,7 +42,7 @@ const config = [
     },
   },
   {
-    files: ['src/shared/lib/api-client.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'src/test/**'],
+    files: ['src/shared/lib/api-client.ts', 'src/shared/ui/toast.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'src/test/**'],
     rules: { 'no-restricted-imports': 'off' },
   },
 ];

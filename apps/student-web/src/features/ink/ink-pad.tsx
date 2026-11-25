@@ -141,9 +141,12 @@ export function InkPad({ doc, expanded = false, onExpandedChange, disabled, tool
   useLayoutEffect(() => {
     const el = scroller.current;
     if (!el) return;
+    // The pad's own box (offset size), not its inner size (client size): the inner size loses the width of any
+    // scrollbar, and a scrollbar appears because of the sheet sized from it. On devices with classic scrollbars
+    // (Windows, many Android / Linux browsers) that loop made the pad flicker as scrollbars came and went.
     const measure = () => {
-      setWidth(el.clientWidth);
-      setViewport(el.clientHeight);
+      setWidth(el.offsetWidth);
+      setViewport(el.offsetHeight);
     };
     measure();
     if (typeof ResizeObserver === 'undefined') return;
@@ -433,7 +436,9 @@ export function InkPad({ doc, expanded = false, onExpandedChange, disabled, tool
           ref={scroller}
           onScroll={updateReach}
           className={cx(
-            'bg-socrates-soft relative overflow-auto overscroll-contain rounded-[14px]',
+            // No visible scrollbars (the pad has its own up / down buttons; wheel, trackpad and two fingers scroll),
+            // so the writing area is the same size on every device and never resizes itself.
+            'bg-socrates-soft relative overflow-auto overscroll-contain rounded-[14px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
             expanded ? 'min-h-0 flex-1' : 'h-[min(40dvh,280px)]',
           )}
         >

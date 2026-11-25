@@ -165,34 +165,17 @@ export function ParentScreen() {
     setStep('form');
   };
 
-  // Undo puts the same parent back with the token from the remove call (valid for 10 minutes).
-  const restoreParent = async (undoToken: string, name: string) => {
-    try {
-      const restored = await profileApi.restoreParent(undoToken);
-      setParent(restored);
-      setJustLinked(false);
-      setDraft(EMPTY_DRAFT);
-      setStep('linked');
-      showProfileToast(`${name} added back`);
-    } catch (error) {
-      showProfileToast(apiMessage(error, 'Could not undo. Please add them again.'), { kind: 'error' });
-    }
-  };
-
   const handleRemove = async () => {
     if (!parent) return;
     const name = parentName(parent);
     setRemoving(true);
     try {
-      const undoToken = await profileApi.removeParent();
+      await profileApi.removeParent();
       setConfirmRemove(false);
       setParent(null);
       setJustLinked(false);
       startAdd();
-      showProfileToast(
-        `${name} removed`,
-        undoToken ? { actionLabel: 'Undo', onAction: () => restoreParent(undoToken, name) } : {},
-      );
+      showProfileToast(`${name} removed`);
     } catch (error) {
       showProfileToast(apiMessage(error, 'Could not remove. Please try again.'), { kind: 'error' });
     } finally {

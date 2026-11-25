@@ -1,11 +1,11 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { delay, http, HttpResponse } from 'msw';
+import { delay, http } from 'msw';
 import { toast } from 'sonner';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { profileApi, toProfile } from '../../api';
-import { accountRow, fail, ok } from '../../test-fixtures';
+import { accountRow, fail } from '../../test-fixtures';
 import { checkPhoto, formatSize, PhotoPicker } from './photo-picker';
 
 vi.mock('sonner', () => ({ toast: { custom: vi.fn(), dismiss: vi.fn(), success: vi.fn(), error: vi.fn() } }));
@@ -169,18 +169,11 @@ describe('PhotoPicker', () => {
     expect(upload).not.toHaveBeenCalled();
   });
 
-  it('uploads with a progress bar, then offers Undo that removes the new photo', async () => {
-    let removed = false;
+  it('uploads with a progress bar, then confirms with a toast that only has Close', async () => {
     const { names } = stubUpload(async () => {
       await delay(700);
       return { picture: 'https://cdn.test/new.png', completion: 70 };
     });
-    server.use(
-      http.delete(`${API}/api/v4/student/account/photo`, () => {
-        removed = true;
-        return ok({ completion_percentage: 60 });
-      }),
-    );
     renderWithProviders(<PhotoPicker profile={noPhoto} checkFile={fine} />);
     await user().upload(screen.getByLabelText('Choose a photo'), jpeg('me.jpg', 300 * 1024));
 
@@ -197,34 +190,9 @@ describe('PhotoPicker', () => {
     expect(names).toEqual(['me.jpg']);
     const done = lastToast()!;
     expect(done.container).toHaveTextContent('Photo updated');
-    await userEvent.click(within(done.container).getByRole('button', { name: 'Undo' }));
-    await waitFor(() => expect(removed).toBe(true));
-    await waitFor(() => expect(lastToast()?.container).toHaveTextContent('Photo restored'));
-  });
-
-  it('Undo re-uploads the previous photo', async () => {
-    const { names: uploads } = stubUpload(async () => ({ picture: PHOTO_URL, completion: 70 }));
-    server.use(http.get(PHOTO_URL, () => new HttpResponse(new Blob(['png'], { type: 'image/png' }))));
-    renderWithProviders(<PhotoPicker profile={withPhoto} checkFile={fine} />);
-    await user().upload(screen.getByLabelText('Choose a photo'), jpeg('new.jpg'));
-    await waitFor(() => expect(uploads).toEqual(['new.jpg']));
-    await waitFor(() => expect(lastToast()?.container).toHaveTextContent('Photo updated'));
-
-    await userEvent.click(within(lastToast()!.container).getByRole('button', { name: 'Undo' }));
-    await waitFor(() => expect(uploads).toEqual(['new.jpg', 'profile.jpg']));
-    await waitFor(() => expect(lastToast()?.container).toHaveTextContent('Photo restored'));
-  });
-
-  it('says so when the previous photo can’t be restored', async () => {
-    stubUpload(async () => ({ picture: PHOTO_URL, completion: 70 }));
-    server.use(http.get(PHOTO_URL, () => new HttpResponse(null, { status: 404 })));
-    renderWithProviders(<PhotoPicker profile={withPhoto} checkFile={fine} />);
-    await user().upload(screen.getByLabelText('Choose a photo'), jpeg());
-    await waitFor(() => expect(lastToast()?.container).toHaveTextContent('Photo updated'));
-    await userEvent.click(within(lastToast()!.container).getByRole('button', { name: 'Undo' }));
-    await waitFor(() =>
-      expect(lastToast()?.container).toHaveTextContent('Couldn’t undo. Please pick the photo again.'),
-    );
+    expect(within(done.container).queryByRole('button', { name: 'Undo' })).toBeNull();
+    await userEvent.click(within(done.container).getByRole('button', { name: 'Close' }));
+    expect(toast.dismiss).toHaveBeenCalledWith('t1');
   });
 
   it('cancelling the upload closes the sheet without an error', async () => {

@@ -4,7 +4,7 @@ import { Button } from '@prepzy/design-system';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import type { TestTypeKey } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
@@ -127,7 +127,7 @@ function PlayerScreen({
     });
   };
   const secondsLeft = useCountdown(session.deadline, () => {
-    toast.info("Time's up — submitting your answers.");
+    notify.info("Time's up — submitting your answers.");
     startSubmit();
   });
   const counts = countStatuses(session.questions, attempt.snapshot);

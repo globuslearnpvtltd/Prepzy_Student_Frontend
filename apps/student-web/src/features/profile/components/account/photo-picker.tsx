@@ -101,24 +101,6 @@ export function PhotoPicker({ profile, checkFile = checkPhoto }: { profile: Prof
     if (!busy) setSheet({ step: 'closed' });
   };
 
-  /** Puts the previous photo back: re-uploads it, or removes the new one when there was none. */
-  const undo = async (previous: string | null) => {
-    try {
-      if (!previous) {
-        await remove.mutateAsync();
-      } else {
-        const blob = await fetch(previous).then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.blob();
-        });
-        await upload.mutateAsync({ file: new File([blob], 'profile.jpg', { type: blob.type || 'image/jpeg' }) });
-      }
-      showProfileToast('Photo restored');
-    } catch {
-      showProfileToast('Couldn’t undo. Please pick the photo again.', { kind: 'error' });
-    }
-  };
-
   const handleFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -134,7 +116,6 @@ export function PhotoPicker({ profile, checkFile = checkPhoto }: { profile: Prof
       return;
     }
 
-    const previous = profile.picture;
     const base = { step: 'uploading' as const, name: file.name, size: formatSize(file.size) };
     setSheet({ ...base, percent: 0 });
     timer.current = setInterval(
@@ -151,7 +132,7 @@ export function PhotoPicker({ profile, checkFile = checkPhoto }: { profile: Prof
     try {
       await upload.mutateAsync({ file, signal: controller.signal });
       setSheet({ step: 'closed' });
-      showProfileToast('Photo updated', { actionLabel: 'Undo', onAction: () => undo(previous) });
+      showProfileToast('Photo updated');
     } catch (error) {
       setSheet({ step: 'closed' });
       if (controller.signal.aborted || isAbort(error)) return;
@@ -164,11 +145,10 @@ export function PhotoPicker({ profile, checkFile = checkPhoto }: { profile: Prof
   };
 
   const removePhoto = async () => {
-    const previous = profile.picture;
     setSheet({ step: 'closed' });
     try {
       await remove.mutateAsync();
-      showProfileToast('Photo updated', { actionLabel: 'Undo', onAction: () => undo(previous) });
+      showProfileToast('Photo updated');
     } catch {
       showProfileToast('Couldn’t remove your photo. Please try again.', { kind: 'error' });
     }

@@ -56,7 +56,7 @@ function usePlanDetails() {
   const months = activePlan?.durationMonths ?? 0;
   const boardPlanName = months ? `${months} Month${months > 1 ? 's' : ''}` : '';
   const planName =
-    competitive && summary ? (summary.isFreeForever ? 'Free' : capitalize(summary.planType)) : boardPlanName;
+    competitive && summary ? (summary.isFreeForever ? 'Basic' : capitalize(summary.planType)) : boardPlanName;
 
   const chips: Chip[] = [
     { label: examName },

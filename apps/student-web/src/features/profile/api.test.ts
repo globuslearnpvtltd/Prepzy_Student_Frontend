@@ -48,11 +48,9 @@ describe('profileApi', () => {
         }),
       ),
       http.delete(`${API}/api/v4/student/mentor`, () => ok(null)),
-      http.post(`${API}/api/v4/student/mentor/restore`, () => ok({ mentor_data: null })),
     );
     expect(await profileApi.parent()).toMatchObject({ id: 4, contactMethod: 'email' });
     expect(await profileApi.removeParent()).toBeNull();
-    await expect(profileApi.restoreParent('t')).rejects.toThrow('No parent returned');
   });
 
   it('sends a report with its screenshot and fills in what the backend leaves out', async () => {

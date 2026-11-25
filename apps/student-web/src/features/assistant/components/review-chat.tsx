@@ -282,8 +282,6 @@ function ReviewChatPanel({ context, onClose }: { context: ReviewContext; onClose
             // A photo or handwriting goes with the question (NEET's tutor gets it read as text by the backend).
             allowInk
             inkDraftKey={`vedica:${context.assessmentId}:${context.questionId}:${context.attemptId}:${context.subQuestionId ?? 0}`}
-            // Live talk replaces voice-to-text here: Vedica hears the student directly.
-            allowVoice={!voice}
             toolbarSlot={
               voice ? (
                 <button

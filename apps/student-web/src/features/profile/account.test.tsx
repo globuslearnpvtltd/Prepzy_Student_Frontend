@@ -268,7 +268,7 @@ describe('profile photo', () => {
     navigation.searchParams = new URLSearchParams('edit=1');
   });
 
-  it('removes the photo with an Undo toast', async () => {
+  it('removes the photo with a Close toast', async () => {
     let removed = false;
     server.use(
       ...accountHandlers({ account: { ...accountRow, profile_picture: 'https://cdn.test/me.png' } }),
@@ -283,8 +283,10 @@ describe('profile photo', () => {
     await userEvent.click(within(sheet).getAllByRole('button', { name: 'Remove photo' })[0]!);
     await waitFor(() => expect(removed).toBe(true));
     await waitFor(() => expect(screen.getAllByText('50%').length).toBeGreaterThan(0));
-    expect(vi.mocked(toast.custom).mock.calls.at(-1)?.[1]).toMatchObject({ duration: 6000 });
-    expect(lastToast()).toContain('Undo');
+    expect(vi.mocked(toast.custom).mock.calls.at(-1)?.[1]).toMatchObject({ duration: 4000 });
+    expect(lastToast()).toContain('Photo updated');
+    expect(lastToast()).toContain('Close');
+    expect(lastToast()).not.toContain('Undo');
   });
 
   it('explains why a file can’t be used, without uploading it', async () => {

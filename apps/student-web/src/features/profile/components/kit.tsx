@@ -5,8 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { toast } from 'sonner';
-import { isDesktop } from '../hooks';
+import { notify } from '@/shared/ui/toast';
 
 /** My Account icons (the previous app's /assets/profile, /assets/help and /assets/delete). */
 export const icon = (name: string) => `/illustrations/profile/${name}`;
@@ -50,10 +49,6 @@ const STATE_ICONS = {
     '<svg width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 8C14 9.26704 13.5989 10.5015 12.8541 11.5266C12.1094 12.5517 11.0593 13.3147 9.85424 13.7062C8.64922 14.0978 7.35118 14.0978 6.14614 13.7063C4.9411 13.3149 3.89092 12.5519 3.14611 11.5269C2.4013 10.5019 2.0001 9.26744 2 8.0004C1.9999 6.73336 2.40091 5.49881 3.14555 4.47369C3.8902 3.44856 4.94026 2.68547 6.14524 2.2938C7.35021 1.90212 8.64826 1.90196 9.85333 2.29333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="white"/></svg>',
   'loader-brand':
     '<svg width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 8C14 9.26704 13.5989 10.5015 12.8541 11.5266C12.1094 12.5517 11.0593 13.3147 9.85424 13.7062C8.64922 14.0978 7.35118 14.0978 6.14614 13.7063C4.9411 13.3149 3.89092 12.5519 3.14611 11.5269C2.4013 10.5019 2.0001 9.26744 2 8.0004C1.9999 6.73336 2.40091 5.49881 3.14555 4.47369C3.8902 3.44856 4.94026 2.68547 6.14524 2.2938C7.35021 1.90212 8.64826 1.90196 9.85333 2.29333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--color-brand)"/></svg>',
-  'toast-ok':
-    '<svg width="100%" height="100%" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--color-success-light)"><path d="M16.5 8.31V9C16.4991 10.6173 15.9754 12.191 15.007 13.4864C14.0386 14.7817 12.6775 15.7294 11.1265 16.1879C9.57557 16.6465 7.91794 16.5914 6.40085 16.0309C4.88376 15.4705 3.58849 14.4346 2.70822 13.0778C1.82795 11.721 1.40984 10.116 1.51625 8.50224C1.62267 6.88842 2.2479 5.35224 3.29871 4.1228C4.34951 2.89336 5.76958 2.03654 7.34714 1.68011C8.92469 1.32368 10.5752 1.48675 12.0525 2.145"/><path d="M6.75 8.25L9 10.5L16.5 3"/></g></svg>',
-  'toast-error':
-    '<svg width="100%" height="100%" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><g stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:var(--color-danger-light)"><path d="M16.5 9C16.5 13.1421 13.1421 16.5 9 16.5C4.85786 16.5 1.5 13.1421 1.5 9C1.5 4.85786 4.85786 1.5 9 1.5C13.1421 1.5 16.5 4.85786 16.5 9Z"/><path d="M11.25 6.75L6.75 11.25"/><path d="M6.75 6.75L11.25 11.25"/></g></svg>',
   'error-sm':
     '<svg width="100%" height="100%" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><g style="stroke:var(--color-danger-strong)" stroke-width="1.16667" stroke-linecap="round"><path d="M7 12.25C9.8995 12.25 12.25 9.8995 12.25 7C12.25 4.10051 9.8995 1.75 7 1.75C4.10051 1.75 1.75 4.10051 1.75 7C1.75 9.8995 4.10051 12.25 7 12.25Z"/><path d="M7 4.66667V7.58333M7 9.33333H7.00583"/></g></svg>',
 } as const;
@@ -349,40 +344,10 @@ export function SheetIcon({ name, tone }: { name: string; tone: keyof typeof ICO
 interface ToastOptions {
   kind?: 'ok' | 'error';
   desktopMessage?: string;
-  actionLabel?: string;
-  onAction?: () => void;
 }
 
-/** Dark toast: top of the page below the header on desktop, bottom on phones; Undo toasts stay 6 s. */
-export function showProfileToast(
-  message: string,
-  { kind = 'ok', desktopMessage, actionLabel, onAction }: ToastOptions = {},
-) {
-  const desktop = isDesktop();
-  toast.custom(
-    (id) => (
-      <div
-        role="status"
-        className="bg-account-ink shadow-account-toast flex w-[calc(100vw-40px)] max-w-[400px] items-center gap-[10px] rounded-[14px] py-[14px] pr-[18px] pl-[16px] leading-normal lg:mt-[72px] lg:w-[380px]"
-      >
-        <StateIcon name={kind === 'ok' ? 'toast-ok' : 'toast-error'} size={18} />
-        <p className="text-on-brand min-w-0 flex-1 text-[13px] leading-[1.5] font-medium">
-          {desktop && desktopMessage ? desktopMessage : message}
-        </p>
-        {actionLabel && onAction && (
-          <button
-            type="button"
-            onClick={() => {
-              toast.dismiss(id);
-              onAction();
-            }}
-            className="text-account-toast-action shrink-0 text-[13px] leading-[1.5] font-semibold hover:underline"
-          >
-            {actionLabel}
-          </button>
-        )}
-      </div>
-    ),
-    { position: desktop ? 'top-center' : 'bottom-center', duration: actionLabel ? 6000 : 4000, unstyled: true },
-  );
+/** The app's toast (shared/ui/toast: dark, Close button), with the profile pages' kinds. */
+export function showProfileToast(message: string, { kind = 'ok', desktopMessage }: ToastOptions = {}) {
+  if (kind === 'ok') notify.success(message, { desktopMessage });
+  else notify.error(message, { desktopMessage });
 }

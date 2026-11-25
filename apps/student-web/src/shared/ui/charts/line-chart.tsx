@@ -124,24 +124,25 @@ export function LineChart({
           })}
         </div>
       </div>
-      <div className="relative mr-10 ml-[30px] h-5" aria-hidden="true">
-        {categories.map((c, i) => (
-          <span
-            key={c}
-            className="text-foreground-muted absolute top-1 text-[10px] whitespace-nowrap"
-            style={{
-              left: `${x(i)}%`,
-              transform:
-                categories.length > 1 && i === 0
-                  ? 'none'
-                  : i === categories.length - 1 && i > 0
-                    ? 'translateX(-100%)'
-                    : 'translateX(-50%)',
-            }}
-          >
-            {c}
-          </span>
-        ))}
+      <div className="relative mr-10 ml-[30px] h-7" aria-hidden="true">
+        {/* Each name gets its own slot (halfway to its neighbours; the outer ones may use the side margins) and
+            wraps onto two lines there, so long subject names ("SOCIAL SCIENCE - HINDI") never run into each other. */}
+        {categories.map((c, i) => {
+          const half = categories.length === 1 ? 50 : 50 / (categories.length - 1);
+          const left = i === 0 ? '-30px' : `${x(i) - half}%`;
+          const right = i === categories.length - 1 ? 'calc(100% + 40px)' : `${x(i) + half}%`;
+          return (
+            <span
+              key={c}
+              title={c}
+              data-testid="line-label"
+              className="text-foreground-muted absolute top-1 line-clamp-2 px-0.5 text-center text-[10px] leading-3 break-words"
+              style={{ left, width: `calc(${right} - ${left})` }}
+            >
+              {c}
+            </span>
+          );
+        })}
       </div>
       <figcaption className="flex items-center justify-center gap-6 pt-3">
         {series.map((s) => (

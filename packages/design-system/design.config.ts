@@ -307,6 +307,15 @@ export const designConfig = defineDesignConfig({
         ended: '#FF0000', // "plan ended" pill fill (20%)
         'ended-line': '#F00000', // "plan ended" pill border (26%)
       },
+      // NEET (competitive) sidebar (Figma "Sidebar" 823:18189).
+      rail: {
+        line: '#EAEAF6', // sidebar right border
+        active: '#F1F0F9', // active item background
+        'active-line': '#DDDBF0', // active item border
+        'active-text': '#2D2A6E', // active item label
+        text: '#82828C', // item labels
+        icon: '#B3B5B6', // item icons
+      },
       socrates: {
         page: '#F5F4FA', // solver page background
         ink: '#241D52', // headings

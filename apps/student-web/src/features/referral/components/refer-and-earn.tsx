@@ -16,9 +16,15 @@ import { Faq, HowItWorks, ReferFooter, WhatTheyGet } from './info';
 import { MoneyFlowExample, MoneyFlowFriend } from './money-flow';
 import { SendCreditsDialog } from './send-credits-dialog';
 
-const PAGE = 'text-ink flex w-full min-w-0 flex-1 flex-col gap-11 pb-6 leading-normal lg:gap-[72px] lg:px-5 lg:pt-2';
+const PAGE_BASE = 'text-ink flex w-full min-w-0 flex-1 flex-col gap-11 pb-6 leading-normal lg:gap-[72px] lg:px-5';
+
+/** Board keeps its extra 8px on desktop; competitive (NEET) pages start at the shell's top padding like the others. */
+function usePageClass() {
+  return useExam().category === 'competitive' ? PAGE_BASE : `${PAGE_BASE} lg:pt-2`;
+}
 
 function LoadingState() {
+  const PAGE = usePageClass();
   return (
     <div className={PAGE} aria-busy="true" aria-label="Loading Refer & Earn">
       <Skeleton className="h-[339px] w-full rounded-[22px] lg:h-[260px]" />
@@ -39,6 +45,7 @@ function LoadingState() {
 /** Refer & Earn hub for any exam: the exam (rates, example plan, share message) comes from the registry. */
 export function ReferAndEarn() {
   const exam = useExam();
+  const PAGE = usePageClass();
   const router = useRouter();
   const queryClient = useQueryClient();
   const hub = useReferralHub();

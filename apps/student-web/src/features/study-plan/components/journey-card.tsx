@@ -125,7 +125,7 @@ export function journeyCopy(data: Journey, exam: string, category: PlanCategory 
  * previous app's JourneyCard did. Phone and desktop versions are both rendered and switched by CSS (md, the
  * previous useIsMobile breakpoint), so there is no hydration flash.
  */
-export function JourneyCard({ className }: { className?: string }) {
+export function JourneyCard({ className, fill = false }: { className?: string; fill?: boolean }) {
   const exam = useExam();
   const journey = useDashboardJourney();
   if (!journey.data) return null;
@@ -146,9 +146,13 @@ export function JourneyCard({ className }: { className?: string }) {
             href={copy.href}
             className="md:hidden"
           />
-          <div className="shadow-journey-card hidden w-full max-w-[553px] rounded-[24px] md:block">
+          {/* fill: grow past the art's 553px to fill the row (competitive dashboard) at the same height. */}
+          <div
+            className={`shadow-journey-card hidden w-full rounded-[24px] md:block ${fill ? '' : 'max-w-[553px]'}`}
+          >
             <DiagnosticCardArt
               className="block h-auto w-full"
+              stretch={fill}
               lead={copy.lead}
               hand={copy.hand}
               bodyLines={copy.bodyLines ?? []}

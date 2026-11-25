@@ -275,7 +275,7 @@ export function DiagnosticResultScreen() {
                     </span>
                     {active && (
                       <span className="text-[11px] font-medium tracking-[0.61px] whitespace-nowrap text-neutral-400 uppercase">
-                        {item.sub}
+                        {competitive && item.key === 'subjects' ? 'YOUR COMPLETE SUBJECT REPORT' : item.sub}
                       </span>
                     )}
                   </span>

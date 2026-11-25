@@ -33,7 +33,7 @@ import {
   toIso,
   type PlanType,
 } from '../api';
-import { useStudyPlanDraft } from '../draft-store';
+import { keepPicksForReturn, useStudyPlanDraft } from '../draft-store';
 import { useClassContext, usePlanStatus } from '../hooks';
 import { Notice, ScreenLoader } from './kit';
 
@@ -636,7 +636,12 @@ export function CreatePlanScreen() {
           };
   const disabled = (step === 1 && !planType) || (step === 3 && !targetDate) || create.isPending;
   const percent = Math.round((step / TOTAL_STEPS) * 100);
-  const back = () => (step > 1 ? setStep(step - 1) : router.push(chaptersHref));
+  // Back to the picker with the chapters still selected (competitive pickers otherwise start empty).
+  const toChapters = () => {
+    keepPicksForReturn();
+    router.push(chaptersHref);
+  };
+  const back = () => (step > 1 ? setStep(step - 1) : toChapters());
   const iconButton =
     'bg-brand-125 text-brand flex size-10 items-center justify-center rounded-full shadow-[0px_8px_20px_rgba(61,52,139,0.06)] disabled:opacity-40';
 
@@ -653,7 +658,7 @@ export function CreatePlanScreen() {
             <button type="button" aria-label="Back" onClick={back} className={iconButton}>
               <ArrowLeft aria-hidden className="size-[18px]" />
             </button>
-            <button type="button" aria-label="Close" onClick={() => router.push(chaptersHref)} className={iconButton}>
+            <button type="button" aria-label="Close" onClick={toChapters} className={iconButton}>
               <X aria-hidden className="size-[18px]" />
             </button>
           </div>

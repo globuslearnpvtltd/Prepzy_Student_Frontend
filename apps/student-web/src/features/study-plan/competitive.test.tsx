@@ -10,7 +10,7 @@ import { ChaptersScreen } from './components/chapters-screen';
 import { CreatePlanScreen } from './components/create-plan-screen';
 import { journeyCopy } from './components/journey-card';
 import { StudyPlanScreen } from './components/study-plan-screen';
-import { useStudyPlanDraft } from './draft-store';
+import { keepPicksForReturn, useStudyPlanDraft } from './draft-store';
 
 // Competitive (NEET) study plan: chapter-step links, locked future days, NEET copy and chapter picker.
 
@@ -198,6 +198,23 @@ describe('competitive chapter picker and create flow', () => {
     await userEvent.click(card);
     expect(useStudyPlanDraft.getState().moduleIds).toEqual([4]);
     expect(screen.getAllByRole('button', { name: /Kinematics/, pressed: true }).length).toBeGreaterThan(0);
+  });
+
+  it('starts with nothing picked on a new visit (e.g. dashboard and back)', async () => {
+    useStudyPlanDraft.getState().setDraft(20, [4]);
+    server.use(neetPlan, syllabus);
+    renderWithProviders(<ChaptersScreen />, { exam: neet });
+    await screen.findByRole('heading', { name: 'Choose topics for your study plan' });
+    await waitFor(() => expect(useStudyPlanDraft.getState().moduleIds).toEqual([]));
+  });
+
+  it('keeps the picks when the student steps back from the create step', async () => {
+    useStudyPlanDraft.getState().setDraft(20, [4]);
+    keepPicksForReturn();
+    server.use(neetPlan, syllabus);
+    renderWithProviders(<ChaptersScreen />, { exam: neet });
+    await screen.findByRole('heading', { name: 'Choose topics for your study plan' });
+    expect(useStudyPlanDraft.getState().moduleIds).toEqual([4]);
   });
 
   it('has no revise-only note on the first create step', async () => {

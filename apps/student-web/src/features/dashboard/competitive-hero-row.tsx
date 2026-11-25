@@ -27,7 +27,7 @@ export function CompetitiveHeroRow() {
 
   return (
     <div data-testid="competitive-hero-row" className="flex w-full flex-col gap-[30px] px-3 pt-3 empty:hidden md:gap-[24px]">
-      <DashboardHeroRow />
+      <DashboardHeroRow fill />
       {showWeek && <WeeklyProgressCard week={data.week} href={routes.studyPlan(exam.slug)} />}
     </div>
   );

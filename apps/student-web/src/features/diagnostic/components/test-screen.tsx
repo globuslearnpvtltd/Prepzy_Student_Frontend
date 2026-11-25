@@ -12,6 +12,7 @@ import { BackButton, Breadcrumb, Notice, ScreenLoader } from '@/features/study-p
 import { routes } from '@/shared/config/routes';
 import { subjectLabel } from '@/shared/layout/shell-api';
 import { isApiError, userMessage } from '@/shared/lib/errors';
+import { CompetitiveEvaluating } from './competitive-evaluating';
 import { CompetitiveScoreCard } from './competitive-score-card';
 import { attemptReducer, diagnosticApi, formatClock, isCase, statusCounts, type AttemptAction, type DiagnosticQuestion, type QuestionStatus } from '../api';
 
@@ -350,8 +351,8 @@ function Legend({ questions }: { questions: DiagnosticQuestion[] }) {
 
 const EVALUATING = ['Verifying Submitted Answers', 'Calculating Total Score', 'Preparing Performance Summary'];
 
-/** `flat`: the competitive look (a flat tinted page instead of a blurred overlay). */
-function Evaluating({ onDone, flat = false }: { onDone: () => void; flat?: boolean }) {
+/** Board exams' evaluating overlay (competitive exams use CompetitiveEvaluating). */
+function Evaluating({ onDone }: { onDone: () => void }) {
   const [done, setDone] = useState(0);
   useEffect(() => {
     if (done >= EVALUATING.length) {
@@ -362,7 +363,7 @@ function Evaluating({ onDone, flat = false }: { onDone: () => void; flat?: boole
     return () => clearTimeout(id);
   }, [done, onDone]);
   return (
-    <div role="dialog" aria-modal="true" aria-label="Evaluating your test" className={cx('fixed inset-0 z-50 flex items-center justify-center p-5', flat ? 'bg-brand-75' : 'bg-neutral-950/30 backdrop-blur-[6px]')}>
+    <div role="dialog" aria-modal="true" aria-label="Evaluating your test" className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/30 p-5 backdrop-blur-[6px]">
       <div className="bg-surface border-neutral-150 flex w-full max-w-[420px] flex-col gap-5 rounded-2xl border p-6 shadow-lg">
         <h2 className="text-[20px] font-bold text-neutral-900">Evaluating your test</h2>
         <ul className="flex flex-col gap-3 rounded-lg bg-neutral-50 p-4">
@@ -540,7 +541,7 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
           <Palette questions={state.questions} index={state.index} onJump={jump} />
         </div>
       </div>
-      {evaluating && <Evaluating onDone={finishAnimation} flat={competitive} />}
+      {evaluating && (competitive ? <CompetitiveEvaluating onDone={finishAnimation} /> : <Evaluating onDone={finishAnimation} />)}
     </div>
   );
 }

@@ -190,7 +190,7 @@ function ChapterSelection({
       <div className="flex flex-col gap-3 md:hidden">
         <h1 className="mt-4 text-[26px] leading-[1.18] font-bold text-neutral-950">Which chapters have you studied?</h1>
         <p className="text-[14px] text-neutral-500">
-          Choose the chapters you&apos;ve covered so far to help us build your diagnostic test.
+          Choose the chapters you&apos;ve covered so far to help us build your study plan.
         </p>
         {subjects.map((subject) => {
           const open = mobileOpen && subject.id === activeId;
@@ -297,7 +297,7 @@ function ChapterSelection({
             Which chapters have you studied?
           </h1>
           <p className="mt-2 text-[14px] text-neutral-500">
-            Choose the chapters you&apos;ve covered so far to help us build your diagnostic test.
+            Choose the chapters you&apos;ve covered so far to help us build your study plan.
           </p>
           <div
             className={cx(

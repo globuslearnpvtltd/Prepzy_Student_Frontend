@@ -3,14 +3,14 @@
 import { cx } from '@prepzy/design-system';
 import { Check, ChevronDown, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { routes } from '@/shared/config/routes';
 import { subjectLabel } from '@/shared/layout/shell-api';
 import { modulesOf, toSentenceCase, type SyllabusSubject } from '../api';
-import { useStudyPlanDraft } from '../draft-store';
+import { takeKeepPicks, useStudyPlanDraft } from '../draft-store';
 import { useClassContext, useSyllabus } from '../hooks';
 import { CompetitiveTopicGrid } from './competitive-chapters';
-import { BackButton, Breadcrumb, Notice, ProgressRing, ScreenLoader, stickyFooter } from './kit';
+import { BackButton, Breadcrumb, DesktopCrumb, Notice, ProgressRing, ScreenLoader, stickyFooter } from './kit';
 
 function ChapterRow({
   index,
@@ -195,6 +195,16 @@ export function ChaptersScreen() {
     [draft.classId, draft.moduleIds, classId],
   );
   const selected = useMemo(() => new Set(picked), [picked]);
+  const competitive = exam?.category === 'competitive';
+
+  // Competitive (NEET): every visit (dashboard and back, reload) starts with nothing selected; only
+  // stepping back from the create step keeps the picks. The ref keeps one decision per visit (Strict Mode runs effects twice).
+  const keepPicks = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!competitive) return;
+    keepPicks.current ??= takeKeepPicks();
+    if (!keepPicks.current) useStudyPlanDraft.getState().clear();
+  }, [competitive]);
 
   // Drop chapters that are no longer offered.
   useEffect(() => {
@@ -221,12 +231,14 @@ export function ChaptersScreen() {
     draft.setDraft(classId, selected.has(id) ? picked.filter((m) => m !== id) : [...picked, id]);
   const total = subjects.reduce((sum, s) => sum + s.moduleCount, 0);
   const count = picked.length;
-  const competitive = exam.category === 'competitive';
 
   return (
     <div className="flex min-h-full w-full flex-col">
       <div className="border-neutral-150 md:bg-surface flex items-center justify-between md:h-20 md:rounded-2xl md:border md:px-5 md:shadow-[0px_16px_40px_rgba(61,52,139,0.08)]">
-        <BackButton href={competitive ? routes.dashboard(exam.slug) : routes.diagnosticResult(exam.slug)} />
+        <div className="flex min-w-0 items-center gap-4">
+          <BackButton href={competitive ? routes.dashboard(exam.slug) : routes.diagnosticResult(exam.slug)} />
+          {competitive && <DesktopCrumb dashboardHref={routes.dashboard(exam.slug)} current="Study plan" />}
+        </div>
       </div>
       <Breadcrumb dashboardHref={routes.dashboard(exam.slug)} current="Study plan" className="mt-4 md:hidden" />
       <div className="flex flex-col py-5 md:gap-[6px] md:py-6">

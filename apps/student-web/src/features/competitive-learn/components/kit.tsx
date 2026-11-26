@@ -3,10 +3,11 @@
 import { cx, Skeleton } from '@prepzy/design-system';
 import { ArrowLeft, ArrowRight, ChevronRight, Home, Zap } from 'lucide-react';
 import Link from 'next/link';
-import { Fragment, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { userMessage } from '@/shared/lib/errors';
+import { CrumbTrail } from '@/shared/ui/crumb-trail';
 import type { ChapterStatus } from '../api';
 import { adjacentSteps, type ChapterStep } from '../steps';
 
@@ -44,44 +45,38 @@ export function Breadcrumb({
         <ArrowLeft aria-hidden className="size-4" />
         <span className="hidden whitespace-nowrap sm:inline">Back</span>
       </Link>
-      <nav
-        aria-label="Breadcrumb"
-        className={cx(
-          'bg-surface flex min-w-0 items-center gap-2 overflow-x-auto rounded-md px-3 py-2.5 shadow-sm [scrollbar-width:none] lg:px-4 lg:py-3.5',
-          right && 'flex-1',
-        )}
-      >
-        {crumbs.map((crumb, index) => {
-          const last = index === crumbs.length - 1;
-          const label =
-            index === 0 ? (
-              <>
-                <Home aria-hidden className="size-4 sm:hidden" />
-                <span className="max-sm:sr-only">{crumb.label}</span>
-              </>
-            ) : (
-              <span className="whitespace-nowrap">{crumb.label}</span>
-            );
-          return (
-            <Fragment key={index}>
-              {crumb.href && !last ? (
-                <Link href={crumb.href} className="text-brand flex items-center text-sm leading-5 font-bold hover:underline">
-                  {label}
-                </Link>
+      <div className={cx('bg-surface flex min-w-0 items-center gap-2 rounded-md shadow-sm', right && 'flex-1')}>
+        <CrumbTrail
+          crumbs={crumbs}
+          outerClassName={right ? 'flex-1' : undefined}
+          className="gap-2 px-3 py-2.5 lg:px-4 lg:py-3.5"
+          separator={<ChevronRight aria-hidden className="size-4 shrink-0 text-neutral-300" />}
+          renderCrumb={(crumb, { index, last }) => {
+            const label =
+              index === 0 ? (
+                <>
+                  <Home aria-hidden className="size-4 sm:hidden" />
+                  <span className="max-sm:sr-only">{crumb.label}</span>
+                </>
               ) : (
-                <span
-                  aria-current={last ? 'page' : undefined}
-                  className={cx('flex items-center text-sm leading-5 font-semibold', last ? 'text-neutral-350' : 'text-brand')}
-                >
-                  {label}
-                </span>
-              )}
-              {!last && <ChevronRight aria-hidden className="size-4 shrink-0 text-neutral-300" />}
-            </Fragment>
-          );
-        })}
-        {right && <div className="ml-auto shrink-0">{right}</div>}
-      </nav>
+                <span className="whitespace-nowrap">{crumb.label}</span>
+              );
+            return crumb.href && !last ? (
+              <Link href={crumb.href} className="text-brand flex items-center text-sm leading-5 font-bold hover:underline">
+                {label}
+              </Link>
+            ) : (
+              <span
+                aria-current={last ? 'page' : undefined}
+                className={cx('flex items-center text-sm leading-5 font-semibold', last ? 'text-neutral-350' : 'text-brand')}
+              >
+                {label}
+              </span>
+            );
+          }}
+        />
+        {right && <div className="ml-auto shrink-0 pr-3 lg:pr-4">{right}</div>}
+      </div>
     </div>
   );
 }

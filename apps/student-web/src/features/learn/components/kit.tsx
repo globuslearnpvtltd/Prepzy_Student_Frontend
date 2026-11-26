@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronRight, House } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { userMessage } from '@/shared/lib/errors';
+import { CrumbTrail } from '@/shared/ui/crumb-trail';
 
 export const COURSE_FALLBACK = '/illustrations/tests/course.jpg';
 
@@ -80,12 +81,11 @@ export function Breadcrumb({
         <ArrowLeft aria-hidden className="size-4" />
         <span className="hidden whitespace-nowrap sm:inline">Back</span>
       </Link>
-      <nav
-        aria-label="Breadcrumb"
-        className="bg-surface flex min-w-0 items-center gap-2 overflow-x-auto rounded-xl px-3 py-2.5 shadow-sm lg:px-4 lg:py-3.5"
-      >
-        {crumbs.map((crumb, index) => {
-          const last = index === crumbs.length - 1;
+      <CrumbTrail
+        crumbs={crumbs}
+        className="bg-surface gap-2 rounded-xl px-3 py-2.5 shadow-sm lg:px-4 lg:py-3.5"
+        separator={<ChevronRight aria-hidden className="size-4 shrink-0 text-neutral-300" />}
+        renderCrumb={(crumb, { index, last }) => {
           const label =
             index === 0 ? (
               <>
@@ -95,25 +95,20 @@ export function Breadcrumb({
             ) : (
               <span className="whitespace-nowrap">{crumb.label}</span>
             );
-          return (
-            <span key={`${crumb.label}-${index}`} className="flex items-center gap-2">
-              {crumb.href && !last ? (
-                <Link href={crumb.href} aria-label={crumb.label} className="text-brand flex items-center text-sm font-bold hover:underline">
-                  {label}
-                </Link>
-              ) : (
-                <span
-                  aria-current={last ? 'page' : undefined}
-                  className={cx('flex items-center text-sm font-semibold', last ? 'text-neutral-350' : 'text-brand')}
-                >
-                  {label}
-                </span>
-              )}
-              {!last && <ChevronRight aria-hidden className="size-4 shrink-0 text-neutral-300" />}
+          return crumb.href && !last ? (
+            <Link href={crumb.href} aria-label={crumb.label} className="text-brand flex items-center text-sm font-bold hover:underline">
+              {label}
+            </Link>
+          ) : (
+            <span
+              aria-current={last ? 'page' : undefined}
+              className={cx('flex items-center text-sm font-semibold', last ? 'text-neutral-350' : 'text-brand')}
+            >
+              {label}
             </span>
           );
-        })}
-      </nav>
+        }}
+      />
       {children}
     </div>
   );

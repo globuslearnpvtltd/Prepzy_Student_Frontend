@@ -44,6 +44,8 @@ export interface ChapterNotes {
   notesReady: boolean;
   videoReady: boolean;
   thumbnail: string | null;
+  /** The book's cover: the summary video card's picture (else the video's own thumbnail). */
+  courseImage: string | null;
 }
 
 export interface SummaryVideo {
@@ -80,6 +82,7 @@ export function toChapterNotes(raw: Raw): ChapterNotes {
     notesReady: flag(raw.student_note_active),
     videoReady: flag(raw.student_video_active),
     thumbnail: text(raw.video_thumbnail),
+    courseImage: text(raw.course_image),
   };
 }
 

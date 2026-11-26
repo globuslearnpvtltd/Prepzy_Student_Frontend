@@ -12,7 +12,14 @@ export const phoneSchema = z
 
 /** Country picker + national number → full international number (e.g. +919876543210). */
 export const phoneFormSchema = z
-  .object({ country: z.string(), phone: z.string().trim().min(1, 'Enter your mobile number') })
+  .object({
+    country: z.string(),
+    phone: z
+      .string()
+      .trim()
+      .min(1, 'Enter your mobile number')
+      .regex(/^[\d\s]+$/, 'Mobile number can contain digits only'),
+  })
   .transform(({ country, phone }) => normalizePhone(`+${COUNTRY_DIAL_CODES[country] ?? '91'}${phone.replace(/\D/g, '')}`))
   .refine(isValidPhone, { message: 'Enter a valid mobile number', path: ['phone'] });
 

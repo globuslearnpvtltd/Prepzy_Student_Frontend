@@ -4,6 +4,7 @@ export { DidYouKnow } from './components/kit';
 export { CourseEntry } from './components/course-entry';
 export { ModuleScreen } from './components/module-screen';
 export { LectureScreen } from './components/lecture-screen';
+export { CourseAssessmentScreen } from './components/course-assessment-screen';
 export { ChapterPyqsScreen, NcertQuestionsScreen } from './components/question-screens';
 export { CourseDetailScreen, CoursesScreen } from './components/courses-screens';
 export { LectureVideoPlayer } from './components/lazy-video-player';

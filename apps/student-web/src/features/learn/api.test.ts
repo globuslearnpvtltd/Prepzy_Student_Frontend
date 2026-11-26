@@ -32,11 +32,14 @@ describe('learn helpers', () => {
     expect(toArray({})).toEqual([]);
   });
 
-  it('maps activities to the player or the exam engine', () => {
+  it('maps lectures to the player and course assessments to their page before the test', () => {
     const lecture = toActivity({ category: 'lecture', id: 7, module: 3 })!;
     expect(activityHref('cbse', '5', lecture)).toBe('/cbse/learn/5/3/lecture/7');
-    const quiz = toActivity({ category: 'assessment', id: 9, type: 'unit_test' })!;
-    expect(activityHref('cbse', '5', quiz)).toBe('/cbse/tests/quiz/9');
+    const unitTest = toActivity({ category: 'assessment', id: 9, type: 'unit_test' })!;
+    expect(activityHref('cbse', '5', unitTest)).toBe('/cbse/learn/5/assessments/unit_test/9');
+    for (const type of ['quiz', 'mid_term_exam', 'final_exam']) {
+      expect(activityHref('cbse', '5', { category: 'assessment', id: '4', moduleId: '3', type })).toBe(`/cbse/learn/5/assessments/${type}/4`);
+    }
     expect(activityHref('cbse', '5', { category: 'assessment', id: '1', moduleId: null, type: 'odd' })).toBe('/cbse/assessments');
     expect(toActivity(null)).toBeNull();
     expect(toActivity({ category: 'lecture' })).toBeNull();

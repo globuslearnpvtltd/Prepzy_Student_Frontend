@@ -243,7 +243,7 @@ describe('CourseScreen', () => {
     renderWithProviders(<CourseScreen courseId="214" />, { exam: neet });
     expect(await screen.findByRole('link', { name: /Laws of Motion/ })).toHaveAttribute('href', '/neet/learn/214/341/video-lectures');
     expect(screen.getByText('1/1 completed')).toBeInTheDocument();
-    expect(await screen.findByText('Physics')).toBeInTheDocument();
+    expect((await screen.findAllByText('Physics'))[0]).toBeInTheDocument();
   });
 
   it('opens chapters on the first step the institute allows', async () => {

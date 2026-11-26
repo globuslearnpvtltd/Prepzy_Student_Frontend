@@ -7,15 +7,10 @@ import {
   type PortalConfig,
 } from '@/shared/config/portals';
 import { isPublicPath, routes } from '@/shared/config/routes';
+import { PREVIOUS_ACCESS_COOKIES, studentCookieNames } from '@/shared/config/session-cookies';
 
-/** Session cookie set by the backend on student login / onboarding (this app's own name). */
-export const SESSION_COOKIE = 'prepzyAccessToken';
-/**
- * The previous app's cookie (also what this app used before it had its own names). A student who only has it is
- * still treated as signed in: the backend swaps it for this app's cookies on the first API call (or answers 401 and
- * clears it, and the app goes to login).
- */
-export const LEGACY_SESSION_COOKIE = 'accessToken';
+/** Access cookie set by the backend on student login / onboarding (this app's name for this environment). */
+export const SESSION_COOKIE = studentCookieNames().access;
 /** Non-sensitive cookie the app sets to remember the student's exam (see features/auth/device.ts). */
 const EXAM_COOKIE = 'prepzy_exam';
 
@@ -61,7 +56,7 @@ export function middleware(request: NextRequest) {
   if (hostPortal) return portalResponse(request, hostPortal, true);
   if (pathPortal) return portalResponse(request, pathPortal, false);
 
-  const signedIn = request.cookies.has(SESSION_COOKIE) || request.cookies.has(LEGACY_SESSION_COOKIE);
+  const signedIn = [SESSION_COOKIE, ...PREVIOUS_ACCESS_COOKIES].some((name) => request.cookies.has(name));
   const redirect = (path: string) => NextResponse.redirect(new URL(path, request.url));
 
   if (pathname === '/') return redirect(signedIn ? homeFor(request) : routes.login());

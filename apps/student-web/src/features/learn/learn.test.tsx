@@ -151,20 +151,20 @@ describe('Chapter page', () => {
     expect(await screen.findByText('SCIENCE PART 1 · CHAPTER 1 OF 2', { exact: false, ignore: 'script' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: /Mirrors and Images/ })).toHaveAttribute('href', '/cbse/learn/5/2/lecture/8');
     expect(screen.getByLabelText('Completed')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Mirror Quiz/ })).toHaveAttribute('href', '/cbse/tests/quiz/20');
+    expect(screen.getByRole('link', { name: /Mirror Quiz/ })).toHaveAttribute('href', '/cbse/learn/5/assessments/quiz/20');
     expect(screen.getByRole('link', { name: /Chapter Notes/ })).toHaveAttribute('href', '/cbse/notes/5?module_id=2');
     expect(screen.getByRole('link', { name: /Summary Video/ })).toHaveAttribute('href', '/cbse/notes/video/31');
     expect(screen.queryByRole('link', { name: /Unit Test 1/ })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('tab', { name: 'Practice' }));
-    expect(screen.getByRole('link', { name: /Unit Test 1/ })).toHaveAttribute('href', '/cbse/tests/quiz/21');
+    expect(screen.getByRole('link', { name: /Unit Test 1/ })).toHaveAttribute('href', '/cbse/learn/5/assessments/unit_test/21');
     expect(await screen.findByRole('link', { name: /2 board questions, 2020 to 2023/ })).toHaveAttribute('href', '/cbse/learn/5/2/pyqs');
     expect(screen.getByRole('link', { name: /1 question with solutions/ })).toHaveAttribute('href', '/cbse/learn/5/2/ncert-questions');
 
     await userEvent.click(screen.getByRole('button', { name: 'Change chapter' }));
     const drawer = screen.getByRole('dialog', { name: 'Change chapter' });
     expect(within(drawer).getByRole('link', { name: /The Human Eye/ })).toHaveAttribute('href', '/cbse/learn/5/3');
-    expect(within(drawer).getByRole('link', { name: 'Mid Term' })).toHaveAttribute('href', '/cbse/tests/mid/90');
+    expect(within(drawer).getByRole('link', { name: 'Mid Term' })).toHaveAttribute('href', '/cbse/learn/5/assessments/mid_term_exam/90');
     fireEvent.keyDown(document, { key: 'Escape' });
   });
 
@@ -278,7 +278,7 @@ describe('Lecture page', () => {
     expect(await screen.findByRole('link', { name: /Ch 1: Light Reflection/ })).toHaveAttribute('href', '/cbse/learn/5/2?tab=learn');
 
     await userEvent.click(screen.getAllByRole('button', { name: /Next/ })[0]!);
-    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/cbse/tests/quiz/20'));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/cbse/learn/5/assessments/quiz/20'));
     expect(completed).toBe(true);
     await userEvent.click(screen.getAllByRole('button', { name: /Previous/ })[0]!);
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/cbse/learn/5/2/lecture/7'));

@@ -5,6 +5,7 @@ import { ArrowRight, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { userMessage } from '@/shared/lib/errors';
+import { CrumbTrail } from '@/shared/ui/crumb-trail';
 
 export function Failure({ title, error }: { title: string; error?: unknown }) {
   return (
@@ -37,25 +38,23 @@ export function Crumbs({
           <ArrowRight aria-hidden className="size-4 rotate-180" />
           Back
         </Link>
-        <nav aria-label="Breadcrumb" className="bg-surface border-learn-line hidden min-w-0 sm:flex items-center gap-2 overflow-x-auto rounded-xl border px-3 py-2.5 lg:px-4">
-          {crumbs.map((crumb, index) => (
-            <span key={`${crumb.label}-${index}`} className="flex items-center gap-2 text-sm whitespace-nowrap">
-              {crumb.href ? (
-                <Link href={crumb.href} className="text-brand font-semibold hover:underline">
-                  {crumb.label}
-                </Link>
-              ) : (
-                <span
-                  aria-current={index === crumbs.length - 1 ? 'page' : undefined}
-                  className={cx('font-medium', index === crumbs.length - 1 ? 'text-neutral-550' : 'text-brand')}
-                >
-                  {crumb.label}
-                </span>
-              )}
-              {index < crumbs.length - 1 && <span aria-hidden className="text-neutral-300">›</span>}
-            </span>
-          ))}
-        </nav>
+        <CrumbTrail
+          crumbs={crumbs}
+          outerClassName="hidden sm:flex"
+          className="bg-surface border-learn-line gap-2 rounded-xl border px-3 py-2.5 lg:px-4"
+          separator={<span className="text-sm text-neutral-300">›</span>}
+          renderCrumb={(crumb, { last }) =>
+            crumb.href ? (
+              <Link href={crumb.href} className="text-brand text-sm font-semibold hover:underline">
+                {crumb.label}
+              </Link>
+            ) : (
+              <span aria-current={last ? 'page' : undefined} className={cx('text-sm font-medium', last ? 'text-neutral-550' : 'text-brand')}>
+                {crumb.label}
+              </span>
+            )
+          }
+        />
       </div>
       {children}
     </div>

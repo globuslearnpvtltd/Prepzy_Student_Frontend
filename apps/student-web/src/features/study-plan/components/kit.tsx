@@ -1,6 +1,7 @@
 import { cx, Spinner } from '@prepzy/design-system';
 import { AlertTriangle, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { CrumbTrail } from '@/shared/ui/crumb-trail';
 
 /** Centred notice (no class / no plan / errors), as on the previous study plan and diagnostic pages. */
 export function Notice({
@@ -105,19 +106,22 @@ export function Breadcrumb({
   className?: string;
 }) {
   return (
-    <nav
-      aria-label="Breadcrumb"
-      className={cx(
-        'border-neutral-150 bg-surface flex w-full items-center gap-[10px] rounded-md border px-[21px] py-[18px]',
-        className,
-      )}
-    >
-      <Link href={dashboardHref} className="text-brand text-[14px] font-bold hover:opacity-70">
-        Dashboard
-      </Link>
-      <ChevronRight aria-hidden className="size-4 text-neutral-400" />
-      <span className="text-[14px] font-semibold text-neutral-400">{current}</span>
-    </nav>
+    <div className={cx('border-neutral-150 bg-surface flex w-full min-w-0 rounded-md border px-[21px] py-[18px]', className)}>
+      <CrumbTrail
+        className="gap-[10px]"
+        crumbs={[{ label: 'Dashboard', href: dashboardHref }, { label: current }]}
+        separator={<ChevronRight aria-hidden className="size-4 text-neutral-400" />}
+        renderCrumb={(crumb, { last }) =>
+          last ? (
+            <span className="text-[14px] font-semibold text-neutral-400">{crumb.label}</span>
+          ) : (
+            <Link href={crumb.href!} className="text-brand text-[14px] font-bold hover:opacity-70">
+              {crumb.label}
+            </Link>
+          )
+        }
+      />
+    </div>
   );
 }
 

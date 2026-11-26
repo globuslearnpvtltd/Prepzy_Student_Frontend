@@ -19,10 +19,8 @@ export const legacyLearnRedirects: LegacyRedirect[] = [
   rule(`/${exam}/learns/course/:course/module/:module/pyqs`, '/:exam/learn/:course/:module/pyqs'),
   rule(`/${exam}/learns/course/:course/module/:module/ncert-questions`, '/:exam/learn/:course/:module/ncert-questions'),
   rule(`/${exam}/learns/course/:course/module/:module`, '/:exam/learn/:course/:module'),
-  // Assessment start pages inside a course open the test player by type.
-  rule(`/${exam}/learns/course/:course/assessments/final_exam/:id`, '/:exam/tests/final/:id'),
-  rule(`/${exam}/learns/course/:course/assessments/mid_term_exam/:id`, '/:exam/tests/mid/:id'),
-  rule(`/${exam}/learns/course/:course/assessments/:type/:id`, '/:exam/tests/quiz/:id'),
+  // A course assessment's page before its test (quiz, unit test, mid-term, final); same type and id segments.
+  rule(`/${exam}/learns/course/:course/assessments/:type/:id`, '/:exam/learn/:course/assessments/:type/:id'),
   rule(`/${exam}/learns/course/:course`, '/:exam/learn/:course'),
   // Course-level assessments list → the course (its chapters hold the tests).
   rule(`/${exam}/assessments/:course`, '/:exam/learn/:course'),

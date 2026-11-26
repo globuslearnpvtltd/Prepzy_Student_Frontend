@@ -62,7 +62,9 @@ export const designConfig = defineDesignConfig({
         500: '#64748B',
         550: '#6B7280', // learn / notes: secondary text
         600: '#4A5565',
+        625: '#606060', // course assessment page: detail labels
         450: '#8D8D8D', // dashboard: chart captions
+        475: '#767676', // course assessment page: grade note
         650: '#44446A', // auth body text
         700: '#364153',
         800: '#1E2939',
@@ -84,6 +86,8 @@ export const designConfig = defineDesignConfig({
       info: {
         50: '#E3EDFC',
         25: '#F6F9FE', // board exam player: status tiles, question header
+        100: '#D0E1FB', // course assessment page: set switcher outline
+        150: '#B5D0F7', // course assessment page: unselected set
         200: '#91B1FA', // "no plan for this exam" modal: sparkles
         400: '#4285F4', // course progress gradient end
         600: '#1363DF',
@@ -105,7 +109,7 @@ export const designConfig = defineDesignConfig({
         active: '#A5B4FC', // selected language in the menu
       },
       // proposed status colours
-      success: { 50: '#ECFDF3', 100: '#DCFCE7', 300: '#32D583', 350: '#25D366', 400: '#22C55E', 450: '#2FA36B', 500: '#10B981', 600: '#039855', 700: '#16A34A' },
+      success: { 50: '#ECFDF3', 100: '#DCFCE7', 300: '#32D583', 350: '#25D366', 400: '#22C55E', 450: '#2FA36B', 500: '#10B981', 550: '#0FB503', 600: '#039855', 700: '#16A34A' }, // 550: course assessment page marks
       warning: { 50: '#FFFAEB', 100: '#FDE7D9', 500: '#EA580C', 600: '#DC6803', 700: '#B54708' },
       danger: { 25: '#FDECEC', 50: '#FEF3F2', 400: '#F97066', 450: '#E5484D', 600: '#D92D20' }, // 25/450: exam review incorrect
       // Board learn / notes pages (chapter, lecture, PYQ and NCERT screens of the previous app).

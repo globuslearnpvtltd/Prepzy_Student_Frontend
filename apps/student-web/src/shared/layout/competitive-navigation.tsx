@@ -50,22 +50,22 @@ export function remainingPercent(expiryDate: string, durationMonths: number, now
  * NEET sidebar icons from the Figma design (public/icons/neet-sidebar), by nav item key. They're drawn as CSS masks
  * so the active / inactive colour comes from `currentColor`. Items without a design icon keep their own.
  */
-const DESIGN_ICONS: Partial<Record<string, string>> = {
-  dashboard: '/icons/neet-sidebar/dashboard.svg',
-  notes: '/icons/neet-sidebar/notes.svg',
-  'daily-practice': '/icons/neet-sidebar/daily-practice.svg',
-  'mock-tests': '/icons/neet-sidebar/mock-tests.svg',
-  'pyq-library': '/icons/neet-sidebar/pyq-library.svg',
-  'custom-exam': '/icons/neet-sidebar/custom-exam.svg',
-};
+// const DESIGN_ICONS: Partial<Record<string, string>> = {
+//   dashboard: '/icons/neet-sidebar/dashboard.svg',
+//   notes: '/icons/neet-sidebar/notes.svg',
+//   'daily-practice': '/icons/neet-sidebar/daily-practice.svg',
+//   'mock-tests': '/icons/neet-sidebar/mock-tests.svg',
+//   'pyq-library': '/icons/neet-sidebar/pyq-library.svg',
+//   'custom-exam': '/icons/neet-sidebar/custom-exam.svg',
+// };
 
-function NavIcon({ nav, active }: { nav: NavItem; active: boolean }) {
-  const color = active ? 'text-brand' : 'text-rail-icon';
-  const src = DESIGN_ICONS[nav.key];
-  if (!src) return <nav.icon aria-hidden className={cx('size-7 shrink-0', color)} strokeWidth={2} />;
-  const mask = `url(${src}) center / contain no-repeat`;
-  return <span aria-hidden className={cx('size-6 shrink-0 bg-current', color)} style={{ mask, WebkitMask: mask }} />;
-}
+// function NavIcon({ nav, active }: { nav: NavItem; active: boolean }) {
+//   const color = active ? 'text-brand' : 'text-rail-icon';
+//   const src = DESIGN_ICONS[nav.key];
+//   if (!src) return <nav.icon aria-hidden className={cx('size-7 shrink-0', color)} strokeWidth={2} />;
+//   const mask = `url(${src}) center / contain no-repeat`;
+//   return <span aria-hidden className={cx('size-6 shrink-0 bg-current', color)} style={{ mask, WebkitMask: mask }} />;
+// }
 
 function PlanCard({ exam, onNavigate }: { exam: ExamConfig; onNavigate: () => void }) {
   const plan = useActivePlan(exam).data;

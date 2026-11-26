@@ -54,7 +54,7 @@ const RULES: Rule[] = [
     features: (match) => (isTestType(match[1]) ? [TEST_TYPE_FEATURE[match[1]]] : null),
   },
   { pattern: /^\/custom-test(\/|$)/, features: fixed('custom_exam') },
-  { pattern: /^\/(diagnostic|diagnostic-test|diagnostic-result)(\/|$)/, features: fixed('diagnostic_test') },
+  { pattern: /^\/(diagnostic|diagnostic-test|diagnostic-result|diagnostic-solutions)(\/|$)/, features: fixed('diagnostic_test') },
   { pattern: /^\/study-plan(\/|$)/, features: fixed('study_plan') },
   { pattern: /^\/pyq-trends(\/|$)/, features: fixed('pyq_trends') },
   { pattern: /^\/syllabus(\/|$)/, features: fixed('syllabus') },

@@ -16,6 +16,8 @@ export interface NotifyOptions {
   desktopMessage?: string;
   /** ms; default 4 s (errors 6 s). */
   duration?: number;
+  /** Reuse one toast: a new toast with the same id replaces the shown one instead of stacking. */
+  id?: string | number;
 }
 
 const DESKTOP_QUERY = '(min-width: 1024px)';
@@ -69,13 +71,14 @@ export function AppToast({ kind, message, onClose }: { kind: ToastKind; message:
   );
 }
 
-function show(kind: ToastKind, message: string, { desktopMessage, duration }: NotifyOptions = {}): string | number {
+function show(kind: ToastKind, message: string, { desktopMessage, duration, id }: NotifyOptions = {}): string | number {
   const desktop = isDesktop();
   const text = desktop && desktopMessage ? desktopMessage : message;
   return sonner.custom((id) => <AppToast kind={kind} message={text} onClose={() => sonner.dismiss(id)} />, {
     position: desktop ? 'top-center' : 'bottom-center',
     duration: duration ?? (kind === 'error' ? 6000 : 4000),
     unstyled: true,
+    ...(id === undefined ? {} : { id }),
   });
 }
 

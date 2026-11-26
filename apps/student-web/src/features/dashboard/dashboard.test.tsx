@@ -148,7 +148,7 @@ describe('board dashboard (CBSE)', () => {
     expect(screen.queryByText('Complete Profile')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start Solving' })).toHaveAttribute('href', '/cbse/doubt-solver');
     expect(screen.getByRole('link', { name: 'Use Atlas.' })).toHaveAttribute('href', '/cbse/dashboard?atlas=1');
-    expect(screen.getByRole('link', { name: 'Add parent details' })).toHaveAttribute('href', '/cbse/profile');
+    expect(screen.getByRole('link', { name: 'Add parent details' })).toHaveAttribute('href', '/cbse/profile/parent');
     expect(await screen.findByRole('link', { name: /Invite friends, earn credits/ })).toHaveAttribute(
       'href',
       '/cbse/refer-and-earn',

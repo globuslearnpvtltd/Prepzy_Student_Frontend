@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { navigation } from '@/test/setup';
 import { useMediumDialog } from '@/features/language';
 import { toDateInput, toHelpRequest, toParent, toProfile } from './api';
 import { AccountScreen } from './components/account/account-screen';
+import { dateOfBirthError } from './components/account/edit-column';
 import { DeleteAccountPage } from './components/delete/delete-page';
 import { DeleteAccountDialog } from './components/delete/delete-dialog';
 import { formatPhone } from './components/kit';
@@ -242,6 +243,29 @@ describe('Edit profile (?edit=1)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.getByRole('button', { name: 'Edit personal info' })).toBeInTheDocument();
+  });
+
+  it('does not save a date of birth in the future', async () => {
+    const put = vi.fn();
+    server.use(...accountHandlers(), http.put(`${API}/api/v4/student/account`, put));
+    renderWithProviders(<AccountScreen />, { exam: cbse });
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit personal info' }));
+    const dob = screen.getByLabelText('Date of birth');
+    expect(dob).toHaveAttribute('max');
+    fireEvent.change(dob, { target: { value: `${new Date().getFullYear() + 2}-12-12` } });
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByText('Date of birth can’t be in the future.')).toBeInTheDocument();
+    expect(dob).toHaveAttribute('aria-invalid', 'true');
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('checks typed dates of birth the picker cannot stop', () => {
+    expect(dateOfBirthError('')).toBeUndefined();
+    expect(dateOfBirthError('2008-02-16')).toBeUndefined();
+    expect(dateOfBirthError(`${new Date().getFullYear() + 1}-01-01`)).toBe('Date of birth can’t be in the future.');
+    // Chrome lets a year run to six digits; as text, "20255-…" would sort before today.
+    expect(dateOfBirthError('20255-12-12')).toBe('Date of birth can’t be in the future.');
+    expect(dateOfBirthError('1899-12-31')).toBe('Enter a valid date of birth.');
   });
 
   it('saves school and address and shows an error toast when it fails', async () => {

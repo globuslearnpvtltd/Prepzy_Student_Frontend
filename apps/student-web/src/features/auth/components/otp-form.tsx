@@ -1,7 +1,17 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Alert, Button, FieldError } from '@prepzy/design-system';
+import {
+  Alert,
+  Button,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  FieldError,
+} from '@prepzy/design-system';
+import { LogOut } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -10,7 +20,7 @@ import { notify } from '@/shared/ui/toast';
 import type { z } from 'zod';
 import { DEFAULT_EXAM } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
-import { userMessage } from '@/shared/lib/errors';
+import { isApiError, userMessage } from '@/shared/lib/errors';
 import { authApi } from '../api';
 import { getDeviceFingerprint, rememberExam } from '../device';
 import { authKeys, homeFor } from '../hooks';
@@ -116,13 +126,13 @@ export function OtpForm() {
   }, [secondsLeft]);
 
   const verify = useMutation({
-    mutationFn: async (otp: string) => {
+    mutationFn: async ({ otp, logoutAllDevices = false }: { otp: string; logoutAllDevices?: boolean }) => {
       if (!phone) throw new Error('Missing phone');
       if (flow === 'signup') {
         await authApi.verifySignupOtp(phone, otp);
         return null;
       }
-      return authApi.verifyLoginOtp(phone, otp, await getDeviceFingerprint());
+      return authApi.verifyLoginOtp(phone, otp, await getDeviceFingerprint(), { logoutAllDevices });
     },
     onSuccess: (student) => {
       if (!student) {
@@ -145,6 +155,9 @@ export function OtpForm() {
     },
     onError: (error) => notify.error(userMessage(error)),
   });
+
+  // Signed in on the maximum number of devices: the backend kept the OTP, so the same code can log out every device.
+  const deviceLimit = flow === 'login' && isApiError(verify.error) && verify.error.code === 'MAX_LOGIN_SESSIONS';
 
   const sentTo = `We sent a 6-digit code on WhatsApp to ${phone || 'your number'}.`;
 
@@ -188,7 +201,7 @@ export function OtpForm() {
 
         <form
           noValidate
-          onSubmit={form.handleSubmit(({ otp }) => verify.mutate(otp))}
+          onSubmit={form.handleSubmit(({ otp }) => verify.mutate({ otp }))}
           className="bg-surface shadow-onboarding-card-float lg:border-line lg:shadow-onboarding-card relative z-10 mx-5 -mt-8 flex flex-col items-center rounded-xl p-5 lg:mx-0 lg:mt-0 lg:border lg:p-7"
         >
           <div className="flex w-[299px] flex-col lg:w-[386px]">
@@ -209,11 +222,18 @@ export function OtpForm() {
             >
               Verify &amp; continue
             </Button>
-            {verify.isError && (
-              <Alert tone="danger" className="mt-3">
-                {userMessage(verify.error, 'That code is not valid. Please try again.')}
-              </Alert>
-            )}
+            {verify.isError &&
+              (deviceLimit ? (
+                <DeviceLimitNotice
+                  maxDevices={maxDevicesOf(verify.error)}
+                  pending={verify.isPending}
+                  onLogoutAll={() => verify.mutate({ otp: form.getValues('otp'), logoutAllDevices: true })}
+                />
+              ) : (
+                <Alert tone="danger" className="mt-3">
+                  {userMessage(verify.error, 'That code is not valid. Please try again.')}
+                </Alert>
+              ))}
           </div>
           <p className="text-brand mt-3.5 text-center text-[13px] lg:mt-4" aria-live="polite">
             Didn&apos;t receive it?{' '}
@@ -257,6 +277,69 @@ export function OtpForm() {
         </section>
       </main>
     </div>
+  );
+}
+
+/** The device limit from a 403 MAX_LOGIN_SESSIONS (`details.max_devices`), when the backend sent it. */
+function maxDevicesOf(error: unknown): number | null {
+  const details = isApiError(error) ? (error.details as { max_devices?: unknown } | undefined) : undefined;
+  const max = Number(details?.max_devices);
+  return Number.isInteger(max) && max > 0 ? max : null;
+}
+
+/**
+ * Shown when the login hits the device limit (403 MAX_LOGIN_SESSIONS): "Device limit reached" with the limit and
+ * "Log out of all devices", which asks for confirmation first ("Log out everywhere?"). Confirming re-sends the same
+ * code with `logout_all_devices` (every session of the account ends, then this device is signed in).
+ */
+function DeviceLimitNotice({
+  maxDevices,
+  pending,
+  onLogoutAll,
+}: {
+  maxDevices: number | null;
+  pending: boolean;
+  onLogoutAll: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <Alert tone="danger" className="mt-3">
+      <p className="font-semibold">Device limit reached</p>
+      <p className="mt-1">
+        You&apos;re signed in on too many devices
+        {maxDevices ? ` (limit: ${maxDevices} ${maxDevices === 1 ? 'device' : 'devices'})` : ''}. Log out of all devices
+        to continue here.
+      </p>
+      <Button type="button" intent="danger" loading={pending} onClick={() => setConfirming(true)} className="mt-3 w-full">
+        Log out of all devices
+      </Button>
+      <Dialog open={confirming} onOpenChange={setConfirming}>
+        <DialogContent className="w-[345px] max-w-[calc(100%-32px)] gap-0 rounded-2xl border-[1.5px] px-6 pt-8 pb-6 text-center md:w-[420px]">
+          <span className="bg-brand-50 text-brand mx-auto mb-5 flex size-14 items-center justify-center rounded-full">
+            <LogOut aria-hidden className="size-7" />
+          </span>
+          <DialogTitle className="mb-3 text-[20px] leading-7 font-semibold text-neutral-950">Log out everywhere?</DialogTitle>
+          <DialogDescription className="mb-8 text-[14px] leading-relaxed text-neutral-600">
+            You&apos;ll be signed out on all other devices and logged in here.
+          </DialogDescription>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming(false);
+                onLogoutAll();
+              }}
+              className="bg-brand hover:bg-brand-600 text-on-brand flex w-full items-center justify-center rounded-lg px-6 py-3 font-medium transition-colors duration-200"
+            >
+              Log out &amp; continue
+            </button>
+            <DialogClose className="border-line text-ink hover:bg-neutral-50 flex w-full items-center justify-center rounded-lg border px-6 py-3 font-medium transition-colors duration-200">
+              Cancel
+            </DialogClose>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Alert>
   );
 }
 

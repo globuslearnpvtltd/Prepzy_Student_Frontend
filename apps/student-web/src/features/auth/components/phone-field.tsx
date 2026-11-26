@@ -5,6 +5,10 @@ import { useMemo } from 'react';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { COUNTRY_DIAL_CODES } from '../countries';
 
+/** The longest national number (E.164 allows 15 digits including the country code). */
+export const PHONE_MAX_DIGITS = 15;
+export const digitsOnly = (value: string) => value.replace(/\D/g, '').slice(0, PHONE_MAX_DIGITS);
+
 const flagOf = (iso: string) => String.fromCodePoint(...[...iso.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
 
 /** Mobile number with a country picker (flag + dial code), styled like the original login. */
@@ -74,11 +78,18 @@ export function PhoneField({
           id="phone"
           type="tel"
           inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={PHONE_MAX_DIGITS}
           autoComplete="tel-national"
           aria-invalid={!!error}
           aria-describedby={error ? 'phone-error' : undefined}
           className="text-ink min-w-0 flex-1 rounded-r-lg bg-transparent pr-4 pl-1.5 text-[18px] font-bold tracking-[0.5px] outline-none lg:text-[20px]"
           {...registration}
+          onChange={(event) => {
+            // Digits only: letters and symbols are dropped as they are typed or pasted ("98765 43210" → 9876543210).
+            event.target.value = digitsOnly(event.target.value);
+            return registration.onChange(event);
+          }}
         />
       </div>
       <FieldError id="phone-error" className="font-plain text-onboarding-error mt-0 mb-2 text-[13px] font-semibold">

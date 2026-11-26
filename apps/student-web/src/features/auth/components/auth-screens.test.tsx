@@ -180,6 +180,14 @@ describe('PhoneField', () => {
     expect(screen.getByText('+44')).toBeInTheDocument();
   });
 
+  it('accepts digits only: letters and symbols are dropped while typing', async () => {
+    renderWithProviders(<PhoneHarness />);
+    const input = screen.getByLabelText('Mobile number');
+    await userEvent.type(input, '98a76b5-43 2x10');
+    expect(input).toHaveValue('9876543210');
+    expect(input).toHaveAttribute('maxLength', '15');
+  });
+
   it('links the error message to the input', () => {
     renderWithProviders(<PhoneHarness error="Enter your mobile number" />);
     const input = screen.getByLabelText('Mobile number');
@@ -208,6 +216,10 @@ describe('phone schemas', () => {
     expect(phoneFormSchema.parse({ country: 'GB', phone: '7700 900123' })).toBe('+447700900123');
     expect(phoneFormSchema.parse({ country: 'XX', phone: '98765 43210' })).toBe('+919876543210');
     expect(phoneFormSchema.safeParse({ country: 'IN', phone: '12345' }).success).toBe(false);
+    // Letters are refused, not silently stripped
+    const lettered = phoneFormSchema.safeParse({ country: 'IN', phone: '98765abc43210' });
+    expect(lettered.success).toBe(false);
+    expect(lettered.error?.issues[0]?.message).toBe('Mobile number can contain digits only');
     expect(phoneSchema.parse(' 98765 43210 ')).toBe('+919876543210');
     expect(phoneSchema.safeParse('').success).toBe(false);
   });
@@ -369,6 +381,70 @@ describe('OtpForm (more flows)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Verify & continue' }));
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/neet/tests'));
     expect(document.cookie).toContain('prepzy_exam=cbse');
+  });
+
+  it('offers "Log out from all devices" on the device limit and retries with the same code', async () => {
+    useOnboardingStore.getState().startOtp('+919876543210', 'login');
+    const bodies: unknown[] = [];
+    server.use(
+      http.post(`${API}/api/v4/auth/verify-login-otp`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        return body.logout_all_devices
+          ? HttpResponse.json({ success: true, message: 'Logged in successfully', data: { account_id: 7 } })
+          : HttpResponse.json(
+              {
+                success: false,
+                message: 'Maximum of 2 login sessions allowed for this user.',
+                code: 'MAX_LOGIN_SESSIONS',
+                data: null,
+                details: { active_sessions: ['a', 'b'], max_devices: 2 },
+              },
+              { status: 403 },
+            );
+      }),
+    );
+    renderWithProviders(<OtpForm />);
+    await userEvent.type(screen.getByLabelText('One-time code'), '123456');
+    await userEvent.click(screen.getByRole('button', { name: 'Verify & continue' }));
+
+    expect(await screen.findByText('Device limit reached')).toBeInTheDocument();
+    expect(screen.getByText(/signed in on too many devices \(limit: 2 devices\)\. Log out of all devices/)).toBeInTheDocument();
+
+    // Confirmation first: Cancel keeps the student here without calling the backend
+    await userEvent.click(screen.getByRole('button', { name: 'Log out of all devices' }));
+    expect(await screen.findByRole('dialog', { name: 'Log out everywhere?' })).toHaveTextContent(
+      "You'll be signed out on all other devices and logged in here.",
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(bodies).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Log out of all devices' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Log out & continue' }));
+
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalled());
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0]).not.toHaveProperty('logout_all_devices');
+    expect(bodies[1]).toMatchObject({ phone: '+919876543210', otp: '123456', logout_all_devices: true });
+  });
+
+  it('shows the device-limit box without a number when the backend sends no limit', async () => {
+    useOnboardingStore.getState().startOtp('+919876543210', 'login');
+    server.use(
+      http.post(`${API}/api/v4/auth/verify-login-otp`, () =>
+        HttpResponse.json(
+          { success: false, message: 'Maximum', code: 'MAX_LOGIN_SESSIONS', data: null },
+          { status: 403 },
+        ),
+      ),
+    );
+    renderWithProviders(<OtpForm />);
+    await userEvent.type(screen.getByLabelText('One-time code'), '123456');
+    await userEvent.click(screen.getByRole('button', { name: 'Verify & continue' }));
+    expect(
+      await screen.findByText("You're signed in on too many devices. Log out of all devices to continue here."),
+    ).toBeInTheDocument();
   });
 
   it('validates the code format before calling the backend', async () => {

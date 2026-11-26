@@ -52,7 +52,7 @@ function corsHeaders(origin = '*') {
 export async function signIn(context: BrowserContext, exam = 'neet') {
   const url = test.info().project.use.baseURL!;
   await context.addCookies([
-    { name: 'prepzyAccessToken', value: 'e2e', url },
+    { name: 'prepzy_student_staging_access_token', value: 'e2e', url },
     { name: 'prepzy_exam', value: exam, url },
   ]);
 }

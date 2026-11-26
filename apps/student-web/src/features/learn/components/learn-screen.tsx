@@ -24,6 +24,10 @@ export function ContinueLearning() {
     queryKey: learnKeys.continue(classId),
     queryFn: () => learnApi.continueCourses(exam, classId!),
     enabled: classId !== null,
+    // Progress changes on other pages (a lecture finished, a test submitted): always re-read it when the dashboard
+    // opens, instead of showing the list cached up to a minute earlier.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
   if (query.isError) return <SectionError title="Failed to fetch Continue Learning" error={query.error} />;
   const courses = query.data ?? [];

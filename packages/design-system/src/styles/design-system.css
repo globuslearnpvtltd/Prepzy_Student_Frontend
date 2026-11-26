@@ -34,9 +34,11 @@
   --color-neutral-350: #9CA3AF;
   --color-neutral-400: #9090B0;
   --color-neutral-450: #8D8D8D;
+  --color-neutral-475: #767676;
   --color-neutral-500: #64748B;
   --color-neutral-550: #6B7280;
   --color-neutral-600: #4A5565;
+  --color-neutral-625: #606060;
   --color-neutral-650: #44446A;
   --color-neutral-700: #364153;
   --color-neutral-800: #1E2939;
@@ -54,6 +56,8 @@
   --color-accent-800: #8A4B00;
   --color-info-25: #F6F9FE;
   --color-info-50: #E3EDFC;
+  --color-info-100: #D0E1FB;
+  --color-info-150: #B5D0F7;
   --color-info-200: #91B1FA;
   --color-info-400: #4285F4;
   --color-info-600: #1363DF;
@@ -74,6 +78,7 @@
   --color-success-400: #22C55E;
   --color-success-450: #2FA36B;
   --color-success-500: #10B981;
+  --color-success-550: #0FB503;
   --color-success-600: #039855;
   --color-success-700: #16A34A;
   --color-warning-50: #FFFAEB;

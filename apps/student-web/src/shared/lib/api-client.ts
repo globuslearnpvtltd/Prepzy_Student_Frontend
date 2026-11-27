@@ -1,4 +1,5 @@
 import { env } from '@/shared/config/env';
+import { ENV_HEADER } from '@/shared/config/session-cookies';
 import { ApiError } from './errors';
 
 type Query = Record<string, string | number | boolean | null | undefined>;
@@ -87,13 +88,18 @@ async function readBody(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Sent on every request: this website's environment, so the backend sets, reads and clears this environment's
+ * session cookies only (`prepzy_student_{env}_…`, the names the middleware checks). The backend's CORS allows it.
+ */
+const siteHeaders: Record<string, string> = { [ENV_HEADER]: env.appEnv };
+
 /** Fetch wrapper: cookies included, JSON in/out, timeouts, and one error type (ApiError). */
 export function createApiClient(baseUrl: string) {
   async function request<T>(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
-    // Kept client-side for error reports only. Not sent as a header: the backend's CORS policy allows
-    // just Content-Type and Authorization, and any other custom header makes the browser block the request.
+    // Kept client-side for error reports only (not sent as a header).
     const requestId = newRequestId();
-    const headers: Record<string, string> = { accept: 'application/json' };
+    const headers: Record<string, string> = { accept: 'application/json', ...siteHeaders };
     const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
     if (body !== undefined && !isForm) headers['content-type'] = 'application/json';
 
@@ -140,7 +146,7 @@ export function createApiClient(baseUrl: string) {
      */
     stream: async (path: string, body: unknown, options: Pick<RequestOptions, 'signal'> = {}) => {
       const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
-      const headers: Record<string, string> = { accept: 'text/event-stream' };
+      const headers: Record<string, string> = { accept: 'text/event-stream', ...siteHeaders };
       if (!isForm) headers['content-type'] = 'application/json';
       let response: Response;
       try {
@@ -170,7 +176,7 @@ export function createApiClient(baseUrl: string) {
       void fetch(buildUrl(baseUrl, path), {
         method,
         body: JSON.stringify(body),
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...siteHeaders },
         credentials: 'include',
         keepalive: true,
       }).catch(() => undefined);

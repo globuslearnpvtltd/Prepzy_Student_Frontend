@@ -7,10 +7,10 @@ import {
   type PortalConfig,
 } from '@/shared/config/portals';
 import { isPublicPath, routes } from '@/shared/config/routes';
-import { PREVIOUS_ACCESS_COOKIES, STUDENT_COOKIES } from '@/shared/config/session-cookies';
+import { PREVIOUS_ACCESS_COOKIES, studentCookieNames } from '@/shared/config/session-cookies';
 
-/** Access cookie set by the backend on student login / onboarding (same name in every environment). */
-export const SESSION_COOKIE = STUDENT_COOKIES.access;
+/** Access cookie set by the backend on student login / onboarding (this website's environment's name). */
+export const SESSION_COOKIE = studentCookieNames().access;
 /** Non-sensitive cookie the app sets to remember the student's exam (see features/auth/device.ts). */
 const EXAM_COOKIE = 'prepzy_exam';
 

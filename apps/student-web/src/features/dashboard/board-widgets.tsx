@@ -492,7 +492,7 @@ export function LinkParentCard() {
         </div>
       </div>
       <Link
-        href={routes.profile(exam.slug)}
+        href={routes.profileParent(exam.slug)}
         className="bg-accent-400 text-on-brand w-full rounded-[24px] py-3 text-center text-[14px] font-bold hover:opacity-90"
       >
         Add parent details

@@ -38,6 +38,16 @@ const today = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+const MIN_DATE_OF_BIRTH = '1900-01-01';
+
+export const dateOfBirthError = (value: string) => {
+  if (!value) return undefined;
+  const year = value.split('-')[0] ?? '';
+  if (year.length > 4 || value > today()) return 'Date of birth can’t be in the future.';
+  if (value < MIN_DATE_OF_BIRTH) return 'Enter a valid date of birth.';
+  return undefined;
+};
+
 const labelClass = 'flex gap-[2px] text-[12px] font-semibold text-account-ink';
 // dense: desktop personal info inputs are 45px tall instead of 47px.
 // The 1.5px focus / error border takes half a pixel off the padding so the height stays the same.
@@ -261,6 +271,8 @@ function PersonalInfoCard({ profile, editing, canEdit, onEdit, onClose }: CardPr
     if (!form.lastName.trim()) next.lastName = 'Enter your last name.';
     if (form.email.trim() && !EMAIL_REGEX.test(form.email.trim()))
       next.email = 'Enter a full email, like name@gmail.com.';
+    const dobError = dateOfBirthError(form.dateOfBirth);
+    if (dobError) next.dateOfBirth = dobError;
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
@@ -357,10 +369,13 @@ function PersonalInfoCard({ profile, editing, canEdit, onEdit, onClose }: CardPr
             id="date_of_birth"
             type="date"
             value={form.dateOfBirth}
+            min={MIN_DATE_OF_BIRTH}
             max={today()}
             onChange={(e) => setField('dateOfBirth', e.target.value)}
-            className={cx(inputClass(false, true), !form.dateOfBirth && 'text-account-placeholder')}
+            aria-invalid={!!errors.dateOfBirth}
+            className={cx(inputClass(!!errors.dateOfBirth, true), !form.dateOfBirth && 'text-account-placeholder')}
           />
+          <FieldError message={errors.dateOfBirth} />
         </Field>
 
         <Field label="Gender">

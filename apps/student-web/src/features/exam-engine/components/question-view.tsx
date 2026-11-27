@@ -10,14 +10,14 @@ import { RichText } from './rich-text';
 const EMPTY_WRITTEN: WrittenAnswer = { text: '', images: [] };
 
 /**
- * Option tiles in the board player (previous app's McqOptions): light blue cards with a 24px radio circle; the chosen one
- * turns solid blue with white bold text and a white ringed circle.
+ * Option tiles in the board player (previous app's McqOptions): light brand-tinted cards with a 24px radio circle; the chosen one
+ * turns solid brand purple with white bold text and a white ringed circle.
  */
 const boardOption =
-  'bg-info-25 border-info-50 text-neutral-850 rounded-[14px] border-[1.5px] px-6 py-[22px] text-[16px] leading-4 font-medium transition-all duration-300 ease-in-out data-[state=checked]:border-info-700 data-[state=checked]:bg-info-600 data-[state=checked]:text-on-brand data-[state=checked]:font-bold [&>span:first-child]:size-6 [&>span:first-child]:border-[1.5px] [&>span:first-child]:border-neutral-300 [&>span:first-child]:bg-surface data-[state=checked]:[&>span:first-child]:border-[6px] data-[state=checked]:[&>span:first-child]:border-surface data-[state=checked]:[&>span:first-child]:bg-info-700';
+  'bg-brand-25 border-brand-150 text-neutral-850 rounded-[14px] border-[1.5px] px-6 py-[22px] text-[16px] leading-4 font-medium transition-all duration-300 ease-in-out data-[state=checked]:border-brand data-[state=checked]:bg-brand-600 data-[state=checked]:text-on-brand data-[state=checked]:font-bold [&>span:first-child]:size-6 [&>span:first-child]:border-[1.5px] [&>span:first-child]:border-neutral-300 [&>span:first-child]:bg-surface data-[state=checked]:[&>span:first-child]:border-[6px] data-[state=checked]:[&>span:first-child]:border-surface data-[state=checked]:[&>span:first-child]:bg-brand';
 
 /**
- * One question. `look` follows the exam category's player: board papers show "1. question" on a blue header
+ * One question. `look` follows the exam category's player: board papers show "1. question" on a tinted header
  * strip; competitive papers show a "Question 1" chip and lettered options.
  */
 export function QuestionView({
@@ -49,8 +49,8 @@ export function QuestionView({
       {board ? (
         <header
           className={cx(
-            'border-info-50 flex flex-col gap-3 border-b-2 p-6',
-            question.typeLabel === 'Case based' ? 'bg-surface' : 'bg-info-25',
+            'border-brand-150 flex flex-col gap-3 border-b-2 p-6',
+            question.typeLabel === 'Case based' ? 'bg-surface' : 'bg-brand-25',
           )}
         >
           <h2 id={headingId} className="sr-only">
@@ -157,7 +157,7 @@ export function QuestionView({
             const parts = answer?.kind === 'parts' ? answer.parts : {};
             const letter = String.fromCharCode(97 + i);
             return (
-              <section key={part.id} className="border-info-50 flex flex-col gap-3 rounded-[14px] border-[1.5px] p-4">
+              <section key={part.id} className="border-brand-150 flex flex-col gap-3 rounded-[14px] border-[1.5px] p-4">
                 <p className="text-sm font-semibold">
                   Part {letter}
                   {part.marks !== null && (
@@ -203,8 +203,8 @@ function SubQuestion({
     <section aria-label={`Sub-question ${index + 1} of ${question.parts.length}`} className="flex flex-col gap-4">
       <div
         className={cx(
-          'border-info-50 text-neutral-850 flex flex-col gap-2 border-[1.5px] border-b-2 p-6 font-bold',
-          question.typeLabel === 'Case based' ? 'bg-surface' : 'bg-info-25',
+          'border-brand-150 text-neutral-850 flex flex-col gap-2 border-[1.5px] border-b-2 p-6 font-bold',
+          question.typeLabel === 'Case based' ? 'bg-surface' : 'bg-brand-25',
         )}
       >
         <div className="flex items-baseline gap-2">

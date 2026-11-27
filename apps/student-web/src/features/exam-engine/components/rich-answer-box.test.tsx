@@ -40,7 +40,13 @@ describe('rich written answer box', () => {
     expect(editor.querySelector('strong')).toHaveTextContent('r');
     expect(editor.querySelector('img')).toHaveAttribute('src', 'https://cdn/a.png');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Math symbols' }));
+    const fx = screen.getByRole('button', { name: 'Math symbols' });
+    expect(fx.className).toContain('bg-surface');
+    await userEvent.click(fx);
+    // switched on: filled, with white text, and no white background left to hide the label
+    expect(fx.className).toContain('bg-brand');
+    expect(fx.className).toContain('text-on-brand');
+    expect(fx.className).not.toContain('bg-surface');
     const palette = screen.getByRole('group', { name: 'Math symbols' });
     await userEvent.click(within(palette).getByRole('button', { name: 'Insert π' }));
     await userEvent.click(within(palette).getByRole('button', { name: 'Insert ²' }));

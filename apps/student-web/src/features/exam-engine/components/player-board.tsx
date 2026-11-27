@@ -2,17 +2,17 @@
 
 import { Dialog, DialogContent, DialogTitle, cx } from '@prepzy/design-system';
 import { ArrowLeft, Check, ChevronLeft } from 'lucide-react';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { isAnswered } from '../attempt';
 import { formatDuration } from '../hooks';
 import type { ExamQuestion } from '../model';
 import type { ExamPlayerLayout } from './player-types';
 import { QuestionView } from './question-view';
 
-const tile = 'border-info-50 bg-info-25 rounded-[14px] border-[1.5px]';
+const tile = 'border-brand-150 bg-brand-25 rounded-[14px] border-[1.5px]';
 /** Graph-paper backdrop of the previous board player. */
 const gridBackdrop =
-  'bg-[linear-gradient(var(--color-info-50)_1px,transparent_1px),linear-gradient(90deg,var(--color-info-50)_1px,transparent_1px)] bg-[size:24px_24px]';
+  'bg-[linear-gradient(var(--color-brand-75)_1px,transparent_1px),linear-gradient(90deg,var(--color-brand-75)_1px,transparent_1px)] bg-[size:24px_24px]';
 
 /** Short names on the status card's type chips (previous app's sectionLabels); the question card keeps the long ones. */
 const CHIP_LABELS: Record<string, string> = {
@@ -36,7 +36,7 @@ function Tick({ on }: { on: boolean }) {
       aria-hidden
       className={cx(
         'bg-surface flex size-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px]',
-        on ? 'border-info-700 text-info-700' : 'border-neutral-300',
+        on ? 'border-brand text-brand' : 'border-neutral-300',
       )}
     >
       {on && <Check className="size-3" strokeWidth={3} />}
@@ -106,7 +106,7 @@ function StatusPanel({
             onClick={() => onSelect(groups.get(label)![0]!.index)}
             className={cx(
               'flex min-w-0 justify-center overflow-hidden rounded-[36px] border-[1.5px] px-1 py-2.5 text-[12px] leading-4 font-bold text-ellipsis whitespace-nowrap',
-              shown === label ? 'bg-info-700 border-info-700 text-on-brand' : 'border-info-50 text-neutral-900',
+              shown === label ? 'bg-brand border-brand text-on-brand' : 'border-brand-150 text-neutral-900',
             )}
           >
             {chipLabel(label)}
@@ -124,8 +124,8 @@ function StatusPanel({
               aria-label={`Question ${index + 1}${saved ? ', saved' : ''}`}
               onClick={() => onSelect(index)}
               className={cx(
-                'border-info-50 flex items-center gap-3 rounded-[14px] border-[1.5px] p-[18px] text-left text-[14px] leading-4 font-semibold text-neutral-900',
-                index === attempt.index ? 'bg-info-25' : 'bg-surface',
+                'border-brand-150 flex items-center gap-3 rounded-[14px] border-[1.5px] p-[18px] text-left text-[14px] leading-4 font-semibold text-neutral-900',
+                index === attempt.index ? 'bg-brand-25' : 'bg-surface',
               )}
             >
               <Tick on={saved} />
@@ -172,10 +172,24 @@ export function BoardPlayer(props: ExamPlayerLayout) {
     setStatusOpen(false);
   };
 
+  // Every move (Save & Next, Skip, Previous, a question in the status list, the next sub-question) starts at the
+  // top of the question: the question card scrolls on its own, so it kept the previous question's scroll position.
+  const scroller = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    el.scrollTop = 0;
+    // A newly mounted answer editor can move it again while it lays out: once more on the next frame.
+    const frame = requestAnimationFrame(() => {
+      el.scrollTop = 0;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [question.id, part]);
+
   return (
     // Fills the screen under the fixed header (70px phones, 76px md+): the question scrolls, Previous / Next stay put.
     <div className="font-gilroy flex h-[calc(100dvh-70px)] flex-col overflow-hidden md:h-[calc(100dvh-76px)]">
-      <div className="bg-info-25 border-info-50 shrink-0 border-b-[1.5px]">
+      <div className="bg-brand-25 border-brand-150 shrink-0 border-b-[1.5px]">
         <div className="mx-auto flex h-[88px] max-w-[1440px] items-center gap-4 p-[14px] md:h-[112px] md:gap-7">
           <button type="button" onClick={onExit} aria-label="Back" className="text-foreground">
             <ArrowLeft aria-hidden className="size-6" />
@@ -187,7 +201,7 @@ export function BoardPlayer(props: ExamPlayerLayout) {
           <button
             type="button"
             onClick={onSubmit}
-            className="bg-info-700 border-info-700 text-on-brand rounded-[14px] border-[1.5px] px-[14px] py-[13px] text-[16px] leading-[22px] font-semibold hover:opacity-90"
+            className="bg-brand border-brand text-on-brand rounded-[14px] border-[1.5px] px-[14px] py-[13px] text-[16px] leading-[22px] font-semibold hover:opacity-90"
           >
             Finish Quiz
           </button>
@@ -203,12 +217,13 @@ export function BoardPlayer(props: ExamPlayerLayout) {
                 {formatDuration(secondsLeft, true)}
               </span>
             )}
-            <button type="button" onClick={() => setStatusOpen(true)} className="text-info-700 text-sm font-semibold">
+            <button type="button" onClick={() => setStatusOpen(true)} className="text-brand text-sm font-semibold">
               View Status
             </button>
           </div>
           <div
-            className="bg-surface border-info-50 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl border-2 shadow-sm"
+            ref={scroller}
+            className="bg-surface border-brand-150 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl border-2 shadow-sm"
             data-testid="question-scroll"
           >
             <section>
@@ -229,7 +244,7 @@ export function BoardPlayer(props: ExamPlayerLayout) {
               type="button"
               disabled={index === 0 && part === 0}
               onClick={previous}
-              className="border-info-700 text-info-700 disabled:bg-neutral-350 disabled:text-on-brand flex items-center justify-center rounded-[14px] border-[1.5px] px-[18px] py-[13px] text-[16px] leading-[22px] font-semibold disabled:cursor-not-allowed disabled:border-transparent"
+              className="border-brand text-brand disabled:bg-neutral-350 disabled:text-on-brand flex items-center justify-center rounded-[14px] border-[1.5px] px-[18px] py-[13px] text-[16px] leading-[22px] font-semibold disabled:cursor-not-allowed disabled:border-transparent"
             >
               <ChevronLeft aria-hidden className="size-4" />
               Previous
@@ -237,20 +252,20 @@ export function BoardPlayer(props: ExamPlayerLayout) {
             <button
               type="button"
               onClick={skip}
-              className="border-info-700 text-info-700 bg-surface ml-auto flex items-center justify-center rounded-[14px] border-[1.5px] px-[18px] py-[13px] text-[16px] leading-[22px] font-semibold hover:ring-2 hover:ring-inset"
+              className="border-brand text-brand bg-surface ml-auto flex items-center justify-center rounded-[14px] border-[1.5px] px-[18px] py-[13px] text-[16px] leading-[22px] font-semibold hover:ring-2 hover:ring-inset"
             >
               Skip
             </button>
             <button
               type="button"
               onClick={saveAndNext}
-              className="bg-info-700 border-info-700 text-on-brand flex items-center justify-center rounded-[14px] border-[1.5px] px-[18px] py-[13px] text-[16px] leading-[22px] font-semibold hover:opacity-90"
+              className="bg-brand border-brand text-on-brand flex items-center justify-center rounded-[14px] border-[1.5px] px-[18px] py-[13px] text-[16px] leading-[22px] font-semibold hover:opacity-90"
             >
               Save &amp; Next
             </button>
           </footer>
         </div>
-        <aside className="bg-surface border-info-50 hidden w-[34%] shrink-0 overflow-y-auto border-[1.5px] p-[44px] md:block">
+        <aside className="bg-surface border-brand-150 hidden w-[34%] shrink-0 overflow-y-auto border-[1.5px] p-[44px] md:block">
           <StatusPanel {...props} onSelect={select} />
         </aside>
       </div>

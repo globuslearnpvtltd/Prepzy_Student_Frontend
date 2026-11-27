@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { track } from '@/shared/analytics/track';
 import { LectureVideoPlayer, type LectureVideoPlayerProps } from './lecture-video-player';
-import { CAPTIONS_KEYS, formatTime, LANGUAGE_KEY } from './player-utils';
+import { CAPTIONS_KEYS, formatTime, LANGUAGE_KEY, youtubeCaptionRequests } from './player-utils';
 
 vi.mock('@/shared/analytics/track', () => ({ track: vi.fn() }));
 
@@ -59,6 +59,54 @@ describe('formatTime', () => {
     expect(formatTime(3725)).toBe('1:02:05');
     expect(formatTime(Number.NaN)).toBe('0:00');
     expect(formatTime(-1)).toBe('0:00');
+  });
+});
+
+describe('youtubeCaptionRequests (best request last)', () => {
+  const none = { getOption: () => [] };
+  const toEn = { languageCode: 'en', languageName: 'English' };
+  const toHi = { languageCode: 'hi', languageName: 'Hindi' };
+  it('English / Hindi lectures: own captions last, anything else translated into the lecture language', () => {
+    expect(youtubeCaptionRequests(none, 'english')).toEqual([
+      { languageCode: 'hi', translationLanguage: toEn },
+      { languageCode: 'en' },
+    ]);
+    expect(youtubeCaptionRequests(none, 'Hindi')).toEqual([
+      { languageCode: 'en', translationLanguage: toHi },
+      { languageCode: 'hi' },
+    ]);
+    expect(
+      youtubeCaptionRequests(
+        {
+          getOption: () => {
+            throw new Error('not ready');
+          },
+        },
+        'english',
+      ).at(-1),
+    ).toEqual({ languageCode: 'en' });
+  });
+  it('uses listed tracks as listed and translates every other listed track', () => {
+    const tracks = [
+      { languageCode: 'ta', languageName: 'Tamil' },
+      { languageCode: 'hi', languageName: 'Hindi' },
+      { languageCode: 'en-IN', languageName: 'English (India)' },
+    ];
+    expect(youtubeCaptionRequests({ getOption: () => tracks }, 'english')).toEqual([
+      { languageCode: 'ta', translationLanguage: toEn },
+      { languageCode: 'hi', translationLanguage: toEn },
+      { languageCode: 'en-IN' },
+    ]);
+  });
+  it('other lectures (Hinglish): the best available language, untranslated', () => {
+    expect(youtubeCaptionRequests(none, 'Hinglish')).toEqual([{ languageCode: 'en' }, { languageCode: 'hi' }]);
+    expect(youtubeCaptionRequests({}, null)).toEqual([{ languageCode: 'hi' }, { languageCode: 'en' }]);
+    const tamil = [{ languageCode: 'ta', languageName: 'Tamil' }];
+    expect(youtubeCaptionRequests({ getOption: () => tamil }, 'tamil')).toEqual([
+      { languageCode: 'hi' },
+      { languageCode: 'en' },
+      { languageCode: 'ta' },
+    ]);
   });
 });
 
@@ -222,13 +270,18 @@ describe('LectureVideoPlayer: playback', () => {
     expect(mute).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('toggles YouTube captions, remembers the choice and reads the quality YouTube reports', async () => {
+  it('toggles YouTube captions by choosing a caption track, remembers the choice and reads the quality', async () => {
     localStorage.setItem(CAPTIONS_KEYS.board, 'off');
     const { media } = renderPlayer({ videos: [{ language: 'english', link: YOUTUBE }] });
     expect(JSON.parse(media().dataset.config!).youtube.cc_load_policy).toBe(0);
     const api = {
       loadModule: vi.fn(),
       unloadModule: vi.fn(),
+      getOption: vi.fn(() => [
+        { languageCode: 'hi', languageName: 'Hindi' },
+        { languageCode: 'en', languageName: 'English' },
+      ]),
+      setOption: vi.fn(),
       getPlaybackQuality: vi.fn(() => 'hd720'),
       addEventListener: vi.fn(),
     };
@@ -238,11 +291,22 @@ describe('LectureVideoPlayer: playback', () => {
 
     const cc = screen.getByRole('button', { name: 'Turn on captions' });
     expect(cc).toHaveAttribute('aria-pressed', 'false');
+    api.setOption.mockClear();
     await userEvent.click(cc);
+    // loadModule alone shows nothing on YouTube: a track must be chosen (the video's own language)
     expect(api.loadModule).toHaveBeenCalledWith('captions');
+    // an English lecture: Hindi captions translated to English, then the video's English captions (last wins)
+    expect(api.setOption.mock.calls).toEqual([
+      ['captions', 'track', { languageCode: 'hi', translationLanguage: { languageCode: 'en', languageName: 'English' } }],
+      ['captions', 'track', { languageCode: 'en' }],
+    ]);
     expect(localStorage.getItem(CAPTIONS_KEYS.board)).toBe('on');
+    // the track list arrives with playback: chosen again then
+    api.setOption.mockClear();
+    fireEvent.playing(media());
+    expect(api.setOption).toHaveBeenLastCalledWith('captions', 'track', { languageCode: 'en' });
     fireEvent.keyDown(document.body, { key: 'c' });
-    expect(api.unloadModule).toHaveBeenCalledWith('captions');
+    expect(api.setOption).toHaveBeenLastCalledWith('captions', 'track', {});
     expect(localStorage.getItem(CAPTIONS_KEYS.board)).toBe('off');
   });
 
@@ -266,6 +330,16 @@ describe('LectureVideoPlayer: playback', () => {
       expect(screen.getByTestId('video-layer')).toHaveAttribute('data-cropped', 'true');
       act(() => listeners[0]!({ data: 1 }));
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      // resumed after buffering (react-player v3 sends no second "play"): the crop lifts again once settled,
+      // otherwise the captions stay hidden in the cropped strip
+      expect(screen.getByTestId('video-layer')).toHaveAttribute('data-cropped', 'true');
+      act(() => vi.advanceTimersByTime(4500));
+      expect(screen.getByTestId('video-layer')).toHaveAttribute('data-cropped', 'false');
+      // the same through the element's own "playing" event
+      act(() => listeners[0]!({ data: 3 }));
+      fireEvent.playing(media());
+      act(() => vi.advanceTimersByTime(4500));
+      expect(screen.getByTestId('video-layer')).toHaveAttribute('data-cropped', 'false');
     } finally {
       vi.useRealTimers();
     }

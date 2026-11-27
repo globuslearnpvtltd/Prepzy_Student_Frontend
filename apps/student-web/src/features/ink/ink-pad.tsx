@@ -4,7 +4,7 @@ import { cx } from '@prepzy/design-system';
 import { ChevronDown, ChevronUp, Eraser, Hand, Maximize2, Minimize2, PenLine, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { EXPORT_INK, InkDoc, type InkStroke } from './ink-doc';
+import { EXPORT_INK, InkDoc, PAPER, type InkStroke } from './ink-doc';
 
 const MIN_SHEET = 120; // CSS px: the smallest sheet, on a very short screen
 const MAX_SHEET = 1400; // one message's worth: longer pages become too small for the tutor to read
@@ -133,7 +133,12 @@ export function InkPad({ doc, expanded = false, onExpandedChange, disabled, tool
     advance: undefined as ReturnType<typeof setTimeout> | undefined,
   }).current;
 
-  const context = useCallback(() => canvas.current?.getContext('2d', { desynchronized: true }) ?? null, []);
+  // A low-latency (desynchronized) canvas is drawn without transparency on many GPUs: anything not painted shows
+  // black. So the canvas is opaque (alpha: false) and every repaint fills it with white paper first.
+  const context = useCallback(
+    () => canvas.current?.getContext('2d', { desynchronized: true, alpha: false }) ?? null,
+    [],
+  );
   const inkColor = useCallback(() => (canvas.current ? getComputedStyle(canvas.current).color : EXPORT_INK), []);
 
   // ------------------------------------------------------------------ size
@@ -182,7 +187,7 @@ export function InkPad({ doc, expanded = false, onExpandedChange, disabled, tool
     const ctx = context();
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    doc.paint(ctx, sheetWidth, height, inkColor());
+    doc.paint(ctx, sheetWidth, height, inkColor(), PAPER);
   }, [doc, sheetWidth, height, context, inkColor]);
 
   const updateReach = useCallback(() => {
@@ -222,7 +227,7 @@ export function InkPad({ doc, expanded = false, onExpandedChange, disabled, tool
       return;
     }
     const ctx = context();
-    if (ctx && sheetWidth && !g.stroke) doc.paint(ctx, sheetWidth, height, inkColor());
+    if (ctx && sheetWidth && !g.stroke) doc.paint(ctx, sheetWidth, height, inkColor(), PAPER);
     // `height` is not a dependency: the layout effect above repaints when the size changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, version]);
@@ -245,7 +250,7 @@ export function InkPad({ doc, expanded = false, onExpandedChange, disabled, tool
     const { x, y } = pointAt(event);
     if (doc.eraseAt(x, y, ERASER_RADIUS, g.erased)) {
       const ctx = context();
-      if (ctx) doc.paint(ctx, sheetWidth, height, inkColor());
+      if (ctx) doc.paint(ctx, sheetWidth, height, inkColor(), PAPER);
     }
   };
 
@@ -264,7 +269,7 @@ export function InkPad({ doc, expanded = false, onExpandedChange, disabled, tool
     g.pointer = -1;
     setWriting(false);
     const ctx = context();
-    if (ctx) doc.paint(ctx, sheetWidth, height, inkColor());
+    if (ctx) doc.paint(ctx, sheetWidth, height, inkColor(), PAPER);
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -377,7 +382,7 @@ export function InkPad({ doc, expanded = false, onExpandedChange, disabled, tool
     if (native.type === 'pointercancel') {
       // the system took the gesture (e.g. a notification swipe): do not leave half a mark behind
       const ctx = context();
-      if (ctx) doc.paint(ctx, sheetWidth, height, inkColor());
+      if (ctx) doc.paint(ctx, sheetWidth, height, inkColor(), PAPER);
       return;
     }
     const ctx = context();
@@ -438,7 +443,7 @@ export function InkPad({ doc, expanded = false, onExpandedChange, disabled, tool
           className={cx(
             // No visible scrollbars (the pad has its own up / down buttons; wheel, trackpad and two fingers scroll),
             // so the writing area is the same size on every device and never resizes itself.
-            'bg-socrates-soft relative overflow-auto overscroll-contain rounded-[14px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+            'bg-surface ring-socrates-line relative overflow-auto overscroll-contain rounded-[14px] ring-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
             expanded ? 'min-h-0 flex-1' : 'h-[min(40dvh,280px)]',
           )}
         >

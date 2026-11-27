@@ -16,8 +16,18 @@ import type { UploadedImage, WrittenAnswer } from '../model';
 import { useVoiceAnswer } from '../transcribe';
 import { MAX_ANSWER_IMAGES, TOO_MANY_IMAGES, uploadAnswerImage } from '../upload';
 
-const iconButton =
-  'border-info-700 bg-surface text-info-700 flex size-9 items-center justify-center rounded-full border hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50';
+/**
+ * The answer box's round tool buttons. Each state sets its own colours: `cx` doesn't merge Tailwind classes, so adding
+ * `bg-brand text-on-brand` on top of `bg-surface text-brand` let the white background win and hid the icon (white on
+ * white) while a tool was on.
+ */
+const iconButton = (state: 'idle' | 'on' | 'recording' = 'idle') =>
+  cx(
+    'flex size-9 items-center justify-center rounded-full border transition-colors focus-visible:ring-brand-200 focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+    state === 'idle' && 'border-brand bg-surface text-brand hover:bg-brand-75',
+    state === 'on' && 'border-brand bg-brand text-on-brand hover:bg-brand-600',
+    state === 'recording' && 'border-danger bg-danger text-on-brand',
+  );
 
 /** The editor's state as a WrittenAnswer: HTML for grading, plain text for "answered", images still shown. */
 export function editorAnswer(editor: Pick<Editor, 'getHTML' | 'getText' | 'isEmpty'>, images: UploadedImage[]): WrittenAnswer {
@@ -202,7 +212,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="border-info-700 bg-info-25 relative flex min-h-[220px] flex-col rounded-[14px] border-[1.5px]">
+      <div className="border-brand bg-brand-25 relative flex min-h-[220px] flex-col rounded-[14px] border-[1.5px]">
         {editor ? (
           <EditorContent editor={editor} className={inkOpen ? 'hidden' : 'flex max-h-[420px] flex-1 flex-col overflow-y-auto'} />
         ) : (
@@ -247,7 +257,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
                     onClick={() => void closeInk()}
                     aria-label="Add to answer"
                     disabled={inkBusy || ink.isEmpty}
-                    className="bg-info-700 text-on-brand flex h-8 shrink-0 items-center gap-1 rounded-full px-3 text-[12.5px] font-semibold disabled:opacity-50"
+                    className="bg-brand text-on-brand flex h-8 shrink-0 items-center gap-1 rounded-full px-3 text-[12.5px] font-semibold disabled:opacity-50"
                   >
                     {inkBusy ? <Spinner size="sm" label="Adding" /> : <Check aria-hidden className="size-3.5" />}
                     {/* Short on phones so the pad's toolbar fits on one line. */}
@@ -262,7 +272,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
         <div className={inkOpen ? 'hidden' : 'absolute right-4 bottom-4 flex items-center gap-2.5'}>
           <button
             type="button"
-            className={iconButton}
+            className={iconButton()}
             aria-label="Write by hand"
             title="Write by hand"
             disabled={!editor}
@@ -275,7 +285,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
           </button>
           <button
             type="button"
-            className={cx(iconButton, 'text-[13px] font-semibold italic', symbols && 'bg-info-700 text-on-brand')}
+            className={cx(iconButton(symbols ? 'on' : 'idle'), 'text-[13px] font-semibold italic')}
             aria-label="Math symbols"
             aria-expanded={symbols}
             onClick={() => setSymbols((open) => !open)}
@@ -285,7 +295,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
           {voice.supported && (
             <button
               type="button"
-              className={cx(iconButton, voice.state === 'recording' && 'bg-danger text-on-brand border-danger')}
+              className={iconButton(voice.state === 'recording' ? 'recording' : 'idle')}
               aria-label={voice.state === 'recording' ? 'Stop recording' : 'Answer by voice'}
               aria-pressed={voice.state === 'recording'}
               disabled={voice.state === 'transcribing'}
@@ -302,7 +312,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
           )}
           <button
             type="button"
-            className={iconButton}
+            className={iconButton()}
             aria-label="Add photo of your answer"
             disabled={upload.isPending || !editor}
             onClick={() => gallery.current?.click()}
@@ -311,7 +321,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
           </button>
           <button
             type="button"
-            className={cx(iconButton, 'md:hidden')}
+            className={cx(iconButton(), 'md:hidden')}
             aria-label="Take a photo"
             disabled={upload.isPending || !editor}
             onClick={() => camera.current?.click()}
@@ -323,7 +333,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
         <input ref={camera} type="file" accept="image/*" capture="environment" hidden onChange={onFile} />
       </div>
       {symbols && !inkOpen && (
-        <div role="group" aria-label="Math symbols" className="border-info-50 bg-surface flex flex-wrap gap-1.5 rounded-[14px] border p-2">
+        <div role="group" aria-label="Math symbols" className="border-brand-150 bg-surface flex flex-wrap gap-1.5 rounded-[14px] border p-2">
           {MATH_SYMBOLS.map((symbol) => (
             <button
               key={symbol}
@@ -332,7 +342,7 @@ export default function RichAnswerBox({ label, value, onChange, inkDraftKey }: R
               // Keep the editor's selection: insert where the student was typing.
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor?.chain().focus().insertContent(symbol).run()}
-              className="bg-info-25 text-info-700 hover:bg-info-50 min-w-8 rounded-sm px-2 py-1 text-[14px]"
+              className="bg-brand-25 text-brand hover:bg-brand-75 min-w-8 rounded-sm px-2 py-1 text-[14px]"
             >
               {symbol}
             </button>

@@ -1,7 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { competitiveChrome } from '@/shared/config/navigation';
+import { ExamProvider } from '@/shared/hooks/use-exam';
 import { competitiveSuggestionHref } from '@/shared/layout/shell-api';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
@@ -269,6 +271,31 @@ describe('ChapterScreen', () => {
     expect(screen.getAllByRole('link', { name: 'Previous step' })[0]).toHaveAttribute('href', '/neet/learn/214/341/video-lectures');
     expect(screen.getAllByRole('link', { name: 'Next step' })[0]).toHaveAttribute('href', '/neet/learn/214/341/practice-questions');
     expect(screen.getByRole('progressbar', { name: 'Overall progress' })).toHaveAttribute('aria-valuenow', '25');
+  });
+
+  it('re-reads the progress when the student comes back to the page (even with fresh cached data)', async () => {
+    let row = sidebarRow;
+    server.use(
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/:id`, () => ok({ data: { chapter: row } })),
+      http.get(`${API}/api/v4/learn/competitive/${neet.examId}/chapters/341/notes`, () => ok({ data: { module_name: 'Laws of Motion', notes_text: null } })),
+    );
+    const page = <ChapterScreen courseId="214" moduleId="341" step="study-notes" />;
+    const { queryClient, unmount } = renderWithProviders(page, { exam: neet });
+    // the app's own cache keeps data fresh for 60 s (shared/lib/query-client.ts)
+    queryClient.setDefaultOptions({ queries: { ...queryClient.getDefaultOptions().queries, staleTime: 60_000 } });
+    expect(await screen.findByRole('progressbar', { name: 'Overall progress' })).toHaveAttribute('aria-valuenow', '25');
+    unmount();
+
+    // a chapter PYQ test is taken elsewhere, then the student comes back
+    row = { ...sidebarRow, completed_pyqs: 1 };
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExamProvider value={neet}>{page}</ExamProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('progressbar', { name: 'Overall progress' })).toHaveAttribute('aria-valuenow', '50'),
+    );
   });
 
   it('plays a video, switches language and marks it completed', async () => {

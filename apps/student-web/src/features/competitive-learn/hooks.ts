@@ -19,6 +19,13 @@ export const learnKeys = {
   pyqAttempts: (moduleId: string) => ['competitive-learn', 'pyq-attempts', moduleId] as const,
 };
 
+/**
+ * Progress shown on the chapter pages (overall %, step ticks, attempts) changes on other pages (a test, the video,
+ * the notes): re-read it every time a page opens, so coming back never shows the old numbers (user, 2026-11-27).
+ * The cached data is shown meanwhile, so nothing blinks. Content (video, notes) keeps the normal cache.
+ */
+const FRESH_ON_RETURN = { staleTime: 0, refetchOnMount: 'always' as const };
+
 export function useNotesSubjects(classId: number | null) {
   const exam = useExam();
   return useQuery({
@@ -39,12 +46,17 @@ export function useNotesChapters(classId: number | null, subjectId: string | nul
 
 export function useCourse(courseId: string) {
   const exam = useExam();
-  return useQuery({ queryKey: learnKeys.course(courseId), queryFn: () => learnApi.course(exam, courseId) });
+  return useQuery({ queryKey: learnKeys.course(courseId), queryFn: () => learnApi.course(exam, courseId), ...FRESH_ON_RETURN });
 }
 
 export function useChapter(moduleId: string | null | undefined) {
   const exam = useExam();
-  return useQuery({ queryKey: learnKeys.chapter(moduleId ?? ''), queryFn: () => learnApi.chapter(exam, moduleId!), enabled: !!moduleId });
+  return useQuery({
+    queryKey: learnKeys.chapter(moduleId ?? ''),
+    queryFn: () => learnApi.chapter(exam, moduleId!),
+    enabled: !!moduleId,
+    ...FRESH_ON_RETURN,
+  });
 }
 
 export function useSummaryVideo(moduleId: string) {
@@ -59,7 +71,7 @@ export function useStudyNotes(moduleId: string) {
 
 export function usePracticeAssessment(moduleId: string) {
   const exam = useExam();
-  return useQuery({ queryKey: learnKeys.practice(moduleId), queryFn: () => learnApi.practiceAssessment(exam, moduleId) });
+  return useQuery({ queryKey: learnKeys.practice(moduleId), queryFn: () => learnApi.practiceAssessment(exam, moduleId), ...FRESH_ON_RETURN });
 }
 
 export function usePracticeAttempts(assessmentId: string | null | undefined) {
@@ -68,11 +80,12 @@ export function usePracticeAttempts(assessmentId: string | null | undefined) {
     queryKey: learnKeys.practiceAttempts(assessmentId ?? null),
     queryFn: () => learnApi.practiceAttempts(exam, assessmentId!),
     enabled: !!assessmentId,
+    ...FRESH_ON_RETURN,
   });
 }
 
 export const useChapterPyqAttempts = (moduleId: string) =>
-  useQuery({ queryKey: learnKeys.pyqAttempts(moduleId), queryFn: () => learnApi.chapterPyqAttempts(moduleId) });
+  useQuery({ queryKey: learnKeys.pyqAttempts(moduleId), queryFn: () => learnApi.chapterPyqAttempts(moduleId), ...FRESH_ON_RETURN });
 
 /** Marks the chapter's video or notes as done, then refreshes the chapter's progress everywhere. */
 export function useMarkComplete(kind: 'video' | 'notes', moduleId: string) {

@@ -104,7 +104,7 @@ function DiscussCard({ question }: { question: ResultQuestion }) {
   };
   const c = copy[outcome];
   return (
-    <div className="border-info-50 bg-info-25 flex flex-col gap-4 rounded-[14px] border p-6 sm:flex-row sm:items-center">
+    <div className="border-brand-150 bg-brand-25 flex flex-col gap-4 rounded-[14px] border p-6 sm:flex-row sm:items-center">
       <Image
         src="/illustrations/tests/vedica.jpg"
         alt=""
@@ -174,7 +174,7 @@ function BoardResult({ result, home }: { result: ExamResult; home: { label: stri
       >
         <ChevronLeft aria-hidden className="size-5" />
       </Link>
-      <header className="bg-info-600 text-on-brand flex items-center justify-between rounded-[14px] px-5 py-4">
+      <header className="bg-brand-600 text-on-brand flex items-center justify-between rounded-[14px] px-5 py-4">
         <h1 className="text-lg font-medium">Your Score</h1>
         <p className="text-lg font-semibold" aria-label={`Score ${result.obtained} out of ${result.totalMarks}`}>
           {result.obtained}/{result.totalMarks}
@@ -213,17 +213,18 @@ function BoardResultQuestion({ question, number }: { question: ResultQuestion; n
           {question.options.map((option) => (
             <li
               key={option.id}
+              // One border colour per state: cx doesn't merge Tailwind classes, so an added colour could lose to the base one.
               className={cx(
-                'border-border flex w-fit items-center gap-2.5 rounded-[10px] border px-[18px] py-3 text-sm',
-                option.isCorrect && 'border-success-450',
-                option.isSelected && !option.isCorrect && 'border-danger-450',
+                'flex w-fit items-center gap-2.5 rounded-[10px] border px-[18px] py-3 text-sm',
+                option.isCorrect ? 'border-success-450' : option.isSelected ? 'border-danger-450' : 'border-border',
               )}
             >
               <span
                 aria-hidden
+                data-selected={option.isSelected || undefined}
                 className={cx(
-                  'size-5 rounded-full border border-neutral-300',
-                  option.isSelected && 'border-info-700 border-[6px]',
+                  'size-5 shrink-0 rounded-full',
+                  option.isSelected ? 'border-brand border-[6px]' : 'border border-neutral-300',
                 )}
               />
               <span className="flex flex-col gap-2">
@@ -250,14 +251,14 @@ function BoardResultQuestion({ question, number }: { question: ResultQuestion; n
         </section>
       )}
       {question.parts.map((part, i) => (
-        <section key={part.id} className="border-info-50 rounded-[14px] border p-4">
+        <section key={part.id} className="border-brand-150 rounded-[14px] border p-4">
           <p className="mb-2 text-sm font-semibold">
             Part {String.fromCharCode(97 + i)} · {part.obtained ?? 0}/{part.marks ?? 0}
           </p>
           <BoardResultQuestion question={part} number={i + 1} />
         </section>
       ))}
-      <section className="border-info-50 bg-info-25 flex flex-col gap-3 rounded-[14px] border p-6">
+      <section className="border-brand-150 bg-brand-25 flex flex-col gap-3 rounded-[14px] border p-6">
         <p className="flex items-center gap-2 text-lg font-medium">
           {question.outcome === 'incorrect' || question.outcome === 'unattempted' ? (
             <X aria-hidden className="text-danger size-5" />
@@ -274,7 +275,7 @@ function BoardResultQuestion({ question, number }: { question: ResultQuestion; n
         )}
         {question.marks !== null && (
           <p className="text-lg">
-            Marks Obtained: <span className="text-info-600 font-semibold">{question.obtained ?? 0}</span>/
+            Marks Obtained: <span className="text-brand-600 font-semibold">{question.obtained ?? 0}</span>/
             <span className="font-semibold">{question.marks}</span>
           </p>
         )}
@@ -284,7 +285,7 @@ function BoardResultQuestion({ question, number }: { question: ResultQuestion; n
               type="button"
               aria-expanded={ideal}
               onClick={() => setIdeal((v) => !v)}
-              className="bg-info-600 text-on-brand flex w-fit items-center gap-1 rounded-[10px] px-4 py-3 text-sm"
+              className="bg-brand-600 text-on-brand flex w-fit items-center gap-1 rounded-[10px] px-4 py-3 text-sm"
             >
               {ideal ? 'Hide Ideal Answer' : 'View Ideal Answer'}
               <ChevronRight aria-hidden className="size-4" />

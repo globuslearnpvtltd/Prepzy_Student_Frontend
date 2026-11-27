@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { toast } from 'sonner';
+import { notify } from '@/shared/ui/toast';
 import { renderWithProviders } from '@/test/render';
 import { API, server } from '@/test/server';
 import { testExam } from '@/test/exams';
@@ -116,7 +116,7 @@ describe('competitive StudyPlanScreen', () => {
         return HttpResponse.json({ success: true });
       }),
     );
-    const warn = vi.spyOn(toast, 'error');
+    const warn = vi.spyOn(notify, 'error');
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     renderWithProviders(<StudyPlanScreen />, { exam: neet });
 
@@ -146,7 +146,7 @@ describe('competitive StudyPlanScreen', () => {
         ),
       ),
     );
-    const warn = vi.spyOn(toast, 'error');
+    const warn = vi.spyOn(notify, 'error');
     renderWithProviders(<StudyPlanScreen />, { exam: neet });
     await screen.findByText('Study notes (Part 1 of 2) · Cell biology');
     await userEvent.click(screen.getByRole('checkbox', { name: /Cell biology done/ }));

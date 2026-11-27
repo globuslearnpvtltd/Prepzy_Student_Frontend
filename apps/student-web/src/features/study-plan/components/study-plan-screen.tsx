@@ -3,11 +3,11 @@
 import { cx } from '@prepzy/design-system';
 import { ArrowLeft, ArrowRight, BookMarked, CalendarDays, Check, ChevronRight, Clock } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import type { ExamConfig } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { resolveDailyPractice } from '@/shared/layout/competitive-navigation';
 import { subjectLabel } from '@/shared/layout/shell-api';
+import { notify } from '@/shared/ui/toast';
 import {
   dayDots,
   formatDailyTime,
@@ -368,8 +368,8 @@ function DayPanel({
   // Competitive plans (as the previous NEET app): a future day's tasks can be opened but not completed yet.
   const competitive = exam.category === 'competitive';
   const locked = competitive && isFutureDay(date);
-  const warnLocked = () => toast.error(unlockMessage(date), { id: 'study-plan-future-day' });
-  const onError = competitive ? { onError: (error: unknown) => toast.error(errorText(error), { id: 'study-plan-error' }) } : undefined;
+  const warnLocked = () => notify.error(unlockMessage(date), { id: 'study-plan-future-day' });
+  const onError = competitive ? { onError: (error: unknown) => notify.error(errorText(error), { id: 'study-plan-error' }) } : undefined;
 
   const open = (task: PlanTask) => {
     const href = taskHref(exam.slug, task, exam.category);

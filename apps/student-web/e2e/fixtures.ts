@@ -43,7 +43,7 @@ function corsHeaders(origin = '*') {
     'access-control-allow-origin': origin,
     'access-control-allow-credentials': 'true',
     // Same as the real backend (src/index.js corsOptions), so e2e fails if the app sends other headers.
-    'access-control-allow-headers': 'Content-Type,Authorization',
+    'access-control-allow-headers': 'Content-Type,Authorization,X-Request-Id,X-Prepzy-Env',
     'access-control-allow-methods': 'GET, POST, PUT, DELETE',
   };
 }
@@ -52,7 +52,7 @@ function corsHeaders(origin = '*') {
 export async function signIn(context: BrowserContext, exam = 'neet') {
   const url = test.info().project.use.baseURL!;
   await context.addCookies([
-    { name: 'prepzy_student_access_token', value: 'e2e', url },
+    { name: 'prepzy_student_staging_access_token', value: 'e2e', url },
     { name: 'prepzy_exam', value: exam, url },
   ]);
 }

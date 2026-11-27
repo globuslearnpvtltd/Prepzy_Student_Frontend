@@ -43,7 +43,7 @@ test.describe('portal routing', () => {
   });
 
   test('a student session does not open a portal', async ({ page, context }) => {
-    await context.addCookies([{ name: 'prepzy_student_access_token', value: 'e2e', url: baseURL() }]);
+    await context.addCookies([{ name: 'prepzy_student_staging_access_token', value: 'e2e', url: baseURL() }]);
     await page.goto('/schools/dashboard');
     await expect(page).toHaveURL(/\/schools\/login$/);
   });

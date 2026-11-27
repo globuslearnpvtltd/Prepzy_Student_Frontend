@@ -1,4 +1,4 @@
-import type { ExamRef } from '@/shared/config/exams';
+import type { ExamCategory, ExamRef } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { apiClient } from '@/shared/lib/api-client';
 import { assertOk } from '@/shared/lib/unwrap';
@@ -41,7 +41,7 @@ export interface PlanTask {
   isCompleted: boolean;
   isStarted: boolean;
   isAvailable: boolean;
-  target: Record<string, string | number | null> | null;
+  target: Record<string, string | number | boolean | null> | null;
 }
 
 export interface PlanStatus {
@@ -51,6 +51,8 @@ export interface PlanStatus {
   hasPlan: boolean;
   examDate: string | null;
   maxTargetDate: string | null;
+  /** First day of the revise-only window ("1 January" board, "1 March" competitive). */
+  revisionWindowFrom: string | null;
 }
 
 export interface SyllabusModule {
@@ -101,7 +103,20 @@ export interface Journey {
   canRetakeDiagnostic: boolean;
 }
 
-export type CreateResult = { feasible: true; planId: number } | { feasible: false; message: string | null; minPerDay: number | null };
+export type CreateResult =
+  | { feasible: true; planId: number }
+  | {
+      feasible: false;
+      message: string | null;
+      minPerDay: number | null;
+      /** Competitive planner only: too_few_days | too_many_days and the day range that would work. */
+      reason?: string | null;
+      minDays?: number | null;
+      maxDays?: number | null;
+    };
+
+/** Exam category of the plan's exam: competitive plans open NEET-style chapter pages and lock future days. */
+export type PlanCategory = ExamCategory;
 
 const num = (value: unknown): number => {
   const n = Number(value);
@@ -173,6 +188,7 @@ export function toStatus(raw: unknown): PlanStatus {
     hasPlan: !!row.has_plan,
     examDate: text(row.exam_date) ? isoDay(row.exam_date) : null,
     maxTargetDate: text(row.max_target_date) ? isoDay(row.max_target_date) : null,
+    revisionWindowFrom: text(row.revision_window_from),
   };
 }
 
@@ -310,22 +326,55 @@ export function dayDots(day: PlanDay): ('done' | 'started' | 'scheduled')[] {
   return Array.from({ length: shown }, (_, i) => (i < done ? 'done' : i >= shown - started ? 'started' : 'scheduled'));
 }
 
+/**
+ * Where a competitive task opens: the chapter's step pages (video lectures, study notes, practice questions,
+ * chapter PYQs), the doubt solver, custom test and daily practice. LV / LQ have no competitive page.
+ */
+function competitiveTaskHref(exam: string, t: NonNullable<PlanTask['target']>): string | null {
+  const course = t.course_id;
+  const chapter = t.module_id;
+  const step = (key: string) =>
+    course !== null && course !== undefined && course !== '' && chapter !== null && chapter !== undefined && chapter !== ''
+      ? routes.learnModule(exam, course as string | number, chapter as string | number, key)
+      : null;
+  switch (t.type) {
+    case 'summary_video':
+      return step('video-lectures');
+    case 'notes':
+      return step('study-notes');
+    case 'unit_test':
+      return step('practice-questions');
+    case 'pyq':
+      return step('chapter-pyq');
+    case 'doubt_solver':
+      return routes.doubtSolver(exam);
+    case 'custom_test':
+      return routes.customTest(exam);
+    case 'dpp':
+      // The live paper is resolved on open (resolveDailyPractice); this is the fallback page.
+      return routes.dailyPractice(exam);
+    default:
+      return null;
+  }
+}
+
 /** Where a task opens in the new app, or null when it can't be opened. */
-export function taskHref(exam: string, task: PlanTask): string | null {
+export function taskHref(exam: string, task: PlanTask, category: PlanCategory = 'board'): string | null {
   const t = task.target;
   if (!t || !task.isAvailable) return null;
-  const course = t.course_id ?? '';
-  const chapter = t.module_id ?? '';
+  if (category === 'competitive') return competitiveTaskHref(exam, t);
+  const course = (t.course_id ?? '') as string | number;
+  const chapter = (t.module_id ?? '') as string | number;
   switch (t.type) {
     case 'lecture':
-      return routes.lecture(exam, course, chapter, t.lecture_id ?? '');
+      return routes.lecture(exam, course, chapter, (t.lecture_id ?? '') as string | number);
     case 'lecture_quiz':
     case 'unit_test':
       return routes.boardModule(exam, course, chapter, 'practice');
     case 'notes':
       return routes.notesView(exam, course, chapter);
     case 'summary_video':
-      return t.note_id ? routes.summaryVideo(exam, t.note_id) : null;
+      return t.note_id ? routes.summaryVideo(exam, t.note_id as string | number) : null;
     case 'pyq':
       return routes.chapterPyqs(exam, course, chapter);
     case 'doubt_solver':
@@ -335,6 +384,15 @@ export function taskHref(exam: string, task: PlanTask): string | null {
     default:
       return null;
   }
+}
+
+/** A plan day after today (local date): its tasks can't be completed yet (competitive plans). */
+export const isFutureDay = (date: string, today: string = toIso(new Date())) => date > today;
+
+/** "These tasks unlock on 5 Mar. You can complete them on that day." */
+export function unlockMessage(date: string): string {
+  const day = fromIso(date);
+  return `These tasks unlock on ${day.getDate()} ${day.toLocaleDateString('en-GB', { month: 'short' })}. You can complete them on that day.`;
 }
 
 export const toSentenceCase = (value: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : value);
@@ -387,7 +445,17 @@ export const studyPlanApi = {
     return toStatus(assertOk(await apiClient.get<Envelope<unknown>>(`/api/v4/study-plan/classes/${classId}/status`)).data);
   },
   async create(input: { classId: number; planType: PlanType; moduleIds: number[]; dailyMinutes: number; targetDate: string }): Promise<CreateResult> {
-    const body = await apiClient.post<Envelope<{ feasible?: boolean; plan_id?: number; message?: string; min_per_day?: number }>>(
+    const body = await apiClient.post<
+      Envelope<{
+        feasible?: boolean;
+        plan_id?: number;
+        message?: string;
+        min_per_day?: number;
+        reason?: string | null;
+        min_days?: number | null;
+        max_days?: number | null;
+      }>
+    >(
       '/api/v4/study-plan/plans',
       {
         class_id: input.classId,
@@ -399,7 +467,12 @@ export const studyPlanApi = {
     );
     const data = body?.data;
     if (data?.feasible && data.plan_id) return { feasible: true, planId: data.plan_id };
-    return { feasible: false, message: data?.message ?? body?.message ?? null, minPerDay: data?.min_per_day ?? null };
+    return {
+      feasible: false,
+      message: data?.message ?? body?.message ?? null,
+      minPerDay: data?.min_per_day ?? null,
+      ...(data && 'reason' in data ? { reason: data.reason ?? null, minDays: data.min_days ?? null, maxDays: data.max_days ?? null } : {}),
+    };
   },
   async journey(classId: number): Promise<Journey | null> {
     return toJourney((await apiClient.get<Envelope<unknown>>(`/api/v4/study-plan/classes/${classId}/dashboard`))?.data);

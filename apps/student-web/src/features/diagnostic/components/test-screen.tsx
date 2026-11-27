@@ -10,7 +10,10 @@ import { RichText } from '@/features/exam-engine/ui';
 import { useExam } from '@/shared/hooks/use-exam';
 import { BackButton, Breadcrumb, Notice, ScreenLoader } from '@/features/study-plan/ui';
 import { routes } from '@/shared/config/routes';
+import { subjectLabel } from '@/shared/layout/shell-api';
 import { isApiError, userMessage } from '@/shared/lib/errors';
+import { CompetitiveEvaluating } from './competitive-evaluating';
+import { CompetitiveScoreCard } from './competitive-score-card';
 import { attemptReducer, diagnosticApi, formatClock, isCase, statusCounts, type AttemptAction, type DiagnosticQuestion, type QuestionStatus } from '../api';
 
 const SAVE_DELAY = 2000;
@@ -183,7 +186,10 @@ function QuestionView({
   onPrevious,
   onNext,
   onSubmit,
+  subjectName,
 }: {
+  /** The subject chip's text (competitive: "NEET-PHYSICS" shown as "Physics"). */
+  subjectName?: string;
   question: DiagnosticQuestion;
   number: number;
   isLast: boolean;
@@ -215,7 +221,7 @@ function QuestionView({
           <span className="bg-brand-50 text-brand rounded-sm px-2 py-1 text-[10px] font-semibold md:text-[12px]">Question {number}</span>
           {caseBased && <span className="rounded-sm bg-neutral-50 px-3 py-1.5 text-[11px] font-semibold text-neutral-700">Case based</span>}
           {marked && <span className="bg-brand text-on-brand rounded-sm px-3 py-1.5 text-[11px] font-semibold">Marked for review</span>}
-          <span className="bg-brand-50 text-brand ml-auto rounded-full px-3 py-1 text-[12px] font-semibold">{question.subject_name}</span>
+          <span className="bg-brand-50 text-brand ml-auto rounded-full px-3 py-1 text-[12px] font-semibold">{subjectName ?? question.subject_name}</span>
         </div>
         {caseBased ? (
           <div className="border-neutral-150 flex max-h-[280px] flex-col gap-3 overflow-y-auto rounded-[16px] border bg-neutral-50 p-5">
@@ -345,6 +351,7 @@ function Legend({ questions }: { questions: DiagnosticQuestion[] }) {
 
 const EVALUATING = ['Verifying Submitted Answers', 'Calculating Total Score', 'Preparing Performance Summary'];
 
+/** Board exams' evaluating overlay (competitive exams use CompetitiveEvaluating). */
 function Evaluating({ onDone }: { onDone: () => void }) {
   const [done, setDone] = useState(0);
   useEffect(() => {
@@ -376,6 +383,8 @@ function Evaluating({ onDone }: { onDone: () => void }) {
 export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string }) {
   const exam = useExam();
   const examRef = useMemo(() => ({ category: exam.category, examId: exam.examId }), [exam.category, exam.examId]);
+  // Competitive exams show a score card after evaluating; board exams go straight to the report.
+  const competitive = exam.category === 'competitive';
   const router = useRouter();
   const session = useQuery({
     queryKey: ['diagnostic', 'questions', assessmentId],
@@ -449,8 +458,19 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
   const [animationDone, setAnimationDone] = useState(false);
   const finishAnimation = useCallback(() => setAnimationDone(true), []);
   useEffect(() => {
-    if (animationDone && submit.isSuccess) router.replace(resultHref);
-  }, [animationDone, submit.isSuccess, router, resultHref]);
+    if (animationDone && submit.isSuccess && !competitive) router.replace(resultHref);
+  }, [animationDone, submit.isSuccess, router, resultHref, competitive]);
+
+  if (competitive && animationDone && submit.data)
+    return (
+      <div className="flex min-h-[calc(100dvh-76px)] w-full items-center justify-center p-6 md:p-8">
+        <CompetitiveScoreCard
+          summary={submit.data}
+          onContinue={() => router.replace(resultHref)}
+          onReview={() => router.replace(routes.diagnosticSolutions(exam.slug, assessmentId))}
+        />
+      </div>
+    );
 
   if (session.isError && !(isApiError(session.error) && session.error.status === 400))
     return <Notice tone="danger" title="Couldn't load this test" body={userMessage(session.error, 'Something went wrong while loading the test.')} action={{ label: 'Go back', href: routes.dashboard(exam.slug) }} />;
@@ -513,6 +533,7 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
             onPrevious={() => act({ type: 'go', index: state.index - 1 }, true)}
             onMark={() => act({ type: 'toggle-review', questionId: current.question_id })}
             onSubmit={submitNow}
+            subjectName={competitive ? subjectLabel(current.subject_name) : undefined}
           />
         </div>
         <div className="hidden w-full shrink-0 flex-col gap-6 lg:flex lg:w-[413px]">
@@ -520,7 +541,7 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
           <Palette questions={state.questions} index={state.index} onJump={jump} />
         </div>
       </div>
-      {evaluating && <Evaluating onDone={finishAnimation} />}
+      {evaluating && (competitive ? <CompetitiveEvaluating onDone={finishAnimation} /> : <Evaluating onDone={finishAnimation} />)}
     </div>
   );
 }

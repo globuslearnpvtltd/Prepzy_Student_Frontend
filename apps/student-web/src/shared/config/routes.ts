@@ -79,6 +79,8 @@ export const routes = {
   diagnosticTest: (exam: string, assessmentId: string | number) => `/${exam}/diagnostic-test/${assessmentId}`,
   diagnosticResult: (exam: string, assessmentId?: string | number) =>
     `/${exam}/diagnostic-result${assessmentId ? `?assessment_id=${assessmentId}` : ''}`,
+  /** Review Solutions of a finished diagnostic (competitive exams only). */
+  diagnosticSolutions: (exam: string, assessmentId: string | number) => `/${exam}/diagnostic-solutions?assessment_id=${assessmentId}`,
   referAndEarn: section('refer-and-earn'),
   mockTests: section('mock-tests'),
   pyqLibrary: section('pyq-library'),

@@ -28,8 +28,10 @@ import {
 import { BackButton, Breadcrumb, Notice, ProgressRing, ScreenLoader, stickyFooter } from '@/features/study-plan/ui';
 import type { ExamRef } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
+import { subjectLabel } from '@/shared/layout/shell-api';
 import { isApiError, userMessage } from '@/shared/lib/errors';
 import { diagnosticApi, formatDuration } from '../api';
+import { CompetitiveDiagnosticHeader } from './competitive-header';
 
 const STEPS = ['Select Topics', 'Review Blueprint', 'Take Test'];
 
@@ -86,6 +88,7 @@ function ChapterTile({
   selected,
   disabled,
   selectable,
+  hideTopics = false,
   onToggle,
 }: {
   name: string;
@@ -93,6 +96,8 @@ function ChapterTile({
   selected: boolean;
   disabled: boolean;
   selectable: boolean;
+  /** Competitive exams don't show topic counts. */
+  hideTopics?: boolean;
   onToggle: () => void;
 }) {
   return (
@@ -124,9 +129,11 @@ function ChapterTile({
         >
           {toSentenceCase(name)}
         </span>
-        <span className="text-neutral-350 mt-[3px] block text-[12px]">
-          {topics} topics{!selectable && ' · no questions yet'}
-        </span>
+        {!hideTopics && (
+          <span className="text-neutral-350 mt-[3px] block text-[12px]">
+            {topics} topics{!selectable && ' · no questions yet'}
+          </span>
+        )}
       </span>
     </button>
   );
@@ -140,6 +147,7 @@ function ChapterSelection({
   onToggle,
   onContinue,
   continuing,
+  competitive = false,
 }: {
   subjects: SyllabusSubject[];
   rules: DiagnosticRules;
@@ -148,6 +156,8 @@ function ChapterSelection({
   onToggle: (moduleId: number, subjectId: number) => void;
   onContinue: () => void;
   continuing: boolean;
+  /** Competitive (NEET) wording; no topic counts. */
+  competitive?: boolean;
 }) {
   const [activeId, setActiveId] = useState<number | null>(focusId ?? subjects[0]?.id ?? null);
   const [mobileOpen, setMobileOpen] = useState(true);
@@ -166,6 +176,7 @@ function ChapterSelection({
         name={m.name}
         topics={m.topicCount}
         selectable={m.selectable}
+        hideTopics={competitive}
         selected={set.has(m.id)}
         disabled={!m.selectable || (cap && !set.has(m.id))}
         onToggle={() => onToggle(m.id, subject.id)}
@@ -179,7 +190,7 @@ function ChapterSelection({
       <div className="flex flex-col gap-3 md:hidden">
         <h1 className="mt-4 text-[26px] leading-[1.18] font-bold text-neutral-950">Which chapters have you studied?</h1>
         <p className="text-[14px] text-neutral-500">
-          Choose the chapters you&apos;ve covered so far to help us build your diagnostic test.
+          Choose the chapters you&apos;ve covered so far to help us build your study plan.
         </p>
         {subjects.map((subject) => {
           const open = mobileOpen && subject.id === activeId;
@@ -219,7 +230,13 @@ function ChapterSelection({
             <h2 className="text-[20px] leading-[1.25] font-bold text-neutral-950">Select a subject</h2>
             <p className="text-neutral-350 mt-[6px] text-[13px]">Choose one subject to view its chapters</p>
             <span className="bg-brand-50 text-brand mt-[14px] inline-flex items-center gap-[6px] rounded-full px-3 py-[6px] text-[11px] font-semibold">
-              <Info aria-hidden className="size-3" /> Min {rules.minTotal} chapters overall
+              {competitive ? (
+                `${subjects.length} Subjects`
+              ) : (
+                <>
+                  <Info aria-hidden className="size-3" /> Min {rules.minTotal} chapters overall
+                </>
+              )}
             </span>
           </div>
           <ul className="border-neutral-150 bg-brand-25 flex flex-col gap-4 rounded-xl border p-2">
@@ -234,11 +251,16 @@ function ChapterSelection({
                         <span className="text-on-brand/60 mt-1 block text-[12px]">{subject.moduleCount} chapters</span>
                       </div>
                       <div className="bg-on-brand/10 mt-auto rounded-md p-4">
-                        <span className="text-on-brand/55 block text-[10px] font-medium tracking-[0.1em] uppercase">
+                        <span
+                          className={cx(
+                            'text-on-brand/55 block font-medium',
+                            competitive ? 'text-[12px]' : 'text-[10px] tracking-[0.1em] uppercase',
+                          )}
+                        >
                           Selected
                         </span>
                         <span className="text-on-brand mt-1 block text-[15px] font-bold">
-                          {count} of {rules.maxPerSubject} chapters
+                          {competitive ? `${count} chapters selected` : `${count} of ${rules.maxPerSubject} chapters`}
                         </span>
                         <span className="bg-on-brand/20 mt-3 block h-[5px] w-full overflow-hidden rounded-full">
                           <span
@@ -261,7 +283,7 @@ function ChapterSelection({
                     <span className="flex items-center justify-between gap-2 text-[11.5px]">
                       <span className="text-neutral-350">{subject.moduleCount} Chapters</span>
                       <span className={cx('font-semibold', count ? 'text-brand' : 'text-neutral-350')}>
-                        {count} of {subject.moduleCount} selected
+                        {competitive ? `${count} selected` : `${count} of ${subject.moduleCount} selected`}
                       </span>
                     </span>
                   </button>
@@ -275,7 +297,7 @@ function ChapterSelection({
             Which chapters have you studied?
           </h1>
           <p className="mt-2 text-[14px] text-neutral-500">
-            Choose the chapters you&apos;ve covered so far to help us build your diagnostic test.
+            Choose the chapters you&apos;ve covered so far to help us build your study plan.
           </p>
           <div
             className={cx(
@@ -293,7 +315,11 @@ function ChapterSelection({
             </span>
             <div className="min-w-0">
               <p className={cx('text-[16px] leading-6 font-bold', atCap ? 'text-danger' : 'text-accent-800')}>
-                {atCap ? 'Maximum chapter limit reached' : 'Select your prefered chapters'}
+                {atCap
+                  ? 'Maximum chapter limit reached'
+                  : competitive
+                    ? 'Select your preferred chapters'
+                    : 'Select your prefered chapters'}
               </p>
               <p className={cx('text-[12.5px]', atCap ? 'text-danger' : 'text-accent-700')}>
                 {atCap
@@ -391,6 +417,7 @@ function BlueprintReview({
   onStart,
   starting,
   error,
+  competitive = false,
 }: {
   subjects: SyllabusSubject[];
   selected: number[];
@@ -401,6 +428,8 @@ function BlueprintReview({
   onStart: () => void;
   starting: boolean;
   error: string | null;
+  /** Competitive exams don't show topic counts. */
+  competitive?: boolean;
 }) {
   const blueprint = useQuery({
     queryKey: ['diagnostic', 'blueprint', classId, selected],
@@ -447,9 +476,11 @@ function BlueprintReview({
                     <span className="truncate text-[14px] font-semibold text-neutral-950">
                       {toSentenceCase(m.name)}
                     </span>
-                    <span className="text-neutral-350 text-[12px]">
-                      {m.topicCount} core syllabus {plural(m.topicCount, 'topic', 'topics')}
-                    </span>
+                    {!competitive && (
+                      <span className="text-neutral-350 text-[12px]">
+                        {m.topicCount} core syllabus {plural(m.topicCount, 'topic', 'topics')}
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -557,7 +588,12 @@ export function DiagnosticSetupScreen() {
   const [step, setStep] = useState<1 | 2>(1);
   const [selected, setSelected] = useState<number[]>([]);
   const [focusId, setFocusId] = useState<number | null>(null);
-  const subjects = useMemo(() => syllabus.data?.subjects ?? [], [syllabus.data]);
+  const competitive = exam?.category === 'competitive';
+  // Competitive subject titles look like "NEET-PHYSICS"; show "Physics".
+  const subjects = useMemo(() => {
+    const list = syllabus.data?.subjects ?? [];
+    return competitive ? list.map((s) => ({ ...s, name: subjectLabel(s.name) })) : list;
+  }, [syllabus.data, competitive]);
   const rules = syllabus.data?.rules ?? { minTotal: 5, maxPerSubject: 5 };
   const slug = exam?.slug ?? '';
 
@@ -603,12 +639,21 @@ export function DiagnosticSetupScreen() {
     status.data.state === 'in_progress' ||
     status.data.state === 'cooldown'
   )
-    return <ScreenLoader message="Loading Your Syllabus" sub="Fetching the chapters for your class..." />;
+    return (
+      <ScreenLoader
+        message="Loading Your Syllabus"
+        sub={competitive ? 'Fetching your chapters...' : 'Fetching the chapters for your class...'}
+      />
+    );
   if (!subjects.length)
     return (
       <Notice
         title="No chapters available yet"
-        body="Your class doesn't have diagnostic content set up yet. Please check back soon."
+        body={
+          competitive
+            ? "Your syllabus isn't set up for the diagnostic yet. Please check back soon."
+            : "Your class doesn't have diagnostic content set up yet. Please check back soon."
+        }
       />
     );
 
@@ -621,13 +666,22 @@ export function DiagnosticSetupScreen() {
 
   return (
     <div className="w-full">
-      <div className="mb-4 md:mb-6">
+      <div className={cx('mb-4 md:mb-6', competitive && 'md:hidden')}>
         <Stepper
           current={step}
           onBack={step === 2 ? () => setStep(1) : undefined}
           backHref={step === 1 ? routes.dashboard(slug) : undefined}
         />
       </div>
+      {competitive && (
+        <CompetitiveDiagnosticHeader
+          current={step}
+          dashboardHref={routes.dashboard(slug)}
+          onBack={step === 2 ? () => setStep(1) : undefined}
+          backHref={step === 1 ? routes.dashboard(slug) : undefined}
+          className="mb-6 hidden md:flex"
+        />
+      )}
       <Breadcrumb
         dashboardHref={routes.dashboard(slug)}
         current="Diagnostic test"
@@ -642,6 +696,7 @@ export function DiagnosticSetupScreen() {
           onToggle={toggle}
           onContinue={() => setStep(2)}
           continuing={false}
+          competitive={competitive}
         />
       ) : (
         <BlueprintReview
@@ -661,6 +716,7 @@ export function DiagnosticSetupScreen() {
               ? userMessage(start.error, "We couldn't start your test. Please try again.")
               : null
           }
+          competitive={competitive}
         />
       )}
     </div>

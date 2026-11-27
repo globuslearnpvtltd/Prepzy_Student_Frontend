@@ -3,12 +3,14 @@
 import { cx } from '@prepzy/design-system';
 import { Check, ChevronDown, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { routes } from '@/shared/config/routes';
+import { subjectLabel } from '@/shared/layout/shell-api';
 import { modulesOf, toSentenceCase, type SyllabusSubject } from '../api';
-import { useStudyPlanDraft } from '../draft-store';
+import { takeKeepPicks, useStudyPlanDraft } from '../draft-store';
 import { useClassContext, useSyllabus } from '../hooks';
-import { BackButton, Breadcrumb, Notice, ProgressRing, ScreenLoader, stickyFooter } from './kit';
+import { CompetitiveTopicGrid } from './competitive-chapters';
+import { BackButton, Breadcrumb, DesktopCrumb, Notice, ProgressRing, ScreenLoader, stickyFooter } from './kit';
 
 function ChapterRow({
   index,
@@ -19,7 +21,8 @@ function ChapterRow({
 }: {
   index: number;
   name: string;
-  topics: number;
+  /** null: no topic count (competitive). */
+  topics: number | null;
   selected: boolean;
   onToggle: () => void;
 }) {
@@ -45,9 +48,11 @@ function ChapterRow({
         <span className="text-[16px] leading-[22px] font-semibold text-neutral-800">
           Chapter {index + 1} · {toSentenceCase(name)}
         </span>
-        <span className="hidden text-[13px] leading-[18px] font-medium text-neutral-900/60 md:block">
-          {topics} {topics === 1 ? 'topic' : 'topics'}
-        </span>
+        {topics !== null && (
+          <span className="hidden text-[13px] leading-[18px] font-medium text-neutral-900/60 md:block">
+            {topics} {topics === 1 ? 'topic' : 'topics'}
+          </span>
+        )}
       </span>
       <span
         className={cx(
@@ -67,12 +72,15 @@ function SubjectCard({
   open,
   onOpen,
   onToggle,
+  competitive = false,
 }: {
   subject: SyllabusSubject;
   selected: Set<number>;
   open: boolean;
   onOpen: () => void;
   onToggle: (id: number) => void;
+  /** NEET look: formatted subject name, two-column topic cards on desktop, no topic counts. */
+  competitive?: boolean;
 }) {
   const modules = modulesOf(subject);
   const chosen = modules.filter((m) => selected.has(m.id)).length;
@@ -95,14 +103,16 @@ function SubjectCard({
                 open ? 'text-brand md:text-neutral-800' : 'text-neutral-900 md:text-neutral-800',
               )}
             >
-              {subject.name}
+              {competitive ? subjectLabel(subject.name) : subject.name}
             </span>
             <span className="flex items-center gap-[10px]">
               <span className="md:text-neutral-350 text-[12px] font-medium text-neutral-900/60 md:text-[14px] md:font-semibold">
                 <span className="md:hidden">{modules.length} Chapters</span>
-                <span className="hidden md:inline">{modules.length} chapters available</span>
+                <span className="hidden md:inline">
+                  {modules.length} chapters{competitive && open ? '' : ' available'}
+                </span>
               </span>
-              {chosen > 0 && (
+              {chosen > 0 && !(competitive && open) && (
                 <span className="bg-brand text-on-brand rounded-full px-[10px] py-[2px] text-[12px] font-semibold">
                   {chosen} selected
                 </span>
@@ -119,18 +129,22 @@ function SubjectCard({
       </button>
       {open && (
         <>
-          <div className="hidden flex-col gap-3 md:flex">
-            {modules.map((m, i) => (
-              <ChapterRow
-                key={m.id}
-                index={i}
-                name={m.name}
-                topics={m.topicCount}
-                selected={selected.has(m.id)}
-                onToggle={() => onToggle(m.id)}
-              />
-            ))}
-          </div>
+          {competitive ? (
+            <CompetitiveTopicGrid modules={modules} selected={selected} onToggle={onToggle} />
+          ) : (
+            <div className="hidden flex-col gap-3 md:flex">
+              {modules.map((m, i) => (
+                <ChapterRow
+                  key={m.id}
+                  index={i}
+                  name={m.name}
+                  topics={m.topicCount}
+                  selected={selected.has(m.id)}
+                  onToggle={() => onToggle(m.id)}
+                />
+              ))}
+            </div>
+          )}
           <div className="flex flex-col gap-4 md:hidden">
             {subject.courses.length > 1 && (
               <div className="flex flex-wrap gap-3">
@@ -157,7 +171,7 @@ function SubjectCard({
                 key={m.id}
                 index={numberOf.get(m.id) ?? 0}
                 name={m.name}
-                topics={m.topicCount}
+                topics={competitive ? null : m.topicCount}
                 selected={selected.has(m.id)}
                 onToggle={() => onToggle(m.id)}
               />
@@ -169,7 +183,7 @@ function SubjectCard({
   );
 }
 
-/** "Choose chapters for your study plan" (after the diagnostic report). */
+/** "Choose chapters for your study plan" (after the diagnostic report); competitive: "Choose topics …", NEET look. */
 export function ChaptersScreen() {
   const { exam, classId, isPending } = useClassContext();
   const syllabus = useSyllabus(classId, exam?.examId ?? 0);
@@ -181,6 +195,16 @@ export function ChaptersScreen() {
     [draft.classId, draft.moduleIds, classId],
   );
   const selected = useMemo(() => new Set(picked), [picked]);
+  const competitive = exam?.category === 'competitive';
+
+  // Competitive (NEET): every visit (dashboard and back, reload) starts with nothing selected; only
+  // stepping back from the create step keeps the picks. The ref keeps one decision per visit (Strict Mode runs effects twice).
+  const keepPicks = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!competitive) return;
+    keepPicks.current ??= takeKeepPicks();
+    if (!keepPicks.current) useStudyPlanDraft.getState().clear();
+  }, [competitive]);
 
   // Drop chapters that are no longer offered.
   useEffect(() => {
@@ -211,12 +235,15 @@ export function ChaptersScreen() {
   return (
     <div className="flex min-h-full w-full flex-col">
       <div className="border-neutral-150 md:bg-surface flex items-center justify-between md:h-20 md:rounded-2xl md:border md:px-5 md:shadow-[0px_16px_40px_rgba(61,52,139,0.08)]">
-        <BackButton href={routes.diagnosticResult(exam.slug)} />
+        <div className="flex min-w-0 items-center gap-4">
+          <BackButton href={competitive ? routes.dashboard(exam.slug) : routes.diagnosticResult(exam.slug)} />
+          {competitive && <DesktopCrumb dashboardHref={routes.dashboard(exam.slug)} current="Study plan" />}
+        </div>
       </div>
       <Breadcrumb dashboardHref={routes.dashboard(exam.slug)} current="Study plan" className="mt-4 md:hidden" />
       <div className="flex flex-col py-5 md:gap-[6px] md:py-6">
         <h1 className="text-[32px] leading-[42px] font-bold text-neutral-900 md:text-[40px] md:leading-[48px]">
-          Choose chapters for your study plan
+          {competitive ? 'Choose topics for your study plan' : 'Choose chapters for your study plan'}
         </h1>
         <p className="text-[16px] leading-6 text-neutral-900/70">
           Your study plan will be built from the chapters you choose.
@@ -231,6 +258,7 @@ export function ChaptersScreen() {
             open={openId === subject.id}
             onOpen={() => setOpenId(openId === subject.id ? null : subject.id)}
             onToggle={toggle}
+            competitive={competitive}
           />
         ))}
       </div>

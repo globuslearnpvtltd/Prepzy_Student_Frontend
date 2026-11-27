@@ -426,6 +426,13 @@ describe('ResultView', () => {
     expect(screen.getByText('· Your answer · correct')).toBeInTheDocument();
     expect(screen.getByText('· Your answer')).toBeInTheDocument();
     expect(screen.getByText('· Correct answer')).toBeInTheDocument();
+    // the chosen options' radios are filled (one border colour per state, nothing left to override it)
+    const radios = [...document.querySelectorAll('[data-selected]')];
+    expect(radios).toHaveLength(2);
+    radios.forEach((radio) => {
+      expect(radio.className).toContain('border-brand');
+      expect(radio.className).not.toContain('border-neutral-300');
+    });
 
     const written = screen.getAllByRole('article', { name: 'Question 2' })[0]!;
     expect(within(written).getByText('Water moves')).toBeInTheDocument();
@@ -501,7 +508,7 @@ describe('QuestionView', () => {
     const { container } = renderWithProviders(<Controlled question={mcq} look="board" />);
     expect(screen.getByRole('heading', { name: /^Question \d+$/ })).toBeInTheDocument();
     expect(screen.getByText('Multiple choice · 1 mark')).toBeInTheDocument();
-    expect(container.querySelector('header')!.className).toContain('bg-info-25');
+    expect(container.querySelector('header')!.className).toContain('bg-brand-25');
     renderWithProviders(<Controlled question={{ ...mcq, id: 'q4', marks: 2 }} look="board" />);
     expect(screen.getByText('Multiple choice · 2 marks')).toBeInTheDocument();
     renderWithProviders(<Controlled question={{ ...mcq, id: 'q5', marks: null, image: null }} look="board" />);

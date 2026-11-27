@@ -79,13 +79,13 @@ export function SubmittingScreen({ written }: { written: boolean }) {
         {written ? (
           <>
             <h2 className="text-xl font-bold">
-              Well Done! Your answers are <span className="text-info-700">submitted</span>
+              Well Done! Your answers are <span className="text-brand">submitted</span>
             </h2>
             <p className="text-foreground-muted text-sm">
               Answers are being <span className="text-success font-semibold">Evaluated</span>. Results will be
               available shortly.
             </p>
-            <div className="bg-info-25 w-full rounded-[14px] p-4 text-left text-sm">
+            <div className="bg-brand-25 w-full rounded-[14px] p-4 text-left text-sm">
               <p className="font-semibold">Soon, you will see:</p>
               <ul className="text-foreground-muted mt-2 list-disc pl-5">
                 <li>Your marks &amp; score breakdown.</li>

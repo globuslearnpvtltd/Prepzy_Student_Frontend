@@ -266,6 +266,37 @@ describe('post-submission chat (Discuss with Vedica)', () => {
     expect(form!.get('text')).toBe('Why did I lose a mark?');
   });
 
+  it('has no Stop button and lets the student ask again only once the answer has arrived', async () => {
+    let finish: () => void = () => undefined;
+    const encoder = new TextEncoder();
+    server.use(
+      http.get(`${API}/api/v4/chat/board/1/review/3/8/21/messages`, () => HttpResponse.json({ success: true, data: { conversations: [] } })),
+      http.post(`${API}/api/v4/chat/board/1/review/3/8/21/messages`, () =>
+        new HttpResponse(
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue(encoder.encode('data: {"token":"Half an answer"}\n\n'));
+              finish = () => {
+                controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                controller.close();
+              };
+            },
+          }),
+          { headers: { 'content-type': 'text/event-stream' } },
+        ),
+      ),
+    );
+    renderWithProviders(<ReviewChat context={context} open onClose={() => undefined} />, { exam: cbse });
+    await userEvent.type(await screen.findByRole('textbox'), 'Why?{Enter}');
+    expect(await screen.findByText('Half an answer')).toBeInTheDocument();
+    // answer on the way: no Stop, and nothing can ask the next question
+    expect(screen.queryByRole('button', { name: /stop/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
+    act(() => finish());
+    await waitFor(() => expect(screen.getByRole('textbox')).toBeEnabled());
+  });
+
   it('sends JSON for NEET and shows an error when the stream fails', async () => {
     let body: unknown = null;
     server.use(

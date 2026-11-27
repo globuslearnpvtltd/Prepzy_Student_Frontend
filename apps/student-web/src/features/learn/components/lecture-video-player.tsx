@@ -29,6 +29,7 @@ import {
   writeStorage,
   YOUTUBE_QUALITY_LABELS,
   YOUTUBE_SETTLE_DELAY_MS,
+  youtubeCaptionRequests,
 } from './player-utils';
 
 /** The bits of the YouTube IFrame API the player uses (react-player's YouTube element exposes it as `api`). */
@@ -36,6 +37,8 @@ interface YouTubeApi {
   getPlaybackQuality?: () => string;
   loadModule?: (name: string) => void;
   unloadModule?: (name: string) => void;
+  getOption?: (module: string, option: string) => unknown;
+  setOption?: (module: string, option: string, value: unknown) => void;
   addEventListener?: (event: string, listener: (event: { data: number }) => void) => void;
 }
 
@@ -292,15 +295,27 @@ export function LectureVideoPlayer({
     return () => observer.disconnect();
   }, []);
 
-  // Show / hide captions on whichever player is underneath: the captions module of a YouTube embed, or
-  // the subtitle tracks of an uploaded file.
+  // Show / hide captions on whichever player is underneath: a YouTube embed, or the subtitle tracks of an
+  // uploaded file. YouTube ignores loadModule / unloadModule on their own (the CC button did nothing); captions
+  // appear only when a caption language is chosen, and disappear when the choice is cleared.
   const applyCaptions = (on: boolean) => {
     const element = mediaRef.current;
     if (!element) return;
     const api = element.api;
-    if (api && typeof api.loadModule === 'function') {
-      if (on) api.loadModule('captions');
-      else api.unloadModule?.('captions');
+    if (api && typeof api.setOption === 'function') {
+      try {
+        if (on) {
+          api.loadModule?.('captions');
+          // the best language last: YouTube ignores languages the video has no captions in
+          for (const request of youtubeCaptionRequests(api, currentVideo?.language)) {
+            api.setOption('captions', 'track', request);
+          }
+        } else {
+          api.setOption('captions', 'track', {});
+        }
+      } catch {
+        // The embed isn't ready yet; this runs again on ready and on play.
+      }
       return;
     }
     if (isYoutube) return;
@@ -407,8 +422,21 @@ export function LectureVideoPlayer({
     unsettleYoutube();
   };
 
+  // Playback (re)started: at the start, after buffering, after a seek. react-player v3 fires onPlay only once per
+  // play, not when YouTube resumes after buffering (v2 did), and YouTube nearly always buffers right after play,
+  // so the settle timer must restart here too. Without it the embed stayed cropped and hid the captions.
+  const handleResumed = () => {
+    setBuffering(false);
+    if (!isYoutube) return;
+    restartYoutubeSettle();
+    // YouTube lists its caption tracks only once the video plays, so pick the track again now.
+    applyCaptions(captionsOn);
+  };
+
   const handleBufferRef = useRef(handleBuffer);
   handleBufferRef.current = handleBuffer;
+  const handleResumedRef = useRef(handleResumed);
+  handleResumedRef.current = handleResumed;
 
   // YouTube's element reports no "waiting" event, so buffering is read from the IFrame API's state changes.
   const watchedApis = useRef(new WeakSet<object>());
@@ -421,7 +449,7 @@ export function LectureVideoPlayer({
       watchedApis.current.add(api);
       api.addEventListener('onStateChange', ({ data }) => {
         if (data === 3) handleBufferRef.current();
-        else if (data === 1) setBuffering(false);
+        else if (data === 1) handleResumedRef.current();
       });
     }
     if (element && resumeAt.current > 0) {
@@ -678,7 +706,7 @@ export function LectureVideoPlayer({
                 onEnded={handleEnded}
                 onError={handleError}
                 onWaiting={handleBuffer}
-                onPlaying={() => setBuffering(false)}
+                onPlaying={handleResumed}
                 onDurationChange={() => {
                   const total = mediaRef.current?.duration;
                   if (total && Number.isFinite(total)) setDuration(total);

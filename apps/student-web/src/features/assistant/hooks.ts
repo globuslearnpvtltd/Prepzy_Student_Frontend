@@ -251,5 +251,5 @@ export function useReviewChat(exam: ExamConfig, ctx: ReviewContext, enabled: boo
     setFollowups([]);
   }, []);
 
-  return { messages, followups, streaming, loading: history.isPending && enabled, ask, appendTurns, stop: () => abort.current?.abort() };
+  return { messages, followups, streaming, loading: history.isPending && enabled, ask, appendTurns };
 }

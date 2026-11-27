@@ -95,6 +95,16 @@ describe('InkDoc', () => {
     doc.paintEnd(ctx, doc.begin({ x: 1, y: 1, p: 0.5 }, false), 'black');
     expect(ctx.strokeStyle).toBe('black');
   });
+
+  it('fills the sheet with paper instead of clearing it when asked (the pad is never a black canvas)', () => {
+    const doc = new InkDoc();
+    const calls: string[] = [];
+    const ctx = { fillRect: () => calls.push('fill'), clearRect: () => calls.push('clear') } as unknown as CanvasRenderingContext2D;
+    doc.paint(ctx, 100, 100, 'black', 'white');
+    expect(calls).toEqual(['fill']);
+    doc.paint(ctx, 100, 100, 'black');
+    expect(calls).toEqual(['fill', 'clear']);
+  });
 });
 
 describe('InkPad', () => {

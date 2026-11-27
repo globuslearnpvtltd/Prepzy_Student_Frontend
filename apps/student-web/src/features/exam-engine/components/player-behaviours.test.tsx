@@ -90,9 +90,11 @@ describe('board player', () => {
     expect(scroller).not.toContainElement(screen.getByRole('button', { name: /Save & Next/ }));
 
     await userEvent.click(screen.getByRole('radio', { name: /Coulomb/ }));
+    scroller.scrollTop = 300; // read down the first question
     await userEvent.click(screen.getByRole('button', { name: 'Skip' }));
-    // Skipping clears the answer and moves on.
+    // Skipping clears the answer and moves on, to the top of the next question.
     expect(await screen.findByText('State Gauss law.')).toBeInTheDocument();
+    expect(scroller.scrollTop).toBe(0);
     expect(screen.getAllByRole('tab', { name: 'Short answer' })[0]).toHaveAttribute('aria-selected', 'true');
     // The side panel numbers questions across the paper, like the question card (not 1, 2 … per type).
     const panel = screen.getAllByRole('navigation', { name: 'Questions' })[0]!;

@@ -77,6 +77,9 @@ describe('LimitDialog inside an exam', () => {
     await act(() => apiClient.get('/api/limited').catch(() => undefined));
     const link = await screen.findByRole('link', { name: 'See plans' });
     expect(link).toHaveAttribute('href', '/purchase?exam=neet');
+    // above every chatbot panel (they go up to z-[130]), page behind blurred
+    expect(screen.getByRole('dialog').className).toContain('z-[201]');
+    expect(document.querySelector('.pz-dialog__overlay')!.className).toMatch(/z-\[200\].*backdrop-blur-sm/);
     await userEvent.click(link);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

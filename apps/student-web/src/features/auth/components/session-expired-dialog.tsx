@@ -1,6 +1,7 @@
 'use client';
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@prepzy/design-system';
+import { TOP_DIALOG } from '@/shared/layout/limit-dialog';
 import { Clock } from 'lucide-react';
 import { useSessionExpiry } from '../hooks';
 
@@ -17,7 +18,9 @@ export function SessionExpiredDialog() {
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
-        className="w-[345px] max-w-[calc(100%-32px)] gap-0 rounded-2xl border-[1.5px] px-6 pt-8 pb-6 text-center md:w-[420px]"
+        // over any open chatbot, page blurred (shared with the plan-limit dialog)
+        overlayClassName={TOP_DIALOG.overlayClassName}
+        className={`${TOP_DIALOG.className} w-[345px] max-w-[calc(100%-32px)] gap-0 rounded-2xl border-[1.5px] px-6 pt-8 pb-6 text-center md:w-[420px]`}
       >
         <span className="bg-brand-50 text-brand mx-auto mb-5 flex size-14 items-center justify-center rounded-full">
           <Clock aria-hidden className="size-7" />

@@ -8,6 +8,7 @@ import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
 import { userMessage } from '@/shared/lib/errors';
 import type { LibraryStatus } from './api';
+import { CrumbTrail } from '@/shared/ui/crumb-trail';
 
 export const panel = 'bg-surface rounded-[20px] border border-neutral-100 shadow-sm';
 
@@ -17,20 +18,29 @@ export function HubBreadcrumb({ label }: { label: string }) {
   const router = useRouter();
   const box = 'bg-surface flex h-12 items-center rounded-xl px-4 shadow-sm';
   return (
-    <div className="flex gap-2">
-      <button type="button" onClick={() => router.back()} className={cx(box, 'gap-2 text-sm font-medium')}>
+    <div className="flex min-w-0 gap-2">
+      <button type="button" onClick={() => router.back()} className={cx(box, 'shrink-0 gap-2 text-sm font-medium')}>
         <ArrowLeft aria-hidden className="size-4" />
         Back
       </button>
-      <nav aria-label="Breadcrumb" className={cx(box, 'gap-2 text-sm font-semibold')}>
-        <Link href={routes.dashboard(exam.slug)} className="text-brand">
-          Dashboard
-        </Link>
-        <ChevronRight aria-hidden className="text-foreground-subtle size-4" />
-        <span aria-current="page" className="text-foreground-subtle">
-          {label}
-        </span>
-      </nav>
+      <div className={cx(box, 'min-w-0')}>
+        <CrumbTrail
+          className="gap-2 text-sm font-semibold"
+          crumbs={[{ label: 'Dashboard', href: routes.dashboard(exam.slug) }, { label }]}
+          separator={<ChevronRight aria-hidden className="text-foreground-subtle size-4" />}
+          renderCrumb={(crumb, { last }) =>
+            last ? (
+              <span aria-current="page" className="text-foreground-subtle">
+                {crumb.label}
+              </span>
+            ) : (
+              <Link href={crumb.href!} className="text-brand">
+                {crumb.label}
+              </Link>
+            )
+          }
+        />
+      </div>
     </div>
   );
 }

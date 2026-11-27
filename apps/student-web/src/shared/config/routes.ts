@@ -55,6 +55,12 @@ export const routes = {
     `/${exam}/learn/${courseId}/${moduleId}${tab ? `?tab=${tab}` : ''}`,
   lecture: (exam: string, courseId: string | number, moduleId: string | number, lectureId: string | number) =>
     `/${exam}/learn/${courseId}/${moduleId}/lecture/${lectureId}`,
+  /**
+   * The page before a course assessment's test (board): mid-term / final sets, or quiz / unit test details and
+   * submissions. `type` is the assessment type (quiz, unit_test, mid_term_exam, final_exam), as in the previous app's URL.
+   */
+  courseAssessment: (exam: string, courseId: string | number, type: string, assessmentId: string | number) =>
+    `/${exam}/learn/${courseId}/assessments/${type}/${assessmentId}`,
   chapterPyqs: (exam: string, courseId: string | number, moduleId: string | number) =>
     `/${exam}/learn/${courseId}/${moduleId}/pyqs`,
   ncertQuestions: (exam: string, courseId: string | number, moduleId: string | number) =>

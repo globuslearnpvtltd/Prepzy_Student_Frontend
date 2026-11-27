@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { routes } from '@/shared/config/routes';
 import { useExam } from '@/shared/hooks/use-exam';
+import { useMediaQuery } from '@/shared/hooks/use-media-query';
 import { notesApi, pdfDownloadUrl, type ChapterNotes } from '../api';
 import { prepareNotes, type NoteSection } from '../document';
 import { NotesContent } from './notes-content';
@@ -143,14 +144,24 @@ function DownloadButton({ note }: { note: ChapterNotes }) {
   );
 }
 
-function VideoCard({ note }: { note: ChapterNotes }) {
+/**
+ * The chapter's summary video. `row` (under the notes, below xl): picture beside the text; `stacked` (xl, above "On
+ * this page"): picture on top. The picture is the book's cover, else the video's own thumbnail.
+ */
+function VideoCard({ note, layout = 'row', className }: { note: ChapterNotes; layout?: 'row' | 'stacked'; className?: string }) {
   const exam = useExam();
   const ready = note.videoReady && !!note.noteId;
+  const picture = note.courseImage ?? note.thumbnail;
+  const stacked = layout === 'stacked';
   const content = (
     <>
       <span
-        className="bg-brand-100 relative flex aspect-video w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-cover bg-center md:w-[160px]"
-        style={note.thumbnail ? { backgroundImage: `url(${note.thumbnail})` } : undefined}
+        className={cx(
+          'bg-brand-100 relative flex aspect-video shrink-0 items-center justify-center overflow-hidden rounded-lg bg-center bg-no-repeat',
+          note.courseImage ? 'bg-contain' : 'bg-cover',
+          stacked ? 'w-full' : 'w-[120px] md:w-[160px]',
+        )}
+        style={picture ? { backgroundImage: `url(${picture})` } : undefined}
       >
         <span className="bg-night-950/25 absolute inset-0" />
         {ready ? (
@@ -165,12 +176,18 @@ function VideoCard({ note }: { note: ChapterNotes }) {
       </span>
       <span className="flex min-w-0 flex-col gap-1">
         <span className="text-brand text-[11px] font-semibold tracking-wide uppercase">Summary video</span>
-        <span className="text-[14px] leading-5 font-semibold text-neutral-900 md:text-[15px]">{note.moduleName} Summary Video</span>
+        <span className={cx('leading-5 font-semibold text-neutral-900', stacked ? 'text-[14px]' : 'text-[14px] md:text-[15px]')}>
+          {note.moduleName} Summary Video
+        </span>
         <span className="text-neutral-550 text-[12px] leading-4">Complete explanation with examples</span>
       </span>
     </>
   );
-  const box = 'bg-surface border-learn-line flex items-center gap-4 rounded-2xl border p-3 md:p-4';
+  const box = cx(
+    'bg-surface border-learn-line flex rounded-2xl border',
+    stacked ? 'flex-col gap-3 p-3' : 'items-center gap-4 p-3 md:p-4',
+    className,
+  );
   return ready ? (
     <Link href={routes.summaryVideo(exam.slug, note.noteId)} className={cx(box, 'hover:border-brand-200 hover:shadow-card transition-shadow')}>
       {content}
@@ -216,6 +233,8 @@ function SectionIndex({ sections, active, onSelect }: { sections: NoteSection[];
  */
 export function NotesViewScreen({ courseId }: { courseId: string }) {
   const exam = useExam();
+  // xl: the summary video sits above "On this page" on the right; narrower, under the notes.
+  const wide = useMediaQuery('(min-width: 80rem)');
   const searchParams = useSearchParams();
   const linkedModule = searchParams.get('module_id');
   const query = useQuery({ queryKey: ['notes', 'course', courseId], queryFn: () => notesApi.courseNotes(courseId) });
@@ -380,7 +399,7 @@ export function NotesViewScreen({ courseId }: { courseId: string }) {
                   )}
                 </article>
 
-                <VideoCard note={active} />
+                {!wide && <VideoCard note={active} />}
 
                 <nav
                   aria-label="Chapter navigation"
@@ -394,10 +413,11 @@ export function NotesViewScreen({ courseId }: { courseId: string }) {
           )}
         </div>
 
-        {/* Index (xl+) */}
-        {hasIndex && (
-          <div className="sticky top-[100px] hidden max-h-[calc(100dvh-124px)] overflow-y-auto pb-4 xl:block">
-            <SectionIndex sections={doc.sections} active={activeSection} onSelect={goToSection} />
+                {/* Summary video and index (xl+) */}
+        {(hasIndex || (wide && active && !query.isPending)) && (
+          <div className="sticky top-[100px] hidden max-h-[calc(100dvh-124px)] flex-col gap-6 overflow-y-auto pb-4 xl:flex">
+            {wide && active && !query.isPending && <VideoCard key={active.moduleId} note={active} layout="stacked" />}
+            {hasIndex && <SectionIndex sections={doc.sections} active={activeSection} onSelect={goToSection} />}
           </div>
         )}
       </div>

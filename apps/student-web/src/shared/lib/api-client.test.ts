@@ -5,7 +5,7 @@ import { ApiError, userMessage } from './errors';
 import { assertOk, unwrapData } from './unwrap';
 
 describe('apiClient', () => {
-  it('sends cookies, query params and only CORS-allowed headers, and returns the JSON body', async () => {
+  it('sends cookies, query params, the site environment and only CORS-allowed headers, and returns the JSON body', async () => {
     let seen: Request | undefined;
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     server.use(
@@ -19,10 +19,12 @@ describe('apiClient', () => {
     });
     expect(new URL(seen!.url).searchParams.get('class_id')).toBe('12');
     expect(new URL(seen!.url).searchParams.has('empty')).toBe(false);
-    // The backend's CORS policy only allows Content-Type and Authorization; any other custom header
-    // makes browsers block every request (this broke login once).
-    const sentHeaders = Object.keys((fetchSpy.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>);
-    expect(sentHeaders.filter((h) => !['accept', 'content-type', 'authorization'].includes(h.toLowerCase()))).toEqual([]);
+    // Only headers the backend's CORS policy allows (src/config/cors.ts); any other makes the browser block the
+    // request. X-Prepzy-Env names the session cookies after this website's environment.
+    const sentHeaders = (fetchSpy.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>;
+    const allowed = ['accept', 'content-type', 'authorization', 'x-request-id', 'x-prepzy-env'];
+    expect(Object.keys(sentHeaders).filter((h) => !allowed.includes(h.toLowerCase()))).toEqual([]);
+    expect(sentHeaders['X-Prepzy-Env']).toBe('test');
     expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ credentials: 'include' });
     fetchSpy.mockRestore();
   });

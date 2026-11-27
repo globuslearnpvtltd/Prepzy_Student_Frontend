@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Loader2, Pause, Play, Square, X } from 'lucide-react';
+import { Check, Loader2, Pause, Play, X } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   formatClock,
@@ -128,7 +128,9 @@ function ReviewChatPanel({ context, onClose }: { context: ReviewContext; onClose
     if (saved) markHistoryLoaded?.();
   }, [saved, markHistoryLoaded]);
 
+  // One question at a time: while Vedica's answer is on the way nothing can ask the next one (no Stop button).
   const ask = (text: string, image: File | null = null) => {
+    if (chat.streaming) return;
     audio.stop();
     voice?.dismissSummary();
     void chat.ask(text, image);
@@ -270,11 +272,6 @@ function ReviewChatPanel({ context, onClose }: { context: ReviewContext; onClose
               </button>
             </div>
           )}
-          {chat.streaming && (
-            <button type="button" onClick={chat.stop} className="text-brand mx-auto mb-2 flex items-center gap-1.5 text-[12px] font-semibold">
-              <Square aria-hidden className="size-3" /> Stop
-            </button>
-          )}
           <Composer
             placeholder="Ask Vedica about this question…"
             onSend={ask}
@@ -287,8 +284,10 @@ function ReviewChatPanel({ context, onClose }: { context: ReviewContext; onClose
                 <button
                   type="button"
                   onClick={voice.isActive ? voice.openScreen : talkLive}
+                  // a live talk is another way to ask: not while an answer is on the way
+                  disabled={chat.streaming && !voice.isActive}
                   aria-label={voice.isActive ? 'Open live talk with Vedica' : 'Talk live with Vedica'}
-                  className={talkLiveButton('h-[30px] pr-3 pl-1 text-[12px]')}
+                  className={talkLiveButton('h-[30px] pr-3 pl-1 text-[12px] disabled:cursor-not-allowed disabled:opacity-50')}
                 >
                   <LiveWaveIcon live={voice.isActive} />
                   <span className="whitespace-nowrap tabular-nums">{voice.isActive ? `Live ${formatClock(voice.elapsed)}` : 'Talk live'}</span>

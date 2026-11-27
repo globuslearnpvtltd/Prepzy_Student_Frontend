@@ -41,7 +41,9 @@ const EXPORT_PADDING = 20;
 const EXPORT_MAX_SIDE = 2048;
 /** Dark ink and white paper for the exported image (design tokens, not the theme). */
 export const EXPORT_INK = colorValue('neutral.950');
-const EXPORT_PAPER = colorValue('neutral.0');
+/** White paper: the exported image and the pad itself (painted, so the pad never shows a black canvas). */
+export const PAPER = colorValue('neutral.0');
+const EXPORT_PAPER = PAPER;
 const UNDO_LIMIT = 200;
 
 const widthAt = (stroke: InkStroke, p: number) =>
@@ -253,9 +255,17 @@ export class InkDoc {
 
   // ------------------------------------------------------------------ painting
 
-  /** Repaint the whole sheet. `ctx` must already be scaled to CSS pixels. */
-  paint(ctx: CanvasRenderingContext2D, width: number, height: number, color: string): void {
-    ctx.clearRect(0, 0, width, height);
+  /**
+   * Repaint the whole sheet. `ctx` must already be scaled to CSS pixels. With `paper` the sheet is filled with it
+   * instead of cleared (the pad's opaque canvas would otherwise show black where nothing is drawn).
+   */
+  paint(ctx: CanvasRenderingContext2D, width: number, height: number, color: string, paper?: string): void {
+    if (paper) {
+      ctx.fillStyle = paper;
+      ctx.fillRect(0, 0, width, height);
+    } else {
+      ctx.clearRect(0, 0, width, height);
+    }
     prepare(ctx, color);
     for (const stroke of this.strokes) paintStroke(ctx, stroke);
   }

@@ -54,9 +54,22 @@ export const authApi = {
     assertOk(await apiClient.post<Envelope<null>>(`${AUTH}/verify-otp`, { phone, otp }));
   },
 
-  /** Sets the session cookies and returns the student. */
-  async verifyLoginOtp(phone: string, otp: string, fingerprint: string): Promise<Student> {
-    const body = await apiClient.post<Envelope<unknown>>(`${AUTH}/verify-login-otp`, { phone, otp, fingerprint });
+  /**
+   * Sets the session cookies and returns the student. `logoutAllDevices` (after a 403 MAX_LOGIN_SESSIONS, same OTP)
+   * ends every session of the account first.
+   */
+  async verifyLoginOtp(
+    phone: string,
+    otp: string,
+    fingerprint: string,
+    { logoutAllDevices = false }: { logoutAllDevices?: boolean } = {},
+  ): Promise<Student> {
+    const body = await apiClient.post<Envelope<unknown>>(`${AUTH}/verify-login-otp`, {
+      phone,
+      otp,
+      fingerprint,
+      ...(logoutAllDevices ? { logout_all_devices: true } : {}),
+    });
     return toStudent(unwrapData(body));
   },
 

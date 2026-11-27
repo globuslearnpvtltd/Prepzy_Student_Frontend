@@ -179,6 +179,26 @@ describe('board dashboard (CBSE)', () => {
     expect(await screen.findAllByText('Your Data will appear here!')).toHaveLength(1);
   });
 
+  it('re-reads Continue Learning every time the dashboard opens (progress changes on other pages)', async () => {
+    server.use(...boardHandlers());
+    const { queryClient, rerender } = renderWithProviders(<Dashboard />, { exam: cbse });
+    expect(await screen.findByText('Electrostatics')).toBeInTheDocument();
+    // The app caches queries for a minute; this list must not wait for that.
+    queryClient.setDefaultOptions({ queries: { ...queryClient.getDefaultOptions().queries, staleTime: 60_000 } });
+
+    server.use(
+      http.get(`${API}/api/v4/dashboard/board/1/classes/12/continue-courses`, () =>
+        HttpResponse.json({
+          success: true,
+          data: { courses: [{ course_id: 6, course_name: 'Optics', class_name: 'CLASS 12', subject_name: 'PHYSICS', progress_percentage: 10 }] },
+        }),
+      ),
+    );
+    rerender(<></>);
+    rerender(<Dashboard />);
+    expect(await screen.findByText('Optics')).toBeInTheDocument();
+  });
+
   it('offers an upgrade on the Basic plan', async () => {
     server.use(plan(12, { duration_months: 0 }), ...boardHandlers());
     renderWithProviders(<Dashboard />, { exam: cbse });

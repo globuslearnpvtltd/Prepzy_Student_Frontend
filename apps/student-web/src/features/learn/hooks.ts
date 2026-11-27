@@ -15,6 +15,7 @@ export const learnKeys = {
   outline: (courseId: string) => ['learn', 'outline', courseId] as const,
   module: (courseId: string, moduleId: string) => ['learn', 'module', courseId, moduleId] as const,
   pyqs: (moduleId: string) => ['learn', 'pyqs', moduleId] as const,
+  courseAssessment: (exam: string, assessmentId: string) => ['learn', 'course-assessment', exam, assessmentId] as const,
   pyqAttempts: (moduleId: string) => ['learn', 'pyq-attempts', moduleId] as const,
   ncert: (moduleId: string) => ['learn', 'ncert', moduleId] as const,
   ncertCount: (moduleId: string) => ['learn', 'ncert-count', moduleId] as const,

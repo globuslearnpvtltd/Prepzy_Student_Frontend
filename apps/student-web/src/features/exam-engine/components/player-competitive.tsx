@@ -11,6 +11,7 @@ import { formatDuration } from '../hooks';
 import type { ExamPlayerLayout } from './player-types';
 import { QuestionGrid, StatusLegend, TEST_LEGEND } from './question-palette';
 import { QuestionView } from './question-view';
+import { CrumbTrail } from '@/shared/ui/crumb-trail';
 
 const pill = 'h-10 rounded-full px-6 text-sm font-semibold transition-colors disabled:opacity-50';
 const card = 'bg-surface rounded-2xl border border-neutral-100 shadow-sm';
@@ -47,27 +48,35 @@ export function CompetitiveBreadcrumb({
         <span className="sr-only lg:hidden">Back</span>
       </button>
       <div className={cx(card, 'flex min-h-[68px] min-w-0 flex-1 items-center gap-4 px-4')}>
-        <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
-          <ol className="flex items-center gap-2 text-sm font-semibold">
-            <li>
-              <Link href={routes.dashboard(exam.slug)} className="text-brand flex items-center">
-                <House aria-hidden className="size-5 lg:hidden" />
-                <span className="hidden lg:inline">Dashboard</span>
-                <span className="sr-only lg:hidden">Dashboard</span>
+        <CrumbTrail
+          outerClassName="flex-1"
+          className="gap-2 text-sm font-semibold"
+          crumbs={[
+            { label: 'Dashboard', href: routes.dashboard(exam.slug) },
+            { label: home.label, href: home.href },
+            { label: current },
+          ]}
+          separator={<ChevronRight aria-hidden className="text-foreground-subtle size-4 shrink-0" />}
+          renderCrumb={(crumb, { index, last }) =>
+            last ? (
+              <span aria-current="page" className="text-foreground-subtle">
+                {crumb.label}
+              </span>
+            ) : (
+              <Link href={crumb.href!} className="text-brand flex items-center">
+                {index === 0 ? (
+                  <>
+                    <House aria-hidden className="size-5 lg:hidden" />
+                    <span className="hidden lg:inline">{crumb.label}</span>
+                    <span className="sr-only lg:hidden">{crumb.label}</span>
+                  </>
+                ) : (
+                  crumb.label
+                )}
               </Link>
-            </li>
-            <ChevronRight aria-hidden className="text-foreground-subtle size-4 shrink-0" />
-            <li className="truncate">
-              <Link href={home.href} className="text-brand">
-                {home.label}
-              </Link>
-            </li>
-            <ChevronRight aria-hidden className="text-foreground-subtle size-4 shrink-0" />
-            <li aria-current="page" className="text-foreground-subtle truncate">
-              {current}
-            </li>
-          </ol>
-        </nav>
+            )
+          }
+        />
         {children && <div className="hidden items-center gap-6 lg:flex">{children}</div>}
       </div>
     </div>

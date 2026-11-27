@@ -7,6 +7,15 @@ import { routes } from '@/shared/config/routes';
 import { useOptionalExam } from '@/shared/hooks/use-exam';
 import { onApiEvent } from '@/shared/lib/api-client';
 
+/**
+ * App-wide dialogs (plan limit, session expired) open over everything, chat panels and live talk included (those go up
+ * to z-index 130; the shared Dialog's own 50 / 51 put this one behind an open chatbot), with the page behind blurred.
+ */
+export const TOP_DIALOG = {
+  overlayClassName: 'z-[200] backdrop-blur-sm',
+  className: 'z-[201]',
+} as const;
+
 /** Shown whenever the backend reports a plan usage limit (HTTP 429). */
 export function LimitDialog() {
   const exam = useOptionalExam();
@@ -22,7 +31,7 @@ export function LimitDialog() {
 
   return (
     <Dialog open={message !== null} onOpenChange={(open) => !open && setMessage(null)}>
-      <DialogContent>
+      <DialogContent overlayClassName={TOP_DIALOG.overlayClassName} className={TOP_DIALOG.className}>
         <DialogTitle>Limit reached</DialogTitle>
         <DialogDescription>{message}</DialogDescription>
         <DialogFooter>

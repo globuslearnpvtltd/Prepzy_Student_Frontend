@@ -1,4 +1,4 @@
-import { dashboardApiBase, LEARN_API, learnApiBase, type ExamRef } from '@/shared/config/exams';
+import { assessmentsApiBase, dashboardApiBase, LEARN_API, learnApiBase, type ExamRef } from '@/shared/config/exams';
 import type { TestTypeKey } from '@/shared/config/exams';
 import { routes } from '@/shared/config/routes';
 import { apiClient } from '@/shared/lib/api-client';
@@ -102,13 +102,20 @@ const ASSESSMENT_LABELS: Record<string, string> = {
 
 export const assessmentLabel = (type: string | null | undefined) => (type && ASSESSMENT_LABELS[type]) || 'Assessment';
 
-/** Where an activity opens: lectures in the lecture player, assessments in the exam engine. */
+/** The course assessment types with a page before their test (`routes.courseAssessment`). */
+export const isCourseAssessmentType = (type: string | null | undefined): type is string => assessmentTestType(type) !== null;
+
+/**
+ * Where an activity opens: lectures in the lecture player; course assessments (quiz, unit test, mid-term, final) on
+ * their page before the test, which lists the sets / submissions and starts the player (previous app's flow).
+ */
 export function activityHref(exam: string, courseId: string, activity: Activity): string {
   if (activity.category === 'lecture') {
     return routes.lecture(exam, courseId, activity.moduleId ?? '0', activity.id);
   }
-  const testType = assessmentTestType(activity.type);
-  return testType ? routes.testPlayer(exam, testType, activity.id) : routes.assessments(exam);
+  return isCourseAssessmentType(activity.type)
+    ? routes.courseAssessment(exam, courseId, activity.type, activity.id)
+    : routes.assessments(exam);
 }
 
 /* -------------------------------- learn page -------------------------------- */
@@ -365,7 +372,141 @@ export interface ChapterAttempt {
   date: string | null;
 }
 
+/* ------------------------- course assessment (before the test) ------------------------- */
+
+/** One submitted attempt of a course assessment (or of a mid-term / final set). */
+export interface CourseAttempt {
+  attemptId: string;
+  attemptNumber: number;
+  date: string | null;
+  totalQuestions: number;
+  totalMarks: number;
+  marksObtained: number;
+}
+
+export interface CourseExamSection {
+  type: string;
+  marks: number;
+  count: number;
+}
+
+/** A mid-term / final set: what the paper holds and what the student did in it. */
+export interface CourseExamSet {
+  setId: string;
+  setNumber: string;
+  /** The set's own duration text; null when the set has none. */
+  duration: string | null;
+  /** Minutes the player allows. */
+  timeLimitMinutes: number | null;
+  totalQuestions: number;
+  sectionCount: number;
+  sections: CourseExamSection[];
+  /** A session is open: the player resumes it. */
+  inProgress: boolean;
+  /** Newest first. */
+  attempts: CourseAttempt[];
+}
+
+export interface CourseAssessmentDetail {
+  id: string;
+  type: string;
+  title: string;
+  instructions: string | null;
+  courseId: string;
+  subjectName: string | null;
+  moduleId: string | null;
+}
+
+interface CourseAssessmentBase {
+  assessment: CourseAssessmentDetail;
+  previous: Activity | null;
+  next: Activity | null;
+}
+
+export type CourseAssessmentOverview =
+  | (CourseAssessmentBase & { kind: 'sets'; testType: Extract<TestTypeKey, 'mid' | 'final'>; sets: CourseExamSet[] })
+  | (CourseAssessmentBase & {
+      kind: 'quiz';
+      testType: Extract<TestTypeKey, 'quiz'>;
+      totalQuestions: number;
+      inProgress: boolean;
+      /** Newest first. */
+      submissions: CourseAttempt[];
+    });
+
+const toCourseAttempt = (raw: Raw): CourseAttempt => ({
+  attemptId: id(raw.attempt_id),
+  attemptNumber: toNumber(raw.attempt_number),
+  date: text(raw.attempt_date),
+  totalQuestions: toNumber(raw.total_questions),
+  totalMarks: toNumber(raw.total_marks),
+  marksObtained: toNumber(raw.total_marks_obtained),
+});
+
+/** An attempt as the "Your attempts" drawer shows it ("72%"). */
+export const toChapterAttempt = (attempt: CourseAttempt): ChapterAttempt => ({
+  attemptId: attempt.attemptId,
+  attemptNumber: attempt.attemptNumber,
+  score: `${Math.round(attempt.totalMarks > 0 ? (attempt.marksObtained / attempt.totalMarks) * 100 : 0)}%`,
+  date: attempt.date,
+});
+
+function toCourseAssessment(data: Raw): CourseAssessmentOverview {
+  const a = asObject(data.assessment);
+  const base: CourseAssessmentBase = {
+    assessment: {
+      id: id(a.assessment_id),
+      type: text(a.assessment_type) ?? '',
+      title: text(a.title) ?? '',
+      instructions: text(a.instructions),
+      courseId: id(a.course_id),
+      subjectName: text(a.subject_name),
+      moduleId: a.module_id === null || a.module_id === undefined ? null : id(a.module_id),
+    },
+    previous: toActivity(data.previous),
+    next: toActivity(data.next),
+  };
+  if (data.test_type === 'mid' || data.test_type === 'final') {
+    return {
+      ...base,
+      kind: 'sets',
+      testType: data.test_type,
+      sets: toArray(data.sets).map((set) => ({
+        setId: id(set.set_id),
+        setNumber: text(set.set_number) ?? '',
+        duration: text(set.duration),
+        timeLimitMinutes: set.time_limit_minutes === null || set.time_limit_minutes === undefined ? null : toNumber(set.time_limit_minutes),
+        totalQuestions: toNumber(set.total_questions),
+        sectionCount: toNumber(set.question_sections),
+        sections: toArray(set.sections).map((section) => ({
+          type: text(section.question_type) ?? '',
+          marks: toNumber(section.marks_per_question),
+          count: toNumber(section.questions_count),
+        })),
+        inProgress: set.in_progress === true,
+        attempts: toArray(set.attempts).map(toCourseAttempt),
+      })),
+    };
+  }
+  return {
+    ...base,
+    kind: 'quiz',
+    testType: 'quiz',
+    totalQuestions: toNumber(data.total_questions),
+    inProgress: data.in_progress === true,
+    submissions: toArray(data.submissions).map(toCourseAttempt),
+  };
+}
+
 export const learnApi = {
+  /** A board course assessment with its sets (mid-term / final) or its details and submissions (quiz / unit test). */
+  async courseAssessment(exam: ExamRef, assessmentId: string): Promise<CourseAssessmentOverview> {
+    const body = assertOk(
+      await apiClient.get<Envelope<Raw>>(`${assessmentsApiBase(exam)}/course-assessments/${assessmentId}`),
+    );
+    return toCourseAssessment(asObject(body.data));
+  },
+
   async chapterPyqAttempts(moduleId: string): Promise<ChapterAttempt[]> {
     const body = assertOk(await apiClient.get<Envelope<{ attempts?: Raw[] }>>(`${LEARN_API}/modules/${moduleId}/pyq-attempts`));
     return (body.data?.attempts ?? []).map((s) => ({

@@ -40,7 +40,8 @@ describe('notes api', () => {
   it('normalises notes, topics and video links', async () => {
     expect(toTopics('bad')).toEqual([]);
     expect(toTopics([{ anchor_id: 'a', topic: 'A' }, { topic: 'no anchor' }])).toEqual([{ anchorId: 'a', topic: 'A' }]);
-    expect(toChapterNotes(note({ student_note_active: 0, notes_pdf: 'null' }))).toMatchObject({ notesReady: false, pdf: null, topics: [{ anchorId: 't1' }] });
+    expect(toChapterNotes(note({ student_note_active: 0, notes_pdf: 'null' }))).toMatchObject({ notesReady: false, pdf: null, topics: [{ anchorId: 't1' }], courseImage: null });
+    expect(toChapterNotes(note({ course_image: 'https://cdn.test/book.webp' })).courseImage).toBe('https://cdn.test/book.webp');
     expect(toVideoUrl('[{"language":"english","link":"https://v.test/a.mp4"}]')).toBe('https://v.test/a.mp4');
     expect(toVideoUrl('https://v.test/b.mp4')).toBe('https://v.test/b.mp4');
     expect(toVideoUrl([])).toBeNull();
@@ -253,6 +254,22 @@ describe('Notes view', () => {
     server.use(http.get(`${API}/api/v4/notes/courses/5`, () => ok({ notes: [] })));
     renderWithProviders(<NotesViewScreen courseId="5" />, { exam: cbse });
     expect((await screen.findAllByText('No Chapters To Show...')).length).toBeGreaterThan(0);
+  });
+
+  it('shows the summary video with the book cover, above "On this page" on wide screens', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }));
+    server.use(http.get(`${API}/api/v4/notes/courses/5`, () => ok({ notes: [note({ course_image: 'https://cdn.test/science.webp', video_thumbnail: 'https://cdn.test/thumb.png' })] })));
+    try {
+      renderWithProviders(<NotesViewScreen courseId="5" />, { exam: cbse });
+      const card = await screen.findByRole('link', { name: /Light Summary Video/ });
+      expect(screen.getAllByRole('link', { name: /Light Summary Video/ })).toHaveLength(1);
+      expect(card.firstElementChild).toHaveStyle({ backgroundImage: 'url(https://cdn.test/science.webp)' });
+      const index = screen.getByRole('navigation', { name: 'Chapter contents' });
+      expect(card.parentElement).toBe(index.parentElement);
+      expect(card.compareDocumentPosition(index) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

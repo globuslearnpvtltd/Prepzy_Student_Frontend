@@ -48,7 +48,7 @@ export function ReportProblem({ questionId, questionHtml }: { questionId: string
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-[640px]">
-          <DialogTitle className="text-info-600 text-center">Report a Problem !</DialogTitle>
+          <DialogTitle className="text-brand-600 text-center">Report a Problem !</DialogTitle>
           <DialogDescription className="text-foreground text-center">
             Notice something wrong or confusing? Tell us about the issue so we can improve your learning experience.
           </DialogDescription>
@@ -64,7 +64,7 @@ export function ReportProblem({ questionId, questionHtml }: { questionId: string
                   type="button"
                   aria-pressed={section === s}
                   onClick={() => setSection(s)}
-                  className={cx('rounded-full border px-3 py-1.5 text-xs', section === s ? 'border-info-600 bg-info-50' : 'border-border')}
+                  className={cx('rounded-full border px-3 py-1.5 text-xs', section === s ? 'border-brand-600 bg-brand-75' : 'border-border')}
                 >
                   {s}
                 </button>

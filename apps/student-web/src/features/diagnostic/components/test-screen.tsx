@@ -13,7 +13,6 @@ import { routes } from '@/shared/config/routes';
 import { subjectLabel } from '@/shared/layout/shell-api';
 import { isApiError, userMessage } from '@/shared/lib/errors';
 import { CompetitiveEvaluating } from './competitive-evaluating';
-import { CompetitiveScoreCard } from './competitive-score-card';
 import { attemptReducer, diagnosticApi, formatClock, isCase, statusCounts, type AttemptAction, type DiagnosticQuestion, type QuestionStatus } from '../api';
 
 const SAVE_DELAY = 2000;
@@ -383,7 +382,7 @@ function Evaluating({ onDone }: { onDone: () => void }) {
 export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string }) {
   const exam = useExam();
   const examRef = useMemo(() => ({ category: exam.category, examId: exam.examId }), [exam.category, exam.examId]);
-  // Competitive exams show a score card after evaluating; board exams go straight to the report.
+  // Competitive exams use their own evaluating screen; both then go straight to the report.
   const competitive = exam.category === 'competitive';
   const router = useRouter();
   const session = useQuery({
@@ -457,20 +456,10 @@ export function DiagnosticTestScreen({ assessmentId }: { assessmentId: string })
 
   const [animationDone, setAnimationDone] = useState(false);
   const finishAnimation = useCallback(() => setAnimationDone(true), []);
+  // Once evaluating finishes (and the submit succeeded), go straight to the report ("Your Learning Profile").
   useEffect(() => {
-    if (animationDone && submit.isSuccess && !competitive) router.replace(resultHref);
-  }, [animationDone, submit.isSuccess, router, resultHref, competitive]);
-
-  if (competitive && animationDone && submit.data)
-    return (
-      <div className="flex min-h-[calc(100dvh-76px)] w-full items-center justify-center p-6 md:p-8">
-        <CompetitiveScoreCard
-          summary={submit.data}
-          onContinue={() => router.replace(resultHref)}
-          onReview={() => router.replace(routes.diagnosticSolutions(exam.slug, assessmentId))}
-        />
-      </div>
-    );
+    if (animationDone && submit.isSuccess) router.replace(resultHref);
+  }, [animationDone, submit.isSuccess, router, resultHref]);
 
   if (session.isError && !(isApiError(session.error) && session.error.status === 400))
     return <Notice tone="danger" title="Couldn't load this test" body={userMessage(session.error, 'Something went wrong while loading the test.')} action={{ label: 'Go back', href: routes.dashboard(exam.slug) }} />;
